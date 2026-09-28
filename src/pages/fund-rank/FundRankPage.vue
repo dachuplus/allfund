@@ -680,15 +680,25 @@ async function fetchCategories() {
     t0List.value = Object.values(t0Merged).sort((a, b) => b.cnt - a.cnt)
     t0RawMap.value = Object.fromEntries(Object.entries(rawMap).map(([k, v]) => [k, [...v]]))
 
-    // 二级分类按归一化后的一级分类分组
+    // 二级分类按归一化后的一级分类分组，并按 t1_tt 合并计数
+    // （防御上游脏数据：同一 t1_tt 在多个原始 t0 下出现时，会被 normT0 合并到同一 t0Key，
+    //   但 t1Arr 仍按原始 t0 分组，导致同名二级分类重复出现；此处按 t1_tt 聚合避免重复）
     const map = {}
     for (const x of t1Arr) {
       if (!x.t1_tt) continue
       const t0Key = normT0(x.t0)
-      if (!map[t0Key]) map[t0Key] = []
-      map[t0Key].push({ value: x.t1_tt, label: x.t1_tt, cnt: x.cnt })
+      if (!map[t0Key]) map[t0Key] = {}
+      const bucket = map[t0Key]
+      if (!bucket[x.t1_tt]) {
+        bucket[x.t1_tt] = { value: x.t1_tt, label: x.t1_tt, cnt: 0 }
+      }
+      bucket[x.t1_tt].cnt += x.cnt
     }
-    t1Map.value = map
+    const merged = {}
+    for (const [k, v] of Object.entries(map)) {
+      merged[k] = Object.values(v).sort((a, b) => b.cnt - a.cnt)
+    }
+    t1Map.value = merged
   } catch (e) {
     console.error('[fund-rank] fetchCategories error', e)
   } finally {

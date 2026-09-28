@@ -181,10 +181,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.1</strong></td>
+              <td><strong>v4.0.2</strong></td>
+              <td>2026-09-28</td>
+              <td><code>待部署后回填</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.1</td>
               <td>2026-09-24</td>
               <td><code>337e165c</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0</td>
@@ -201,7 +207,22 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.1 · 2026-09-24（当前线上）</div>
+        <div class="vd-title">v4.0.2 · 2026-09-28（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.2</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me 生产环境（部署 ID 见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.1 → v4.0.2）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>基金分类脏数据修复</strong>：生产 <code>fund_scores</code> 中 7 条 <code>t0</code> 带「基金」后缀（股票型基金 / 混合型基金 / 债券型基金）归一化为标准 7 大类；其中 1 只 <code>t1_tt='指数型-股票'</code> 误归股票型的基金（安信量化沪深300增强Y）改归<strong>指数型</strong>一级分类。</li>
+              <li><strong>FundRankPage 二级分类去重</strong>：<code>fetchCategories()</code> 构建 <code>t1Map</code> 时按 <code>t1_tt</code> 合并计数，防止上游脏数据导致同一二级分类在筛选时重复出现（如两个「债券型-混合二级」）。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.1 · 2026-09-24（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.1</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp2xbjlgftxt</code>（入口 chunk 名随构建变化，详见线上 version.json hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>337e165c9c454114e399c724d935af854576a75c</code></span></div>
