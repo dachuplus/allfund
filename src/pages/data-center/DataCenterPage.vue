@@ -181,10 +181,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.3</strong></td>
+              <td><strong>v4.0.4</strong></td>
+              <td>2026-09-29</td>
+              <td><code>待部署后回填</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.3</td>
               <td>2026-09-28</td>
               <td><code>c14647bc</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.2</td>
@@ -213,7 +219,22 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.3 · 2026-09-28（当前线上）</div>
+        <div class="vd-title">v4.0.4 · 2026-09-29（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.4</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me 生产环境（部署 ID 见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.3 → v4.0.4）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>热门板块关联基金修复（HotTags.vue · loadTagFunds）</strong>：<code>fund_scores</code> 表无 <code>date</code> 列，原代码 <code>.select('c,n,fund_manager,r1y,k1,fund_scale,date')</code> 触发 Postgres <code>42703 column does not exist</code>，导致补充经理/规模/收益的查询返回 400。已移除 <code>date</code> 列与 <code>nav_date</code> 兜底赋值，弹窗改由 <code>fundMetaUpdateTime</code> / 标签 <code>updated_at</code> 兜底「截止时间」。</li>
+              <li><strong>附带说明（运行态阻塞，非本修复范围）</strong>：部署当下 Supabase 新加坡实例连接池吃紧，代理 <code>/api/sb-proxy</code> 8s 上游上限被触发返回 502，<code>fund_tag_funds</code> 与 <code>fund_scores</code> 两条查询均超时。代码层修复已就位，但需数据库侧恢复/扩容后弹窗方能正常显示关联基金。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.3 · 2026-09-28（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.3</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpyvkr9te4w8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>c14647bc306b049cd44d3f3ad50a705ce7859029</code></span></div>

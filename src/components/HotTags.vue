@@ -901,7 +901,7 @@ async function loadTagFunds(tag) {
     const codesWithOF = allMapCodes.map(c => c.endsWith('.OF') ? c : c + '.OF')
     const { data: scores } = await supabase
       .from('fund_scores')
-      .select('c,n,fund_manager,r1y,k1,fund_scale,date')
+      .select('c,n,fund_manager,r1y,k1,fund_scale')
       .in('c', [...allMapCodes, ...codesWithOF])
     const scoreMap = {}
     if (scores) {
@@ -951,7 +951,7 @@ async function loadTagFunds(tag) {
         r1y: sc.r1y ?? m.syl_1n,  // fund_scores优先，否则用东财近1年收益
         fund_manager: sc.fund_manager || m.fund_manager || '',  // 统一从 fund_scores 取经理（已含场内 ETF/LOF）；fund_tag_funds 仅作兜底
         fund_scale: sc.fund_scale,
-        nav_date: sc.date || '',  // fund_scores 的净值日期，作为底部「截止时间」的兜底来源
+        nav_date: '',  // fund_scores 无净值日期列，底部「截止时间」改由 fundMetaUpdateTime / 标签 updated_at 兜底
         _ftype: m.fund_type,
       }
     })
