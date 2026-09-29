@@ -183,7 +183,7 @@
             <tr>
               <td><strong>v4.0.4</strong></td>
               <td>2026-09-29</td>
-              <td><code>待部署后回填</code></td>
+              <td><code>890a2a06</code></td>
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
@@ -221,8 +221,8 @@
 
         <div class="vd-title">v4.0.4 · 2026-09-29（当前线上）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.4</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me 生产环境（部署 ID 见线上 <code>version.json</code> hash）</span></div>
-        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpnl6up7919x</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>890a2a0650b6b02cfddd776b70fc5daad6549f10</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.3 → v4.0.4）</span></div>
         <div class="vd-row">
           <span class="vd-key">主要变更</span>
