@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.7</strong></td>
+              <td><strong>v4.0.8</strong></td>
+              <td>2026-09-30</td>
+              <td><code>1ad95337</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.7</td>
               <td>2026-09-30</td>
               <td><code>8594d2bf</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.6</td>
@@ -243,7 +249,22 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.7 · 2026-09-30（当前线上）</div>
+        <div class="vd-title">v4.0.8 · 2026-09-30（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.8</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpe120o3rde8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>1ad953371b5545774ef1fca5f40c7d3ed93e837a</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.7 → v4.0.8）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>删除无引用的 <code>MobileTabBar.vue</code> 组件</strong>：v4.0.7 去掉底部 TabBar 后该组件已无任何引用，本次彻底删除源文件。因该组件从未被 import，构建产物<strong>逐字节不变</strong>（入口 chunk 名与 md5 均与 v4.0.7 一致），属仓库清理，无任何线上可见变化。</li>
+              <li><strong>修复推送脚本的删除支持</strong>：<code>scripts/push_files_explicit.py</code> 的 <code>local_file_set()</code> 会把「本地已删除但仍在 <code>git status</code> 中出现的路径」当作本地文件，随后 <code>open()</code> 抛 <code>FileNotFoundError</code>，导致<strong>删除永远推不上 GitHub</strong>。现改为只收「磁盘上真实存在」的文件，并显式跳过删除态（<code>D</code>）、正确处理重命名（<code>R</code>）。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.7 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.7</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp5jmyz9q4l0</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>8594d2bf208e48ea65c3dfa12fcfe140b4c43e3e</code></span></div>
