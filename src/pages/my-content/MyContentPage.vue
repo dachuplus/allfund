@@ -141,7 +141,7 @@ import { FILM_RANK, FILM_DIMS } from '../../data/filmRank.js'
 import { SH_RESTAURANTS, CHEF_DIMS } from '../../data/shRestaurants.js'
 import { SH_RESTAURANTS_EXTRA } from '../../data/shRestaurantsExtra.js'
 import { MUST_EAT_SHANGHAI, MUST_EAT_SOURCES } from '../../data/mustEatShanghai.js'
-import { listArticles, deleteArticle, setArticlePinned, NETWORK_SLOW_MSG, isNetworkError } from '../../api/articles'
+import { listArticles, deleteArticle, setArticlePinned, NETWORK_SLOW_MSG, isNetworkError, toErrorMessage } from '../../api/articles'
 import { confirm, toast } from '../../composables/useToast'
 
 /**
@@ -219,7 +219,7 @@ async function load() {
       articles.value = await listArticles({ status: 'published', limit: 200, category: cat })
     }
   } catch (e) {
-    const msg = (e && e.message) || String(e)
+    const msg = toErrorMessage(e)
     // 瞬时网络故障（504/超时/断网等）→ 统一提示
     if (msg === NETWORK_SLOW_MSG || isNetworkError(e)) {
       loadError.value = '网络速度慢，请稍后再试。'
@@ -250,7 +250,7 @@ async function onDelete(a) {
     toast('已删除', 'success')
     await load()
   } catch (e) {
-    toast('删除失败：' + (e.message || e), 'error')
+    toast('删除失败：' + toErrorMessage(e), 'error')
   }
 }
 
@@ -270,7 +270,7 @@ async function onTogglePin(a) {
     articles.value = list
     toast(target ? '已置顶' : '已取消置顶', 'success')
   } catch (e) {
-    toast('操作失败：' + (e.message || e), 'error')
+    toast('操作失败：' + toErrorMessage(e), 'error')
   }
 }
 

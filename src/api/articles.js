@@ -79,14 +79,34 @@ async function withRetry(fn, maxAttempts, onRetry) {
 export const NETWORK_SLOW_MSG = '网络速度慢，请稍后再试。'
 
 /**
- * 判断错误是否为瞬时网络类故障（边缘函数 502/504、请求超时、断网等）。
+ * 把任意错误形态归一为可读文本，杜绝 [object Object] 这类不可读文案。
+ * 覆盖：Error / {error:'...'} / {error:{message:'...'}} / 字符串 / fetch Response / 其他。
+ */
+export function toErrorMessage(e) {
+  if (!e) return '未知错误'
+  if (typeof e === 'string') return e
+  if (e.message) return String(e.message)
+  if (typeof e.error === 'string') return e.error
+  if (e.error && typeof e.error === 'string') return e.error
+  if (e.error && e.error.message) return String(e.error.message)
+  if (e.statusText) return String(e.statusText)
+  if (typeof e.toString === 'function') {
+    const s = e.toString()
+    if (s && s !== '[object Object]') return s
+  }
+  try { return JSON.stringify(e) } catch { return '未知错误' }
+}
+
+/**
+ * 判断错误是否为瞬时网络类故障（边缘函数 502/504、上游中断、请求超时、断网等）。
  * 命中后统一提示「网络速度慢，请稍后再试。」。
  */
 export function isNetworkError(e) {
-  const msg = (e && (e.message || (e.error && e.error.message))) || String(e || '')
+  const msg = toErrorMessage(e)
   return (
     msg.indexOf('504') !== -1 ||
     msg.indexOf('502') !== -1 ||
+    msg.indexOf('upstream') !== -1 ||
     msg.indexOf('超时') !== -1 ||
     msg.indexOf('timeout') !== -1 ||
     msg.indexOf('Failed to fetch') !== -1 ||
@@ -154,11 +174,11 @@ export async function listArticles({ status = 'published', authorEmail = null, l
     return cached.slice(0, limit)
   }
 
-  // ===== 2. 已发布全量列表：部署时预生成的静态 JSON（毫秒级 CDN 返回） =====
-  //    仅对公开首屏（status=published + 无作者/标签/分类过滤）启用。EdgeOne→Supabase 链路偶发 10-16s
-  //    慢速时，这个静态文件是用户的救命稻草 —— 部署一次（CI 每日 21:30 或手动）即生效。
-  //    注意：指定了分类过滤时跳过此快路径，直接走下方 Supabase 精确过滤。
-  if (status === 'published' && !authorEmail && !tag && !hasCat && offset === 0) {
+  // ===== 2. 已发布公开列表：部署时预生成的静态 JSON（毫秒级 CDN 返回） =====
+  //    适用于「已发布 + 无作者/标签过滤」的所有视图，含按分类查看（如博客页）。
+  //    静态文件含 category 字段，按分类在客户端过滤即可，无需精确回源 Supabase。
+  //    EdgeOne→Supabase 链路偶发 10-16s 慢速时，这个静态文件是用户的救命稻草。
+  if (status === 'published' && !authorEmail && !tag && offset === 0) {
     try {
       const staticRes = await fetch('/articles-list.json?t=' + Date.now(), {
         headers: { Accept: 'application/json' },
@@ -166,10 +186,14 @@ export async function listArticles({ status = 'published', authorEmail = null, l
       if (staticRes.ok) {
         const payload = await staticRes.json()
         if (payload && Array.isArray(payload.articles) && payload.articles.length) {
-          writeCache(ck, payload.articles)
-          // 后台静默刷新（让本地缓存与服务端/边缘函数/Supabase 一致，对未发布新文章也能尽快同步）
-          refreshListInBackground({ status, authorEmail, limit, tag }, ck)
-          return payload.articles.slice(0, limit)
+          let list = payload.articles
+          if (hasCat) list = list.filter((a) => a.category === category)
+          if (list.length) {
+            writeCache(ck, list)
+            // 后台静默刷新（让本地缓存与服务端/边缘函数/Supabase 一致）
+            refreshListInBackground({ status, authorEmail, limit, tag, category }, ck)
+            return list.slice(0, limit)
+          }
         }
       }
       // 静态文件不存在/格式异常 → 走边缘函数
@@ -178,6 +202,7 @@ export async function listArticles({ status = 'published', authorEmail = null, l
     }
 
     // ===== 3. 同域边缘函数（EdgeOne 境外节点就近回源，15s 内超时即走兜底） =====
+    //    /api/articles 返回全量已发布文章（含 category），客户端按分类过滤。
     try {
       const res = await Promise.race([
         fetch('/api/articles', { headers: { Accept: 'application/json' } }),
@@ -186,8 +211,12 @@ export async function listArticles({ status = 'published', authorEmail = null, l
       if (res.ok) {
         const data = await res.json()
         if (Array.isArray(data) && data.length) {
-          if (offset === 0) writeCache(ck, data)
-          return data.slice(0, limit)
+          let list = data
+          if (hasCat) list = list.filter((a) => a.category === category)
+          if (list.length) {
+            if (offset === 0) writeCache(ck, list)
+            return list.slice(0, limit)
+          }
         }
       }
       // 502 / 空数组 → 走下方直连兜底

@@ -193,9 +193,9 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.5</strong></td>
+              <td><strong>v4.0.6</strong></td>
               <td>2026-09-30</td>
-              <td><code>eacca2dc</code></td>
+              <td><code>待部署后回填</code></td>
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
@@ -237,16 +237,18 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.5 · 2026-09-30（当前线上）</div>
-        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.5</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpih0ed8iams</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
-        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>eacca2dc8d17660955da34e633a0acc5a0e1d17a</code></span></div>
-        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">若干 commit（v4.0.4 → v4.0.5）</span></div>
+        <div class="vd-title">v4.0.6 · 2026-09-30（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.6</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>待部署后回填</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">若干 commit（v4.0.4 → v4.0.6）</span></div>
         <div class="vd-row">
           <span class="vd-key">主要变更</span>
           <span class="vd-val">
             <ol class="vd-list">
               <li><strong>管理 tab 子 tab 拆分</strong>：在「管理」下新增「项目简介」「评分模型」两个并列子 tab，与既有的「用户管理」「数据下载」并列。将「项目简介」与「数据接口文档」两块内容迁移至「项目简介」tab；将「评分方法论」迁移至「评分模型」tab。导航区四按钮（用户管理 / 数据下载 / 项目简介 / 评分模型）通过 <code>activeTab</code> 的 <code>users / download / intro / scoring</code> 四态切换对应内容卡片（<code>v-show</code>）。</li>
+              <li><strong>修复「想法 → 博客」加载失败显示 <code>[object Object]</code></strong>：博客列表因带 <code>category</code> 过滤跳过静态 <code>/articles-list.json</code> 快路径，直接回源 Supabase，回源失败时错误对象 <code>{error:'upstream error'}</code> 被 <code>String()</code> 渲染成 <code>[object Object]</code>。现改为：①带分类的公开列表优先走静态 JSON + 客户端按 <code>category</code> 过滤（毫秒级 CDN 兜底）；②新增 <code>toErrorMessage()</code> 归一化任意错误形态，杜绝不可读文案；③<code>isNetworkError()</code> 识别 <code>{error:'…'}</code> 扁平对象，瞬时故障统一提示「网络速度慢，请稍后再试。」。</li>
+              <li><strong>一并落地本地累积改动</strong>：SignalPage 宏观指标列表优化、FundRankPage 移动端修复、HotTags 适配 gov.uk 风格、部署/推送脚本可移植化（去除 <code>/Users/maoshanbo</code> 绝对路径，改为按 <code>$HOME</code> 解析）。</li>
             </ol>
           </span>
         </div>
