@@ -50,8 +50,8 @@
 
     <!-- 已登录且有权限：完整应用 -->
     <div v-else class="app-layout">
-    <!-- PC 端顶部导航 -->
-    <header class="govuk-header" v-if="!isMobile">
+    <!-- 顶部导航（PC / 移动端统一；移动端不再使用底部 TabBar） -->
+    <header class="govuk-header">
       <div class="govuk-header__container">
         <div class="govuk-header__logo">
           <router-link to="/" class="govuk-header__logotype-text" style="text-decoration:none;color:#fff">靠谱指数 · 量化研究</router-link>
@@ -89,15 +89,6 @@
       </div>
     </header>
 
-    <!-- 移动端返回/标题 -->
-    <header class="mobile-header" v-if="isMobile && showBack">
-      <button class="mobile-header__back" @click="router.back()" aria-label="返回">
-        ← 返回
-      </button>
-      <span class="mobile-header__title">{{ pageTitle }}</span>
-      <span class="mobile-header__spacer"></span>
-    </header>
-
     <!-- 主内容区 -->
     <main class="app-main" :class="{ 'pc-main': !isMobile }">
       <div v-if="!routeAllowed" class="no-feature-access">
@@ -123,9 +114,6 @@
       </footer>
     </main>
 
-    <!-- 移动端底部 TabBar -->
-    <MobileTabBar v-if="isMobile" />
-
     <!-- 全局通知与对话框 -->
     <Toast />
     <ConfirmDialog />
@@ -143,7 +131,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import MobileTabBar from './components/MobileTabBar.vue'
 import Toast from './components/Toast.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LoginDialog from './components/LoginDialog.vue'
@@ -309,21 +296,6 @@ const currentFeatureLabel = computed(() => {
   return f ? f.label : ''
 })
 
-/* ---- Tab 数据（仅移动端 TabBar 使用）---- */
-const tabs = [
-  { key: 'home',      path: '/',                 label: '首页',  feature: null },
-  { key: 'content',   path: '/content',          label: '想法',  feature: 'content' },
-  { key: 'signal',    path: '/signal',           label: '策略',  feature: 'signal' },
-  { key: 'fundrank',  path: '/tools/fund-rank',  label: '选品',  feature: 'fund-rank' },
-  { key: 'portfolio', path: '/portfolio',        label: '组合',  feature: 'portfolio' },
-  { key: 'profile',   path: '/profile',          label: '我的',  feature: null },
-]
-
-const pageTitle = computed(() => route.meta?.title || '投资助手')
-const showBack  = computed(() => {
-  const tabPaths = tabs.map(t => t.path)
-  return !tabPaths.includes(route.path)
-})
 </script>
 
 <style scoped>
@@ -456,7 +428,38 @@ const showBack  = computed(() => {
   border-bottom-color: #ffffff;
 }
 
-/* ========== 移动端标题栏 ========== */
+/* ========== 移动端：顶部导航换行布局 ========== */
+/* 移动端不再有底部 TabBar，与 PC 一致使用顶部导航；窄屏下「logo + 个人中心」一行、导航项换行到第二行 */
+@media (max-width: 768px) {
+  .govuk-header__container {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 14px 0;
+  }
+  .govuk-header__logo {
+    order: 1;
+    margin-right: 0;
+  }
+  .govuk-header__logotype-text {
+    font-size: 19px;
+  }
+  .govuk-header__content {
+    order: 2;
+    margin-left: auto;
+  }
+  .govuk-header__nav {
+    order: 3;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .govuk-header__nav-item {
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+}
+
+/* ========== 移动端标题栏（样式保留，模板已不再渲染） ========== */
 .mobile-header {
   display: flex;
   align-items: center;
@@ -491,7 +494,7 @@ const showBack  = computed(() => {
 .app-main {
   flex: 1;
   padding: var(--space-md);
-  padding-bottom: calc(var(--tab-height) + var(--space-md));
+  padding-bottom: var(--space-md);
 }
 .pc-main {
   padding: var(--space-xl) 30px;

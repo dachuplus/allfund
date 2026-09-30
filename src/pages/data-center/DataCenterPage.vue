@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.6</strong></td>
+              <td><strong>v4.0.7</strong></td>
+              <td>2026-09-30</td>
+              <td><code>待部署后回填</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.6</td>
               <td>2026-09-30</td>
               <td><code>0e472750</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.4</td>
@@ -237,7 +243,21 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.6 · 2026-09-30（当前线上）</div>
+        <div class="vd-title">v4.0.7 · 2026-09-30（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.7</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>待部署后回填</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.6 → v4.0.7）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>移动端顶部导航统一（去掉底部 TabBar）</strong>：移除移动端底部 <code>MobileTabBar</code>，移动端与 PC 一致使用顶部 <code>govuk-header</code> 导航；同时去掉移动端专属的「返回/标题」栏（<code>mobile-header</code>）。窄屏（≤768px）下顶部导航改为换行布局：第一行「logo + 个人中心」，第二行导航项（想法 / 策略 / 选品 / 组合 / 管理）自动换行；并移除原先为底部 TabBar 预留的 <code>--tab-height</code> 底部内边距。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.6 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.6</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpid29i5x6ih</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>0e472750d54882df20011b128f9c2dcfd9571bc3</code></span></div>
