@@ -92,19 +92,33 @@ def _git(*args):
 
 
 def local_file_set():
-    """本地应纳入的文件集合（相对仓库根）：已跟踪 + 未跟踪且未被忽略。"""
+    """本地应纳入的文件集合（相对仓库根）：已跟踪 + 未跟踪且未被忽略。
+
+    ⚠️ 只收「磁盘上真实存在」的文件——否则本地已删除（git rm / rm）但仍出现在
+    git status 里的路径会被误当成本地文件，后续 open() 直接 FileNotFoundError，
+    导致删除永远推不上去。
+    """
     files = set()
-    # 已跟踪
+
+    def _add(rel):
+        rel = rel.strip()
+        if rel and os.path.isfile(os.path.join(ROOT, rel)):
+            files.add(rel)
+
+    # 已跟踪（索引）
     for p in _git("ls-files").splitlines():
-        if p.strip():
-            files.add(p.strip())
+        _add(p)
     # 未跟踪且未被忽略（git status 已按 .gitignore 过滤；!! 为被忽略，跳过）
     for line in _git("status", "--porcelain", "--untracked-files=all").splitlines():
         st = line[:2]
         path = line[3:].strip()
         if not path or st == "!!":
             continue
-        files.add(path)
+        if "D" in st:                       # 已删除（索引 D/ 或工作树 /D）→ 不纳入
+            continue
+        if st[:1] == "R" and " -> " in path:  # 重命名：取新名
+            path = path.split(" -> ", 1)[1].strip()
+        _add(path)
     return files
 
 
