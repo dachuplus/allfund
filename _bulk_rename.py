@@ -2,7 +2,7 @@
 # Bulk rename ALLFUND -> ALLFUND (safe strings only; email-domain lines handled manually elsewhere)
 import os, io
 
-ROOT = "/Users/maoshanbo/WorkBuddy/20260405093252/dachu"
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Files containing 'ALLFUND' (non-dist), excluding the 4 email-domain files we edit manually
 # and excluding already-deleted files (build-miniprogram.yml, mp-permissions, migration-to-miniprogram.md).

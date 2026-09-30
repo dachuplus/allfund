@@ -22,8 +22,8 @@ if [ -f .env.local ]; then
 fi
 
 # 定位 edgeone CLI（沙箱未加入 PATH，使用受管 node 工作区中的副本）
-NODE_BIN="$(command -v node || echo '/Users/maoshanbo/.workbuddy/binaries/node/versions/22.22.2-2/bin/node')"
-EDGEONE_BIN="${EDGEONE_BIN:-$(find /Users/maoshanbo/.workbuddy/binaries/node/workspace/node_modules/edgeone -name edgeone.js -path '*edgeone-bin*' 2>/dev/null | head -1)}"
+NODE_BIN="$(command -v node || find "$HOME/.workbuddy/binaries/node/versions" -name node -type f 2>/dev/null | head -1)"
+EDGEONE_BIN="${EDGEONE_BIN:-$(find "$HOME/.workbuddy/binaries/node/workspace/node_modules/edgeone" -name edgeone.js -path '*edgeone-bin*' 2>/dev/null | head -1)}"
 if [ -z "$EDGEONE_BIN" ]; then
   echo "未找到 edgeone CLI（bin），请确认已安装" >&2
   exit 1
@@ -36,13 +36,19 @@ if [ -n "$TOKEN" ]; then
   USE_TOKEN_FLAG="-t $TOKEN"
 fi
 
+# 定位 Python（优先项目 venv，含 requests 等依赖；venv 不存在时回退 PATH 中的 python3）
+PY_BIN="$HOME/.workbuddy/binaries/python/envs/default/bin/python"
+if [ ! -x "$PY_BIN" ]; then
+  PY_BIN="$(command -v python3 || echo python3)"
+fi
+
 echo "==> 1/4 构建前端 (vite build)"
 npm run build
 
 echo "==> 1.5/4 导出已发布文章静态列表 (public/articles-list.json)"
 # 部署时把已发布文章烘焙成静态 JSON，CDN 毫秒级返回，绕开 EdgeOne→Supabase 偶发慢链。
 # 失败不阻断部署（运行时仍有边缘函数兜底），但打印原因以便发现连接问题。
-if /Users/maoshanbo/.workbuddy/binaries/python/envs/default/bin/python scripts/export_articles_list.py 2>&1; then
+if "$PY_BIN" scripts/export_articles_list.py 2>&1; then
   echo "已更新 public/articles-list.json"
 else
   echo "⚠️ 静态文章列表导出失败，继续部署（运行时仍有边缘函数兜底）"
@@ -87,7 +93,7 @@ echo "==> 3.7/4 往 dist/index.html 注入版本探测 inline script（独立于
 # 检测到 hash 变化就 window.location.reload() → 浏览器强制拉新 chunk。
 # 解决「旧 chunk 没有新版检测逻辑 → 永远不 reload → 永远不换 chunk」的死循环。
 # 用同步 XMLHttpRequest（XHR synchronous）让 reload 命令在 chunk 加载前就发出。
-/Users/maoshanbo/.workbuddy/binaries/python/versions/3.14.3/bin/python3 - <<'PY'
+"$PY_BIN" - <<'PY'
 import re, sys
 path = 'dist/index.html'
 with open(path, 'r', encoding='utf-8') as f:
