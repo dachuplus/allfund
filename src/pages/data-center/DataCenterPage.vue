@@ -28,6 +28,18 @@
           :class="{ 'mgmt-tab--active': activeTab === 'download' }"
           @click="activeTab = 'download'"
         >数据下载</button>
+        <button
+          type="button"
+          class="mgmt-tab"
+          :class="{ 'mgmt-tab--active': activeTab === 'intro' }"
+          @click="activeTab = 'intro'"
+        >项目简介</button>
+        <button
+          type="button"
+          class="mgmt-tab"
+          :class="{ 'mgmt-tab--active': activeTab === 'scoring' }"
+          @click="activeTab = 'scoring'"
+        >评分模型</button>
       </div>
     </div>
 
@@ -115,7 +127,7 @@
     </div>
 
     <!-- 项目简介 -->
-    <div class="card" v-show="activeTab==='download'">
+    <div class="card" v-show="activeTab==='intro'">
       <div class="card-title">项目简介 · ALLFUND</div>
       <p class="section-desc">本页面与整个 ALLFUND 项目均托管于 GitHub，可依据本文档从零重新搭建网站。以下为项目全貌，供二次开发与部署参考。</p>
       <div class="intro-grid">
@@ -181,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.4</strong></td>
+              <td><strong>v4.0.5</strong></td>
+              <td>2026-09-30</td>
+              <td><code>待部署后回填</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.4</td>
               <td>2026-09-29</td>
               <td><code>890a2a06</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.3</td>
@@ -219,7 +237,21 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.4 · 2026-09-29（当前线上）</div>
+        <div class="vd-title">v4.0.5 · 2026-09-30（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.5</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>待部署后回填</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>待部署后回填</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">若干 commit（v4.0.4 → v4.0.5）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>管理 tab 子 tab 拆分</strong>：在「管理」下新增「项目简介」「评分模型」两个并列子 tab，与既有的「用户管理」「数据下载」并列。将「项目简介」与「数据接口文档」两块内容迁移至「项目简介」tab；将「评分方法论」迁移至「评分模型」tab。导航区四按钮（用户管理 / 数据下载 / 项目简介 / 评分模型）通过 <code>activeTab</code> 的 <code>users / download / intro / scoring</code> 四态切换对应内容卡片（<code>v-show</code>）。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.4 · 2026-09-29（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.4</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpnl6up7919x</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>890a2a0650b6b02cfddd776b70fc5daad6549f10</code></span></div>
@@ -706,7 +738,7 @@
     </div>
 
     <!-- 评分方法论 -->
-    <div class="card" v-show="activeTab==='download'">
+    <div class="card" v-show="activeTab==='scoring'">
       <div class="card-title">评分方法论 — V7 靠谱指数算法</div>
       <p class="section-desc">ALLFUND 的"靠谱指数"（k_all）是对全市场基金进行量化评分的核心指标。以下详细说明从原始数据到最终评分的完整计算过程。</p>
 
@@ -897,7 +929,7 @@
     </div>
 
     <!-- API 接口文档 -->
-    <div class="card" v-show="activeTab==='download'">
+    <div class="card" v-show="activeTab==='intro'">
       <div class="card-title">数据接口文档</div>
       <p class="section-desc">以下是 本站 使用的所有外部数据接口，所有接口均来源于公开数据平台。</p>
 
@@ -1443,7 +1475,7 @@ async function toggleFeature(key, open) {
   }
 }
 
-// 管理中心 tab：'download' 数据下载 / 'users' 用户管理
+// 管理中心 tab：'users' 用户管理 / 'download' 数据下载 / 'intro' 项目简介 / 'scoring' 评分模型
 const activeTab = ref('users')
 
 // 权限申请（陌生人 → 管理员审批）
@@ -2885,7 +2917,7 @@ watch(isOwner, (val) => {
   margin: 0 0 var(--space-md);
 }
 .mgmt-tabs {
-  display: flex; gap: 0;
+  display: flex; flex-wrap: wrap; gap: 0;
   border-bottom: 2px solid var(--border);
 }
 .mgmt-tab {
