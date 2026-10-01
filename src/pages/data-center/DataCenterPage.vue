@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.8</strong></td>
+              <td><strong>v4.0.9</strong></td>
+              <td>2026-10-01</td>
+              <td><code>84cb531b</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.8</td>
               <td>2026-09-30</td>
               <td><code>1ad95337</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.7</td>
@@ -249,7 +255,24 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.8 · 2026-09-30（当前线上）</div>
+        <div class="vd-title">v4.0.9 · 2026-10-01（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.9</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dphayvc0ok7f</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>84cb531bd9feafe8924a3cfd1d541710c3c8dd9b</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.8 → v4.0.9）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>「更多筛选」份额新增「主代码」选项</strong>：此前份额只能按 A/B/C/D/E/F/H/I/R/T/Y 类后缀筛选，<strong>只有一个份额、名称无类别字母的基金无法被筛出</strong>。现新增「主代码」（名称末位既非份额字母、也非 ETF/LOF/FOF/QDII/REIT 产品类型后缀），全市场命中约 2168 只。</li>
+              <li><strong>「更多筛选」新增「持有期」筛选</strong>：支持 30天 / 60天 / 90天 / 120天 / 180天 / 1年 / 2年 / 3年 / 5年 共 9 档。数据库<strong>无持有期字段</strong>，改为按基金名称中的持有期字样（如「30天」「1个月」「一年」「三个月」）归类；数字型词前要求边界（避免「210天」被「10天」误命中），中文型词不加前导边界（否则「养老目标2060五年持有」会被误排除）。</li>
+              <li><strong>两项筛选均下推到服务端（PostgREST regex <code>match</code>）</strong>：因为列表查询不带 <code>count=exact</code>（会触发 <code>57014</code> statement timeout），前端总数恒为 <code>null</code> 并以已加载条数兜底，<strong>若只在客户端过滤会导致首页命中数偏少、翻页计数与列表不一致</strong>。两个 <code>n=match.</code> 条件在服务端为 AND 关系（如「主代码 ∩ 30天持有」→ 2 只）。</li>
+              <li>同步更新弹窗内「筛选说明」文案，明确持有期口径基于基金名称识别。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.8 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.8</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpe120o3rde8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>1ad953371b5545774ef1fca5f40c7d3ed93e837a</code></span></div>
