@@ -65,13 +65,13 @@
               <span class="more-modal-close" @click="cancelMoreFilter">&#x2715;</span>
             </div>
             <div class="more-modal-body">
-              <!-- 份额类别 -->
+              <!-- 份额类别（多选） -->
               <div class="filter-row">
                 <span class="filter-label">份额</span>
                 <div class="filter-chips">
-                  <div class="filter-chip" :class="{ active: filterSC === '' }" @click="mToggleSC('')">全部</div>
-                  <div class="filter-chip" :class="{ active: filterSC === 'MAIN' }" @click="mToggleSC('MAIN')">主代码</div>
-                  <div v-for="sc in shareClassOptions" :key="sc" class="filter-chip" :class="{ active: filterSC === sc }" @click="mToggleSC(sc)">{{ sc }}类</div>
+                  <div class="filter-chip" :class="{ active: filterSC.length === 0 }" @click="filterSC = []">全部</div>
+                  <div class="filter-chip" :class="{ active: filterSC.includes('MAIN') }" @click="mToggleSC('MAIN')">主代码</div>
+                  <div v-for="sc in shareClassOptions" :key="sc" class="filter-chip" :class="{ active: filterSC.includes(sc) }" @click="mToggleSC(sc)">{{ sc }}类</div>
                 </div>
               </div>
 
@@ -125,12 +125,12 @@
                 </div>
               </div>
 
-              <!-- 持有期（按基金名称中的持有期字样筛选） -->
+              <!-- 持有期（多选，按基金名称中的持有期字样筛选） -->
               <div class="filter-row">
                 <span class="filter-label">持有期</span>
                 <div class="filter-chips">
-                  <div class="filter-chip" :class="{ active: filterHolding === '' }" @click="mToggleHolding('')">全部</div>
-                  <div v-for="h in HOLDING_PERIOD_OPTIONS" :key="h" class="filter-chip" :class="{ active: filterHolding === h }" @click="mToggleHolding(h)">{{ h }}</div>
+                  <div class="filter-chip" :class="{ active: filterHolding.length === 0 }" @click="filterHolding = []">全部</div>
+                  <div v-for="h in HOLDING_PERIOD_OPTIONS" :key="h" class="filter-chip" :class="{ active: filterHolding.includes(h) }" @click="mToggleHolding(h)">{{ h }}</div>
                 </div>
               </div>
 
@@ -154,14 +154,20 @@
                 </div>
               </div>
 
-              <!-- 基金规模区间（亿元）：预设选择或自定义 -->
+              <!-- 基金规模区间（亿元）：多选预设，或自定义区间 -->
               <div class="filter-row">
                 <span class="filter-label">规模</span>
                 <div class="filter-scale-presets">
-                  <div v-for="p in SCALE_PRESETS" :key="p.key" class="filter-chip" :class="{ active: scalePreset === p.key }" @click="pickScalePreset(p.key)">{{ p.label }}</div>
+                  <div
+                    v-for="p in SCALE_PRESETS"
+                    :key="p.key"
+                    class="filter-chip"
+                    :class="{ active: isScaleActive(p.key) }"
+                    @click="pickScalePreset(p.key)"
+                  >{{ p.label }}</div>
                 </div>
               </div>
-              <div class="filter-row" v-if="scalePreset === 'custom'">
+              <div class="filter-row" v-if="scaleCustom">
                 <span class="filter-label">自定义</span>
                 <div class="filter-scale-range">
                   <input type="number" class="scale-input" v-model="filterScaleMin" placeholder="最小" @input="onScaleInput" @keyup.enter="applyMoreFilters" />
@@ -173,7 +179,7 @@
 
               <!-- 筛选说明 -->
               <div class="filter-tip">
-                注：ETF/LOF/定开/申购状态/单日涨跌基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。<br>
+                注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。ETF/LOF/定开/申购状态/单日涨跌基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
                 机构占比、股票占比数据暂未收录，后续版本更新。
               </div>
             </div>
@@ -731,8 +737,8 @@ const filterT1 = ref('')
 
 // 更多筛选
 const showMoreFilter = ref(false)
-const filterSC = ref('')       // 份额：''全部 | 'MAIN'主代码 | 份额字母 A/B/C/...
-const filterHolding = ref('')  // 持有期：''全部 | 30天/60天/90天/120天/180天/1年/2年/3年/5年
+const filterSC = ref([])       // 份额（多选）：可含 'MAIN' 主代码 与 份额字母 A/B/C/...（空数组=全部）
+const filterHolding = ref([])  // 持有期（多选）：可含 '无限制' 与 7天/30天/…/5年（空数组=全部）
 const filterETF = ref('')
 const filterLOF = ref('')
 const filterFOF = ref('')
@@ -740,9 +746,10 @@ const filterCN = ref('')       // 场内：''全部 '1'是(ETF/LOF/REITs不计�
 const filterDK = ref('')
 const filterDailyLimit = ref('')
 const filterSG = ref('')       // 申购状态：''全部 '1'可申购 '0'暂停申购
-const filterScaleMin = ref('')  // 基金规模区间（亿元）最小值
-const filterScaleMax = ref('')  // 基金规模区间（亿元）最大值
-const scalePreset = ref('all')  // 规模预设：all/gt2/2to5/5to10/10to20/20to50/50to100/gt100/custom
+const filterScaleMin = ref('')  // 基金规模区间（亿元）自定义最小值
+const filterScaleMax = ref('')  // 基金规模区间（亿元）自定义最大值
+const scalePicks = ref([])      // 规模预设（多选）：gt2/2to5/5to10/10to20/20to50/50to100/gt100（空数组=全部）
+const scaleCustom = ref(false)  // 规模自定义区间开关（与预设多选互斥）
 const SCALE_PRESETS = [
   { key: 'all',     label: '全部',      min: '',   max: '' },
   { key: 'gt2',     label: '大于2亿',   min: 2,    max: '' },
@@ -754,6 +761,28 @@ const SCALE_PRESETS = [
   { key: 'gt100',   label: '100亿以上', min: 100,  max: '' },
   { key: 'custom',  label: '自定义',    min: null, max: null },
 ]
+
+/** 当前生效的规模区间列表（多选并集）；空数组 = 不做规模过滤 */
+const scaleRanges = computed(() => {
+  if (scaleCustom.value) {
+    const mn = filterScaleMin.value !== '' && filterScaleMin.value != null ? parseFloat(filterScaleMin.value) : null
+    const mx = filterScaleMax.value !== '' && filterScaleMax.value != null ? parseFloat(filterScaleMax.value) : null
+    if (mn == null && mx == null) return []
+    if (Number.isNaN(mn) || Number.isNaN(mx)) return []
+    return [[mn, mx]]
+  }
+  return scalePicks.value
+    .map(k => SCALE_PRESETS.find(p => p.key === k))
+    .filter(Boolean)
+    .map(p => [p.min === '' ? null : p.min, p.max === '' ? null : p.max])
+})
+
+/** 规模预设 chip 的选中态 */
+function isScaleActive(key) {
+  if (key === 'all') return scalePicks.value.length === 0 && !scaleCustom.value
+  if (key === 'custom') return scaleCustom.value
+  return scalePicks.value.includes(key)
+}
 
 // 评分指标权重（6项）
 const showScoreIndicator = ref(false)
@@ -942,7 +971,13 @@ function isExchangeListed(name) {
   return (name.includes('ETF') && !name.includes('ETF联接')) || name.includes('LOF') || name.includes('REIT')
 }
 
-/** 从基金名称提取份额类别字母，排除 ETF/LOF/FOF/QDII/REITs 等产品类型 */
+/**
+ * 从基金名称提取份额类别字母，排除 ETF/LOF/FOF/QDII/REITs 等产品类型。
+ *
+ * ⚠️ v4.0.11 起份额筛选（含多选）已改为**服务端 regex 下推**（见 `src/api/data.js` 的
+ * `shareClassFilter()`），本函数不再是筛选链路的一部分，保留作为该口径的参照实现 ——
+ * 两者已用 SQL 对 11 个档位全量核对，结果逐档一致（差值均为 0）。
+ */
 function extractShareClass(name) {
   if (!name) return ''
   let clean = name
@@ -1000,9 +1035,10 @@ async function loadData(reset = true, _retryCount = 0) {
       t0: t0Filter,
       t1: filterT1.value || undefined,
       search: buildSearchText(),
-      // 主代码：服务端按名称正则过滤（名称末位无份额字母），避免与客户端份额筛选重复
-      mainCode: filterSC.value === 'MAIN' ? '1' : undefined,
-      holding: filterHolding.value || undefined,
+      // 份额（多选，含「主代码」）：服务端按名称正则过滤（并集）
+      shareClasses: filterSC.value.length ? filterSC.value : undefined,
+      // 持有期（多选，含「无限制」）：服务端按名称正则过滤（并集）
+      holdingPeriods: filterHolding.value.length ? filterHolding.value : undefined,
       kKey: currentPeriod.value,
       sortAsc: sortAsc.value,
       page: page.value,
@@ -1012,8 +1048,8 @@ async function loadData(reset = true, _retryCount = 0) {
       dk: filterDK.value || undefined,
       sg: filterSG.value || undefined,
       dailyLimit: filterDailyLimit.value || undefined,
-      scaleMin: filterScaleMin.value !== '' ? parseFloat(filterScaleMin.value) : undefined,
-      scaleMax: filterScaleMax.value !== '' ? parseFloat(filterScaleMax.value) : undefined,
+      // 规模区间（多选并集）：服务端下推；单区间走 gte/lte，多区间走 or(and(...))
+      scaleRanges: scaleRanges.value.length ? scaleRanges.value : undefined,
       // 列排序（代码/简称/经理/规模/管理费/各阶段收益）：服务端在整个 fund_scores 表排序后分页返回
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
@@ -1022,10 +1058,8 @@ async function loadData(reset = true, _retryCount = 0) {
     if (result.data) {
       // 服务端过滤后的真实总数（已含 t0/t1/search 及下推的 ETF/LOF/定开/申购状态/±20%）
       if (result.count != null) totalCount.value = result.count
-      // 前端补充筛选（仅保留无法服务端下推的份额类别/场内，其余已在服务端过滤）
+      // 前端补充筛选：仅「场内」无法服务端下推（份额类别已改为服务端 regex 下推）
       let filtered = result.data
-      // 份额类别（名称末尾字母，排除产品类型关键词）；「主代码」已由服务端 regex 过滤，此处跳过
-      if (filterSC.value && filterSC.value !== 'MAIN') filtered = filtered.filter(f => extractShareClass(f.n) === filterSC.value)
       // 场内（ETF不含联接/LOF/REITs → 是；其余含ETF联接 → 否）
       if (filterCN.value === '1') filtered = filtered.filter(f => isExchangeListed(f.n))
       if (filterCN.value === '0') filtered = filtered.filter(f => !isExchangeListed(f.n))
@@ -1089,8 +1123,8 @@ function setT1(val) {
 
 /** 清除所有更多筛选条件 */
 function clearMoreFilters() {
-  filterSC.value = ''
-  filterHolding.value = ''
+  filterSC.value = []
+  filterHolding.value = []
   filterCN.value = ''
   filterETF.value = ''
   filterLOF.value = ''
@@ -1100,7 +1134,8 @@ function clearMoreFilters() {
   filterSG.value = ''
   filterScaleMin.value = ''
   filterScaleMax.value = ''
-  scalePreset.value = 'all'
+  scalePicks.value = []
+  scaleCustom.value = false
 }
 
 // ========== 更多筛选弹窗（确认后才查询，取消恢复） ==========
@@ -1108,18 +1143,18 @@ let moreFilterSnapshot = null
 
 function openMoreFilter() {
   moreFilterSnapshot = {
-    sc: filterSC.value, holding: filterHolding.value, etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value,
+    sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
-    sp: scalePreset.value,
+    sp: [...scalePicks.value], scu: scaleCustom.value,
   }
   showMoreFilter.value = true
 }
 
 function cancelMoreFilter() {
   if (moreFilterSnapshot) {
-    filterSC.value = moreFilterSnapshot.sc
-    filterHolding.value = moreFilterSnapshot.holding
+    filterSC.value = [...moreFilterSnapshot.sc]
+    filterHolding.value = [...moreFilterSnapshot.holding]
     filterETF.value = moreFilterSnapshot.etf
     filterLOF.value = moreFilterSnapshot.lof
     filterFOF.value = moreFilterSnapshot.fof
@@ -1131,7 +1166,8 @@ function cancelMoreFilter() {
     filterScaleMax.value = moreFilterSnapshot.smax
     filterT0.value = moreFilterSnapshot.t0
     filterT1.value = moreFilterSnapshot.t1
-    scalePreset.value = moreFilterSnapshot.sp
+    scalePicks.value = [...moreFilterSnapshot.sp]
+    scaleCustom.value = moreFilterSnapshot.scu
   }
   showMoreFilter.value = false
 }
@@ -1143,12 +1179,19 @@ function applyMoreFilters() {
 
 function resetMoreFilters() {
   clearMoreFilters()
-  scalePreset.value = 'all'
 }
 
-// 弹窗内筛选只改本地状态，确认后才查询
-function mToggleSC(val) { filterSC.value = filterSC.value === val ? '' : val }
-function mToggleHolding(val) { filterHolding.value = filterHolding.value === val ? '' : val }
+// 弹窗内筛选只改本地状态，确认后才查询（份额/持有期/规模为多选：同行内多选取并集）
+function mToggleSC(val) {
+  filterSC.value = filterSC.value.includes(val)
+    ? filterSC.value.filter(x => x !== val)
+    : filterSC.value.concat(val)
+}
+function mToggleHolding(val) {
+  filterHolding.value = filterHolding.value.includes(val)
+    ? filterHolding.value.filter(x => x !== val)
+    : filterHolding.value.concat(val)
+}
 function mToggleCN(val) { filterCN.value = filterCN.value === val ? '' : val }
 function mToggleSG(val) { filterSG.value = filterSG.value === val ? '' : val }
 function mToggleDailyLimit(val) { filterDailyLimit.value = filterDailyLimit.value === val ? '' : val }
@@ -1162,23 +1205,33 @@ function mToggleFlag(type, val) {
 }
 
 function pickScalePreset(key) {
-  scalePreset.value = key
-  if (key === 'custom') return
-  const p = SCALE_PRESETS.find(x => x.key === key)
-  if (!p) return
-  filterScaleMin.value = p.min
-  filterScaleMax.value = p.max
+  // 「全部」= 清空规模条件；「自定义」与预设多选互斥
+  if (key === 'all') {
+    scalePicks.value = []
+    scaleCustom.value = false
+    return
+  }
+  if (key === 'custom') {
+    scaleCustom.value = !scaleCustom.value
+    if (scaleCustom.value) scalePicks.value = []
+    return
+  }
+  scaleCustom.value = false
+  scalePicks.value = scalePicks.value.includes(key)
+    ? scalePicks.value.filter(x => x !== key)
+    : scalePicks.value.concat(key)
 }
 
 function onScaleInput() {
-  // 手动修改规模输入框视为自定义
-  scalePreset.value = 'custom'
+  // 手动修改规模输入框视为自定义区间（与预设多选互斥）
+  scaleCustom.value = true
+  scalePicks.value = []
 }
 
 const activeMoreFilterCount = computed(() => {
   let n = 0
-  if (filterSC.value) n++
-  if (filterHolding.value) n++
+  if (filterSC.value.length) n++
+  if (filterHolding.value.length) n++
   if (filterETF.value) n++
   if (filterLOF.value) n++
   if (filterFOF.value) n++
@@ -1186,8 +1239,7 @@ const activeMoreFilterCount = computed(() => {
   if (filterDK.value) n++
   if (filterDailyLimit.value) n++
   if (filterSG.value) n++
-  if (filterScaleMin.value !== '' && filterScaleMin.value != null) n++
-  if (filterScaleMax.value !== '' && filterScaleMax.value != null) n++
+  if (scaleRanges.value.length) n++
   return n
 })
 

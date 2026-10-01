@@ -216,15 +216,42 @@ export async function getCategoryRankInfoByScore(codes, scoreCol = 'k1') {
   }
 }
 
-// ========== 份额「主代码」与「持有期」筛选（服务端下推，regex） ==========
+// ========== 份额 / 持有期 / 规模的「多选」服务端下推 ==========
 // 之所以必须走服务端：fund_scores 查询不带 count='exact'（会触发 57014 statement timeout），
 // 前端 totalCount 恒为 null、仅以已加载条数兜底；任何「只在客户端筛」的条件都会
 // 让首页 1000 条里命中数严重偏少，且翻页时计数与列表不一致。
-//
-// 主代码：名称末位不是份额字母(A/B/C/D/E/F/H/I/R/T/Y)，也不是产品类型后缀(ETF/LOF/FOF/QDII/REIT)
-//   —— 用于筛出「只有一个份额、没有 A/B/C 类后缀」的基金（此前无法被份额筛选命中）。
+// 多选 = 同一筛选维度内取「并集」，只能用一个 regex（或一个 or 表达式）表达，故统一在服务端构造。
+
+// ---------- 份额 ----------
+export const SHARE_CLASS_MAIN = 'MAIN'          // 「主代码」档
+export const SHARE_CLASS_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'H', 'I', 'R', 'T', 'Y']
+// 产品类型后缀（ETF联接 必须排在 ETF 前，避免被误剥）
+const SHARE_PRODUCT_SUFFIX = '(ETF联接|ETF|LOF|FOF|QDII|REITs|REIT)$'
+// 主代码：名称末位不是份额字母，或名称本身就是产品类型后缀结尾
 export const MAIN_CODE_REGEX = '^(.*[^ABCDEFHIRTY]|.*(ETF|LOF|FOF|QDII|REIT))$'
 
+/**
+ * 份额多选 → 服务端过滤条件。
+ * 与前端原 extractShareClass() 判定**逐档完全一致**（已用 SQL 对 11 个档位全量核对，差值均为 0）：
+ *   字母档 = 名称末位为该字母 且 名称不以产品类型后缀结尾（否则 「XXETF」 会被误判成 F 类）。
+ * 返回 { match, notMatch }；notMatch 为 null 表示无需附加取反条件。返回 null 表示不做过滤。
+ */
+export function shareClassFilter(selected) {
+  if (!selected || !selected.length) return null
+  const hasMain = selected.includes(SHARE_CLASS_MAIN)
+  const letters = selected.filter(s => s !== SHARE_CLASS_MAIN && SHARE_CLASS_LETTERS.includes(s))
+  const parts = []
+  if (hasMain) parts.push('.*[^ABCDEFHIRTY]', '.*(ETF|LOF|FOF|QDII|REIT)')
+  if (letters.length) parts.push('.*(' + letters.join('|') + ')$')
+  if (!parts.length) return null
+  return {
+    match: '^(' + parts.join('|') + ')$',
+    // 仅选字母档时需要排除产品类型后缀结尾的名称；与「主代码」同选时无需（主代码分支已覆盖）
+    notMatch: hasMain ? null : SHARE_PRODUCT_SUFFIX,
+  }
+}
+
+// ---------- 持有期 ----------
 // 持有期：fund_scores 无该列，按基金名称中的持有期字样推导（与页面展示口径一致）。
 // 分词两类，处理边界差异：
 //   ① 数字型词（7天 / 30天 / 1个月 / 12个月…）：前面必须是行首或非数字，避免「210天」被「10天」误命中；
@@ -243,27 +270,65 @@ const HOLDING_PERIOD_TOKENS = {
   '5年':   { d: ['5年', '60个月'], c: ['五年'] },
 }
 
-// 「无限制」不是名称字段（全库 0 条名称含此词），而是「没有持有期条款」的口径：
-// 名称不含「持有」二字。与上面各档互斥且合起来覆盖全部产品。
+// 「无限制」不是名称字段（全库 0 条名称含此词），而是「没有持有期条款」的口径：名称不含「持有」。
+// 用负向前瞻一次表达（Postgres ARE 支持 (?!...)）：字符串中每个「持」后面都不跟「有」。
 export const HOLDING_NO_LIMIT = '无限制'
-// 「无限制」判据用的子串（取反匹配即得该档）
+// 「无限制」的等价子串判据（取反匹配即得该档；保留给单档老参数使用）
 export const HOLDING_NAME_MARK = '持有'
+const HOLDING_NO_LIMIT_REGEX = '^(?:[^持]|持(?!有))*$'
 
 // 供 UI 渲染的持有期选项（顺序即展示顺序）
 export const HOLDING_PERIOD_OPTIONS = [HOLDING_NO_LIMIT, ...Object.keys(HOLDING_PERIOD_TOKENS)]
 
-/** 生成某持有期档位的名称正则；「无限制」与未收录的档位返回 null（由调用方分别处理） */
-export function holdingPeriodRegex(key) {
-  const t = HOLDING_PERIOD_TOKENS[key]
-  if (!t) return null
-  const alts = []
-  if (t.d.length) alts.push('(?:^|[^0-9])(?:' + t.d.join('|') + ')')
-  if (t.c.length) alts.push('(?:' + t.c.join('|') + ')')
-  return '(?:' + alts.join('|') + ').{0,4}持有'
+/**
+ * 持有期多选 → 单个服务端 regex（null 表示不做过滤）。
+ * 各档 token 合并进同一分支，多档即并集；「无限制」为独立分支与各档 OR。
+ * 单档结果与逐档写法完全等价（例：['30天'] → (?:(?:^|[^0-9])(?:30天|30日|1个月|1月)|(?:一个月)).{0,4}持有）。
+ */
+export function holdingPeriodRegex(selected) {
+  const list = Array.isArray(selected) ? selected : (selected ? [selected] : [])
+  if (!list.length) return null
+  const wantNoLimit = list.includes(HOLDING_NO_LIMIT)
+  const dt = []
+  const ct = []
+  for (const k of list) {
+    const t = HOLDING_PERIOD_TOKENS[k]
+    if (!t) continue
+    dt.push(...t.d)
+    ct.push(...t.c)
+  }
+  const parts = []
+  if (dt.length || ct.length) {
+    const alts = []
+    if (dt.length) alts.push('(?:^|[^0-9])(?:' + dt.join('|') + ')')
+    if (ct.length) alts.push('(?:' + ct.join('|') + ')')
+    parts.push('(?:' + alts.join('|') + ').{0,4}持有')
+  }
+  if (wantNoLimit) parts.push('(?:' + HOLDING_NO_LIMIT_REGEX + ')')
+  return parts.length ? parts.join('|') : null
+}
+
+// ---------- 规模 ----------
+/**
+ * 规模区间多选 → PostgREST or 表达式（null 表示不做过滤）。
+ * ranges: [[min|null, max|null], ...]，单位亿元。
+ * 单段由调用方走 gte/lte（保持与旧行为逐字节一致），此处只负责多段拼接。
+ */
+export function scaleFilterExpr(ranges) {
+  if (!ranges || !ranges.length) return null
+  const parts = []
+  for (const [mn, mx] of ranges) {
+    const conds = []
+    if (mn != null) conds.push('fund_scale.gte.' + mn)
+    if (mx != null) conds.push('fund_scale.lte.' + mx)
+    if (!conds.length) continue
+    parts.push(conds.length === 1 ? conds[0] : 'and(' + conds.join(',') + ')')
+  }
+  return parts.length ? parts.join(',') : null
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
   if (supabase) {
     // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
     //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
@@ -305,20 +370,33 @@ async function fetchFundScoresImpl(params = {}) {
       if (dailyLimit === '1') query = query.gte('daily_change', 20)
       else if (dailyLimit === '0') query = query.or('daily_change.lt.20,daily_change.is.null')
     }
-    // 基金规模区间（亿元）：服务端下推，避免前端只过滤首页
-    if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
-    if (scaleMax != null) query = query.lte('fund_scale', scaleMax)
-    // 份额「主代码」与「持有期」：按名称正则服务端下推（多个 n= 条件为 AND 关系）
-    if (mainCode) query = query.filter('n', 'match', MAIN_CODE_REGEX)
-    if (holding) {
-      if (holding === HOLDING_NO_LIMIT) {
-        // 无限制 = 名称不含「持有」（即无持有期条款的常规产品）
-        query = query.not('n', 'match', HOLDING_NAME_MARK)
+    // 基金规模区间（亿元）：服务端下推。多选区间 → or=(and(gte,lte),...)；单区间仍走 gte/lte（与旧行为一致）
+    if (scaleRanges && scaleRanges.length) {
+      if (scaleRanges.length === 1) {
+        const [mn, mx] = scaleRanges[0]
+        if (mn != null) query = query.gte('fund_scale', mn)
+        if (mx != null) query = query.lte('fund_scale', mx)
       } else {
-        const holdingRx = holdingPeriodRegex(holding)
-        if (holdingRx) query = query.filter('n', 'match', holdingRx)
+        const expr = scaleFilterExpr(scaleRanges)
+        if (expr) query = query.or(expr)
       }
+    } else {
+      if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
+      if (scaleMax != null) query = query.lte('fund_scale', scaleMax)
     }
+    // 份额（多选，含「主代码」）：名称 regex 服务端下推
+    const shareFilter = (shareClasses && shareClasses.length)
+      ? shareClassFilter(shareClasses)
+      : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null)
+    if (shareFilter) {
+      query = query.filter('n', 'match', shareFilter.match)
+      if (shareFilter.notMatch) query = query.not('n', 'match', shareFilter.notMatch)
+    }
+    // 持有期（多选，含「无限制」）：各档 token 合并为单个 regex 下推
+    const holdingRx = (holdingPeriods && holdingPeriods.length)
+      ? holdingPeriodRegex(holdingPeriods)
+      : (holding ? holdingPeriodRegex([holding]) : null)
+    if (holdingRx) query = query.filter('n', 'match', holdingRx)
     // 不再过滤 null 评分（否则债券型-混合二级等数据源未覆盖的分类会显示为空）
     // 改用 nullsFirst: false 让 null 排到最后
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；
