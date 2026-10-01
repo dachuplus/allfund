@@ -227,10 +227,11 @@ export const MAIN_CODE_REGEX = '^(.*[^ABCDEFHIRTY]|.*(ETF|LOF|FOF|QDII|REIT))$'
 
 // 持有期：fund_scores 无该列，按基金名称中的持有期字样推导（与页面展示口径一致）。
 // 分词两类，处理边界差异：
-//   ① 数字型词（30天 / 1个月 / 12个月…）：前面必须是行首或非数字，避免「210天」被「10天」误命中；
+//   ① 数字型词（7天 / 30天 / 1个月 / 12个月…）：前面必须是行首或非数字，避免「210天」被「10天」误命中；
 //   ② 中文型词（一年 / 三个月 / 双月…）：不加前导边界 —— 否则「养老目标2060五年持有」的
 //      「五年」因前面是数字「0」而被误排除（实测该基金确实属于 5 年持有，必须收进来）。
 const HOLDING_PERIOD_TOKENS = {
+  '7天':   { d: ['7天', '7日'], c: [] },
   '30天':  { d: ['30天', '30日', '1个月', '1月'], c: ['一个月'] },
   '60天':  { d: ['60天', '60日', '2个月', '2月'], c: ['两个月', '双月'] },
   '90天':  { d: ['90天', '90日', '3个月', '3月'], c: ['三个月'] },
@@ -242,10 +243,16 @@ const HOLDING_PERIOD_TOKENS = {
   '5年':   { d: ['5年', '60个月'], c: ['五年'] },
 }
 
-// 供 UI 渲染的持有期选项（顺序即展示顺序）
-export const HOLDING_PERIOD_OPTIONS = Object.keys(HOLDING_PERIOD_TOKENS)
+// 「无限制」不是名称字段（全库 0 条名称含此词），而是「没有持有期条款」的口径：
+// 名称不含「持有」二字。与上面各档互斥且合起来覆盖全部产品。
+export const HOLDING_NO_LIMIT = '无限制'
+// 「无限制」判据用的子串（取反匹配即得该档）
+export const HOLDING_NAME_MARK = '持有'
 
-/** 生成某持有期档位的名称正则；未收录的档位返回 null（调用方跳过该条件） */
+// 供 UI 渲染的持有期选项（顺序即展示顺序）
+export const HOLDING_PERIOD_OPTIONS = [HOLDING_NO_LIMIT, ...Object.keys(HOLDING_PERIOD_TOKENS)]
+
+/** 生成某持有期档位的名称正则；「无限制」与未收录的档位返回 null（由调用方分别处理） */
 export function holdingPeriodRegex(key) {
   const t = HOLDING_PERIOD_TOKENS[key]
   if (!t) return null
@@ -301,11 +308,16 @@ async function fetchFundScoresImpl(params = {}) {
     // 基金规模区间（亿元）：服务端下推，避免前端只过滤首页
     if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
     if (scaleMax != null) query = query.lte('fund_scale', scaleMax)
-    // 份额「主代码」与「持有期」：按名称正则服务端下推（两次 match 条件为 AND 关系）
+    // 份额「主代码」与「持有期」：按名称正则服务端下推（多个 n= 条件为 AND 关系）
     if (mainCode) query = query.filter('n', 'match', MAIN_CODE_REGEX)
     if (holding) {
-      const holdingRx = holdingPeriodRegex(holding)
-      if (holdingRx) query = query.filter('n', 'match', holdingRx)
+      if (holding === HOLDING_NO_LIMIT) {
+        // 无限制 = 名称不含「持有」（即无持有期条款的常规产品）
+        query = query.not('n', 'match', HOLDING_NAME_MARK)
+      } else {
+        const holdingRx = holdingPeriodRegex(holding)
+        if (holdingRx) query = query.filter('n', 'match', holdingRx)
+      }
     }
     // 不再过滤 null 评分（否则债券型-混合二级等数据源未覆盖的分类会显示为空）
     // 改用 nullsFirst: false 让 null 排到最后
