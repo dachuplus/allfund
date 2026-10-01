@@ -70,6 +70,7 @@
                 <span class="filter-label">份额</span>
                 <div class="filter-chips">
                   <div class="filter-chip" :class="{ active: filterSC === '' }" @click="mToggleSC('')">全部</div>
+                  <div class="filter-chip" :class="{ active: filterSC === 'MAIN' }" @click="mToggleSC('MAIN')">主代码</div>
                   <div v-for="sc in shareClassOptions" :key="sc" class="filter-chip" :class="{ active: filterSC === sc }" @click="mToggleSC(sc)">{{ sc }}类</div>
                 </div>
               </div>
@@ -124,6 +125,15 @@
                 </div>
               </div>
 
+              <!-- 持有期（按基金名称中的持有期字样筛选） -->
+              <div class="filter-row">
+                <span class="filter-label">持有期</span>
+                <div class="filter-chips">
+                  <div class="filter-chip" :class="{ active: filterHolding === '' }" @click="mToggleHolding('')">全部</div>
+                  <div v-for="h in HOLDING_PERIOD_OPTIONS" :key="h" class="filter-chip" :class="{ active: filterHolding === h }" @click="mToggleHolding(h)">{{ h }}</div>
+                </div>
+              </div>
+
               <!-- 申购状态 -->
               <div class="filter-row">
                 <span class="filter-label">状态</span>
@@ -163,7 +173,7 @@
 
               <!-- 筛选说明 -->
               <div class="filter-tip">
-                注：ETF/LOF/定开/申购状态/单日涨跌基于数据库字段精确筛选；场内/份额类别基于基金名称识别，可能存在少量误判。<br>
+                注：ETF/LOF/定开/申购状态/单日涨跌基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。持有期按名称中的「30天/1个月/一年」等字样归类，仅含名称明确标注持有期的产品。<br>
                 机构占比、股票占比数据暂未收录，后续版本更新。
               </div>
             </div>
@@ -611,7 +621,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
-import { fetchFundScores, fetchFundMeta, fetchFundCategories } from '../../api/data.js'
+import { fetchFundScores, fetchFundMeta, fetchFundCategories, HOLDING_PERIOD_OPTIONS } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
@@ -721,7 +731,8 @@ const filterT1 = ref('')
 
 // 更多筛选
 const showMoreFilter = ref(false)
-const filterSC = ref('')
+const filterSC = ref('')       // 份额：''全部 | 'MAIN'主代码 | 份额字母 A/B/C/...
+const filterHolding = ref('')  // 持有期：''全部 | 30天/60天/90天/120天/180天/1年/2年/3年/5年
 const filterETF = ref('')
 const filterLOF = ref('')
 const filterFOF = ref('')
@@ -989,6 +1000,9 @@ async function loadData(reset = true, _retryCount = 0) {
       t0: t0Filter,
       t1: filterT1.value || undefined,
       search: buildSearchText(),
+      // 主代码：服务端按名称正则过滤（名称末位无份额字母），避免与客户端份额筛选重复
+      mainCode: filterSC.value === 'MAIN' ? '1' : undefined,
+      holding: filterHolding.value || undefined,
       kKey: currentPeriod.value,
       sortAsc: sortAsc.value,
       page: page.value,
@@ -1010,8 +1024,8 @@ async function loadData(reset = true, _retryCount = 0) {
       if (result.count != null) totalCount.value = result.count
       // 前端补充筛选（仅保留无法服务端下推的份额类别/场内，其余已在服务端过滤）
       let filtered = result.data
-      // 份额类别（名称末尾字母，排除产品类型关键词）
-      if (filterSC.value) filtered = filtered.filter(f => extractShareClass(f.n) === filterSC.value)
+      // 份额类别（名称末尾字母，排除产品类型关键词）；「主代码」已由服务端 regex 过滤，此处跳过
+      if (filterSC.value && filterSC.value !== 'MAIN') filtered = filtered.filter(f => extractShareClass(f.n) === filterSC.value)
       // 场内（ETF不含联接/LOF/REITs → 是；其余含ETF联接 → 否）
       if (filterCN.value === '1') filtered = filtered.filter(f => isExchangeListed(f.n))
       if (filterCN.value === '0') filtered = filtered.filter(f => !isExchangeListed(f.n))
@@ -1076,6 +1090,7 @@ function setT1(val) {
 /** 清除所有更多筛选条件 */
 function clearMoreFilters() {
   filterSC.value = ''
+  filterHolding.value = ''
   filterCN.value = ''
   filterETF.value = ''
   filterLOF.value = ''
@@ -1093,7 +1108,7 @@ let moreFilterSnapshot = null
 
 function openMoreFilter() {
   moreFilterSnapshot = {
-    sc: filterSC.value, etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value,
+    sc: filterSC.value, holding: filterHolding.value, etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
     sp: scalePreset.value,
@@ -1104,6 +1119,7 @@ function openMoreFilter() {
 function cancelMoreFilter() {
   if (moreFilterSnapshot) {
     filterSC.value = moreFilterSnapshot.sc
+    filterHolding.value = moreFilterSnapshot.holding
     filterETF.value = moreFilterSnapshot.etf
     filterLOF.value = moreFilterSnapshot.lof
     filterFOF.value = moreFilterSnapshot.fof
@@ -1132,6 +1148,7 @@ function resetMoreFilters() {
 
 // 弹窗内筛选只改本地状态，确认后才查询
 function mToggleSC(val) { filterSC.value = filterSC.value === val ? '' : val }
+function mToggleHolding(val) { filterHolding.value = filterHolding.value === val ? '' : val }
 function mToggleCN(val) { filterCN.value = filterCN.value === val ? '' : val }
 function mToggleSG(val) { filterSG.value = filterSG.value === val ? '' : val }
 function mToggleDailyLimit(val) { filterDailyLimit.value = filterDailyLimit.value === val ? '' : val }
@@ -1161,6 +1178,7 @@ function onScaleInput() {
 const activeMoreFilterCount = computed(() => {
   let n = 0
   if (filterSC.value) n++
+  if (filterHolding.value) n++
   if (filterETF.value) n++
   if (filterLOF.value) n++
   if (filterFOF.value) n++

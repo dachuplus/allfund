@@ -216,8 +216,47 @@ export async function getCategoryRankInfoByScore(codes, scoreCol = 'k1') {
   }
 }
 
+// ========== 份额「主代码」与「持有期」筛选（服务端下推，regex） ==========
+// 之所以必须走服务端：fund_scores 查询不带 count='exact'（会触发 57014 statement timeout），
+// 前端 totalCount 恒为 null、仅以已加载条数兜底；任何「只在客户端筛」的条件都会
+// 让首页 1000 条里命中数严重偏少，且翻页时计数与列表不一致。
+//
+// 主代码：名称末位不是份额字母(A/B/C/D/E/F/H/I/R/T/Y)，也不是产品类型后缀(ETF/LOF/FOF/QDII/REIT)
+//   —— 用于筛出「只有一个份额、没有 A/B/C 类后缀」的基金（此前无法被份额筛选命中）。
+export const MAIN_CODE_REGEX = '^(.*[^ABCDEFHIRTY]|.*(ETF|LOF|FOF|QDII|REIT))$'
+
+// 持有期：fund_scores 无该列，按基金名称中的持有期字样推导（与页面展示口径一致）。
+// 分词两类，处理边界差异：
+//   ① 数字型词（30天 / 1个月 / 12个月…）：前面必须是行首或非数字，避免「210天」被「10天」误命中；
+//   ② 中文型词（一年 / 三个月 / 双月…）：不加前导边界 —— 否则「养老目标2060五年持有」的
+//      「五年」因前面是数字「0」而被误排除（实测该基金确实属于 5 年持有，必须收进来）。
+const HOLDING_PERIOD_TOKENS = {
+  '30天':  { d: ['30天', '30日', '1个月', '1月'], c: ['一个月'] },
+  '60天':  { d: ['60天', '60日', '2个月', '2月'], c: ['两个月', '双月'] },
+  '90天':  { d: ['90天', '90日', '3个月', '3月'], c: ['三个月'] },
+  '120天': { d: ['120天', '120日', '4个月', '4月'], c: ['四个月'] },
+  '180天': { d: ['180天', '180日', '6个月', '6月'], c: ['六个月', '六月'] },
+  '1年':   { d: ['1年', '12个月', '12月'], c: ['一年'] },
+  '2年':   { d: ['2年', '24个月'], c: ['两年'] },
+  '3年':   { d: ['3年', '36个月'], c: ['三年'] },
+  '5年':   { d: ['5年', '60个月'], c: ['五年'] },
+}
+
+// 供 UI 渲染的持有期选项（顺序即展示顺序）
+export const HOLDING_PERIOD_OPTIONS = Object.keys(HOLDING_PERIOD_TOKENS)
+
+/** 生成某持有期档位的名称正则；未收录的档位返回 null（调用方跳过该条件） */
+export function holdingPeriodRegex(key) {
+  const t = HOLDING_PERIOD_TOKENS[key]
+  if (!t) return null
+  const alts = []
+  if (t.d.length) alts.push('(?:^|[^0-9])(?:' + t.d.join('|') + ')')
+  if (t.c.length) alts.push('(?:' + t.c.join('|') + ')')
+  return '(?:' + alts.join('|') + ').{0,4}持有'
+}
+
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, dailyLimit, scaleMin, scaleMax, sortField, sortDir } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding } = params
   if (supabase) {
     // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
     //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
@@ -262,6 +301,12 @@ async function fetchFundScoresImpl(params = {}) {
     // 基金规模区间（亿元）：服务端下推，避免前端只过滤首页
     if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
     if (scaleMax != null) query = query.lte('fund_scale', scaleMax)
+    // 份额「主代码」与「持有期」：按名称正则服务端下推（两次 match 条件为 AND 关系）
+    if (mainCode) query = query.filter('n', 'match', MAIN_CODE_REGEX)
+    if (holding) {
+      const holdingRx = holdingPeriodRegex(holding)
+      if (holdingRx) query = query.filter('n', 'match', holdingRx)
+    }
     // 不再过滤 null 评分（否则债券型-混合二级等数据源未覆盖的分类会显示为空）
     // 改用 nullsFirst: false 让 null 排到最后
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；
