@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.10</strong></td>
+              <td><strong>v4.0.11</strong></td>
+              <td>2026-10-01</td>
+              <td><code>be24fcd9</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.10</td>
               <td>2026-10-01</td>
               <td><code>a648050e</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.9</td>
@@ -261,7 +267,25 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.10 · 2026-10-01（当前线上）</div>
+        <div class="vd-title">v4.0.11 · 2026-10-01（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.11</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpl5qkk91anj</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>be24fcd98a8d59e76e4965752ca93d262828fe18</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.10 → v4.0.11）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>「更多筛选」的份额 / 持有期 / 规模改为多选</strong>（同一行内多选取并集，不同行之间取交集）。</li>
+              <li><strong>份额多选</strong>：可同时选「主代码」与多个份额字母。原为客户端逐条过滤，现改为<strong>服务端名称正则下推</strong> —— 因为列表查询不带 <code>count=exact</code>，客户端过滤会使命中数与分页计数失真；多选后「主代码」与字母档必须是并集，客户端无法与已有的服务端条件叠加。<strong>与旧版逐档结果完全一致</strong>（对 11 个档位全量核对，差值均为 0）。</li>
+              <li><strong>持有期多选</strong>：各档 token 合并进同一个正则分支，「无限制」用负向前瞻 <code>^(?:[^持]|持(?!有))*$</code> 作为独立分支 OR。</li>
+              <li><strong>规模多选</strong>：多段区间用 <code>or=(and(fund_scale.gte.A,fund_scale.lte.B),...)</code> 下推；单段仍走 <code>gte</code>/<code>lte</code>，与旧行为一致。「自定义」区间与预设区间互斥。</li>
+              <li><strong>验证</strong>：12 个组合场景在线上代理实测，首页条数与数据库精确计数<strong>逐条吻合</strong>（未触发 1000 行上限的场景为 252 / 389 / 78，精确一致）；另用真实浏览器对该页做点击实测 —— 请求 URL 中的三个条件正确、界面显示「筛选结果：30 只」与数据库精确值 30 完全一致。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.10 · 2026-10-01（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.10</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp8m3cden8i9</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>a648050e542bb1bca1b0938f425f0ebe8b2522d4</code></span></div>
