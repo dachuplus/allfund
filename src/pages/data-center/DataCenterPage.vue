@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.9</strong></td>
+              <td><strong>v4.0.10</strong></td>
+              <td>2026-10-01</td>
+              <td><code>a648050e</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.9</td>
               <td>2026-10-01</td>
               <td><code>84cb531b</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.8</td>
@@ -255,7 +261,24 @@
           </tbody>
         </table>
 
-        <div class="vd-title">v4.0.9 · 2026-10-01（当前线上）</div>
+        <div class="vd-title">v4.0.10 · 2026-10-01（当前线上）</div>
+        <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.10</code></span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp8m3cden8i9</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>a648050e542bb1bca1b0938f425f0ebe8b2522d4</code></span></div>
+        <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.9 → v4.0.10）</span></div>
+        <div class="vd-row">
+          <span class="vd-key">主要变更</span>
+          <span class="vd-val">
+            <ol class="vd-list">
+              <li><strong>「持有期」新增「无限制」档</strong>：全库<strong>不存在</strong>名称含「无限制」的基金（实测 0 条），故该档定义为<strong>「名称不含『持有』字样」</strong>＝无持有期条款的常规开放式产品，服务端按 <code>not.match</code> 取反匹配，全市场 <strong>18989</strong> 只。其中含 49 只定期开放产品（名称不含「持有」），可用弹窗内既有的「定开」筛选进一步区分。</li>
+              <li><strong>「持有期」新增「7天」档</strong>：按名称中的 <code>7天</code>/<code>7日</code> 归类，全市场 <strong>105</strong> 只（如「XX中证同业存单AAA指数7天持有」）。</li>
+              <li><strong>各档互斥且可枚举</strong>：已用管理口 SQL 全量核对 —— 无限制 18989 与 7天 105 <strong>无交集</strong>，并集 19094 与「无限制 ∪ 7天」的实测计数值一致；7天 ∩ 主代码 = 105（该档全部为主代码份额）。</li>
+              <li>同步更新弹窗内「筛选说明」文案，写明「无限制」的口径与定开叠加用法。</li>
+            </ol>
+          </span>
+        </div>
+
+        <div class="vd-title">v4.0.9 · 2026-10-01（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.9</code></span></div>
         <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dphayvc0ok7f</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>84cb531bd9feafe8924a3cfd1d541710c3c8dd9b</code></span></div>
