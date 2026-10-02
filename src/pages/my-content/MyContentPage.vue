@@ -1,6 +1,6 @@
 <template>
   <div class="content-page">
-    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏，右侧放「写文章」按钮 -->
+    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具，右侧放「写文章」按钮 -->
     <div class="cp-tabs">
       <div class="cp-tab-list">
         <div
@@ -19,7 +19,7 @@
       <GamesPanel />
     </div>
 
-    <!-- 影视二级 Tab：影视观看榜（9+1电视剧评分框架）+ 个人工具 -->
+    <!-- 影视二级 Tab：影视观看榜（9+1电视剧评分框架） -->
     <div v-else-if="category === 'film'">
       <RankBoard
         title="影视观看榜"
@@ -30,10 +30,6 @@
         framework-name="9+1 电视剧评分框架"
         framework-note="九个基础维度各 1-10 分、合计 90 分；「好创新」为加分项，最高 +10 分，总分上限 100 分。"
       />
-      <div class="cp-subblock">
-        <h3 class="cp-subblock-title">个人工具</h3>
-        <MediaTools />
-      </div>
     </div>
 
     <!-- 美食二级 Tab：下辖两个三级 Tab —— 大厨榜-上海 / 必吃榜-上海（2017-2025） -->
@@ -77,10 +73,14 @@
       />
     </div>
 
-    <!-- 工具二级 Tab：进位制转换 -->
+    <!-- 工具二级 Tab：进位制转换 + 个人工具 -->
     <div v-else-if="category === 'tool'" class="cp-tool">
       <h2 class="cp-tool-title">进位制转换</h2>
       <BaseConverterTool />
+      <div class="cp-subblock">
+        <h3 class="cp-subblock-title">个人工具</h3>
+        <MediaTools />
+      </div>
     </div>
 
     <!-- 博客：文章列表 -->

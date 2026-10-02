@@ -22,7 +22,7 @@
         v-model="inputValue"
         class="bc-input"
         rows="3"
-        placeholder="在此输入待转换的数值"
+        placeholder="在此输入待转换的数值，可用小数点"
       ></textarea>
     </label>
 
@@ -60,83 +60,148 @@ const copied = ref(false)
 
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz'
 
-const sourceHint = computed(() =>
-  sourceBase.value <= 36 ? `支持 0-9${sourceBase.value > 10 ? '、a-' + DIGITS[sourceBase.value - 1] : ''}` : '每位用空格分隔的十进制数（0-' + (sourceBase.value - 1) + '）'
-)
+const sourceHint = computed(() => {
+  if (sourceBase.value <= 36) {
+    return `支持 0-9${sourceBase.value > 10 ? '、a-' + DIGITS[sourceBase.value - 1] : ''}，可用小数点`
+  }
+  return `整数/小数部分均用空格分隔的十进制数（0-${sourceBase.value - 1}）`
+})
 const targetHint = computed(() =>
   targetBase.value <= 36 ? '标准进制表示' : '每位用空格分隔的十进制数'
 )
 
 function charToDigit(ch) {
-  const c = ch.toLowerCase()
-  const idx = DIGITS.indexOf(c)
-  return idx
+  return DIGITS.indexOf(ch.toLowerCase())
 }
 
-function parseInput(value, base) {
-  const s = value.trim()
-  if (!s) return 0n
+/**
+ * 将输入字符串解析为有理数 { numerator, denominator }。
+ * 支持整数与小数；进制 ≤36 时用标准位值符号，>36 时每「位」用空格分隔的十进制数。
+ */
+function parseInputRational(value, base) {
+  let s = value.trim()
+  if (!s) return { numerator: 0n, denominator: 1n }
+
+  let negative = false
+  if (s.startsWith('-')) {
+    negative = true
+    s = s.slice(1).trim()
+  } else if (s.startsWith('+')) {
+    s = s.slice(1).trim()
+  }
+
+  const firstDot = s.indexOf('.')
+  if (firstDot !== -1 && s.indexOf('.', firstDot + 1) !== -1) {
+    throw new Error('只能包含一个小数点')
+  }
+
+  const intStr = firstDot === -1 ? s : s.slice(0, firstDot)
+  const fracStr = firstDot === -1 ? '' : s.slice(firstDot + 1)
+
+  const b = BigInt(base)
+
+  // 整数部分
+  let intPart = 0n
   if (base <= 36) {
-    let result = 0n
-    for (const ch of s) {
+    for (const ch of intStr) {
       if (ch === ' ') continue
       const d = charToDigit(ch)
       if (d === -1 || d >= base) {
         throw new Error(`字符 "${ch}" 不是合法的 ${base} 进制符号`)
       }
-      result = result * BigInt(base) + BigInt(d)
+      intPart = intPart * b + BigInt(d)
     }
-    return result
-  }
-  // 37+ 进制：每位用空格分隔的十进制数
-  const parts = s.split(/\s+/).filter(Boolean)
-  if (!parts.length) return 0n
-  let result = 0n
-  for (const p of parts) {
-    const d = BigInt(p)
-    if (d < 0n || d >= BigInt(base)) {
-      throw new Error(`位值 ${p} 超出 ${base} 进制范围（0-${base - 1}）`)
+  } else {
+    const parts = intStr.split(/\s+/).filter(Boolean)
+    for (const p of parts) {
+      const d = BigInt(p)
+      if (d < 0n || d >= b) {
+        throw new Error(`位值 ${p} 超出 ${base} 进制范围（0-${base - 1}）`)
+      }
+      intPart = intPart * b + d
     }
-    result = result * BigInt(base) + d
   }
-  return result
+
+  // 小数部分：精确表示为 fracNum / fracDen
+  let fracNum = 0n
+  let fracDen = 1n
+  if (fracStr) {
+    if (base <= 36) {
+      for (const ch of fracStr) {
+        if (ch === ' ') continue
+        const d = charToDigit(ch)
+        if (d === -1 || d >= base) {
+          throw new Error(`字符 "${ch}" 不是合法的 ${base} 进制符号`)
+        }
+        fracNum = fracNum * b + BigInt(d)
+        fracDen = fracDen * b
+      }
+    } else {
+      const parts = fracStr.split(/\s+/).filter(Boolean)
+      for (const p of parts) {
+        const d = BigInt(p)
+        if (d < 0n || d >= b) {
+          throw new Error(`位值 ${p} 超出 ${base} 进制范围（0-${base - 1}）`)
+        }
+        fracNum = fracNum * b + d
+        fracDen = fracDen * b
+      }
+    }
+  }
+
+  let numerator = intPart * fracDen + fracNum
+  if (negative) numerator = -numerator
+  return { numerator, denominator: fracDen }
 }
 
-function formatOutput(value, base) {
-  if (base <= 36) {
-    if (value === 0n) return '0'
-    let negative = false
-    if (value < 0n) {
-      negative = true
-      value = -value
-    }
-    const b = BigInt(base)
-    const digits = []
-    while (value > 0n) {
-      digits.push(DIGITS[Number(value % b)])
-      value = value / b
-    }
-    return (negative ? '-' : '') + digits.reverse().join('')
-  }
-  // 37+ 进制：每位用空格分隔的十进制数
+function formatInt(value, base) {
   if (value === 0n) return '0'
-  let negative = false
-  if (value < 0n) {
-    negative = true
-    value = -value
-  }
   const b = BigInt(base)
   const digits = []
-  while (value > 0n) {
-    digits.push(String(value % b))
-    value = value / b
+  let v = value
+  while (v > 0n) {
+    digits.push(base <= 36 ? DIGITS[Number(v % b)] : String(v % b))
+    v = v / b
   }
-  return (negative ? '- ' : '') + digits.reverse().join(' ')
+  return digits.reverse().join(base <= 36 ? '' : ' ')
+}
+
+function formatOutputRational({ numerator, denominator }, base) {
+  if (numerator === 0n) return '0'
+
+  const negative = numerator < 0n
+  let n = negative ? -numerator : numerator
+  const d = denominator
+  const b = BigInt(base)
+
+  const intPart = n / d
+  let rem = n % d
+
+  const sign = negative ? (base <= 36 ? '-' : '- ') : ''
+  let result = sign + formatInt(intPart, base)
+
+  if (rem === 0n) return result
+
+  // 小数部分：反复 rem *= targetBase，取 digit = rem / den
+  const maxFracDigits = base <= 36 ? 32 : 16
+  const fracDigits = []
+  let i = 0
+  while (rem !== 0n && i < maxFracDigits) {
+    rem = rem * b
+    const digit = rem / d
+    rem = rem % d
+    fracDigits.push(base <= 36 ? DIGITS[Number(digit)] : String(digit))
+    i++
+  }
+
+  const fracStr = base <= 36 ? fracDigits.join('') : fracDigits.join(' ')
+  const truncated = rem !== 0n ? '…' : ''
+  return `${result}.${fracStr}${truncated}`
 }
 
 const error = computed(() => {
   try {
-    parseInput(inputValue.value, sourceBase.value)
+    parseInputRational(inputValue.value, sourceBase.value)
     return ''
   } catch (e) {
     return e.message || '输入格式有误'
@@ -145,8 +210,8 @@ const error = computed(() => {
 
 const outputValue = computed(() => {
   try {
-    const val = parseInput(inputValue.value, sourceBase.value)
-    return formatOutput(val, targetBase.value)
+    const rational = parseInputRational(inputValue.value, sourceBase.value)
+    return formatOutputRational(rational, targetBase.value)
   } catch (e) {
     return ''
   }
@@ -165,7 +230,6 @@ async function copyResult() {
     copied.value = true
     setTimeout(() => (copied.value = false), 1500)
   } catch (e) {
-    // 降级：选中文本
     const el = document.querySelector('.bc-output')
     if (el) {
       el.select()
