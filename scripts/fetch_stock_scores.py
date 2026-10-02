@@ -1,30 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_stock_scores.py — 抓取 A 股股票数据写入 stock_scores_staging（三级流水线第1级）
+fetch_stock_scores.py — 沪深京港全市场股票「靠谱成长指数 v1」→ stock_scores_staging
 
-设计要点（与基金 fund_scores 完全隔离，全部新建独立表）：
-  - 股票 universe：沪深300(000300) + 中证500(000905) + 中证1000(000852) 成分股（约 1800 只），
-    仅限 A 股（沪 60/68 开头、深 00/30 开头、京 8 开头）。
-  - 行情/估值：腾讯 qt.gtimg.cn 批量报价（pe/pb/市值/换手/涨跌幅/最新价），稳定可靠。
-  - 区间收益/回撤/夏普：新浪日线 K 线（scale=240, datalen=800 ≈ 近3年）实时计算：
-        return_1m/3m/6m/1y/3y、max_drawdown(近1年)、sharpe(近1年)、list_date(上市日)。
-  - 二级行业(industry)：东财行业板块成员映射（best-effort，失败则留空，不阻塞主流程）。
-  - 风控标记：is_st(名称含 ST/*ST)、is_delisted(退市/退市整理)、is_suspended(停牌)、
-        list_date(上市<60天 剔除)。
-  - 全表分位：k_ret/k_drawdown/k_sharpe/k_all（0-100 百分位；k_drawdown 越大表示回撤越小，
-        即按 -max_drawdown 排序；sharpe/return 越大越好）。k_all = 0.5*k_ret+0.25*k_drawdown+0.25*k_sharpe。
-  - 优雅容错：单只失败跳过继续；成分股接口失败则降级用全部成分股并集（已含）。
-  - 结果写入 stock_scores_staging（TRUNCATE 后整表 INSERT），并写 etl_run_log。
+设计（2026-10-02 重构，替代旧的 1800 只成分股 + 基金式评分）：
 
-数据源降级说明：
-  东财 push2/push2his 在沙箱内对突发批量请求会限流（RemoteDisconnected），
-  故优先采用稳定可达的 腾讯报价 + 新浪 K 线；东财 datacenter 成分股接口稳定，仍用于成分股。
-  如未来东财限流解除，可无缝切回（接口已封装在 _em_* 函数中）。
+【覆盖面】沪深京 A 股 + 香港市场全市场（不再限于沪深300/中证500/中证1000 成分股）
+  - A 股 universe：东财 datacenter 业绩报表 RPT_LICO_FN_CPD（最新报告期）
+                   并集 资产负债表 RPT_DMSK_FN_BALANCE（含北交所）
+  - 港股 universe：东财 datacenter RPT_HKF10_INFO_ORGPROFILE（公司资料）
+                   再用腾讯报价过滤掉停牌/退市（取不到报价即剔除）
+
+【基本面因子】
+  A 股：RPT_LICO_FN_CPD  营收同比 YSTZ / 净利同比 SJLTZ / ROE WEIGHTAVG_ROE /
+        毛利率 XSMLL / 每股收益 BASIC_EPS / 每股经营现金流 MGJYXJJE / 归母净利 PARENT_NETPROFIT
+        RPT_DMSK_FN_BALANCE 资产负债率 DEBT_ASSET_RATIO / 行业 INDUSTRY_NAME
+  港股：RPT_HKF10_FN_MAININDICATOR 营收同比 OPERATE_INCOME_YOY / 净利同比 HOLDER_PROFIT_YOY /
+        ROE ROE_AVG / 毛利率 GROSS_PROFIT_RATIO / 每股收益 BASIC_EPS /
+        每股经营现金流 PER_NETCASH_OPERATE / 归母净利 HOLDER_PROFIT /
+        资产负债率 DEBT_ASSET_RATIO / PE_TTM / PB_TTM / 总市值 TOTAL_MARKET_CAP
+  历史归母净利（年报 2022–2025）→ 近3年净利复合增速 profit_cagr_3y、连续亏损年数 loss_years
+
+【五维评分（股票专属，不是基金公式）】横截面百分位 0–100
+  k_growth   成长 30% ← 营收同比、净利同比、近3年净利复合增速
+  k_quality  质量 25% ← ROE、毛利率、经营现金流含金量(每股经营现金流/每股收益)
+  k_safety   健康 20% ← 资产负债率(反向)、连续亏损年数(反向)
+  k_value    估值 15% ← PE_TTM(反向)、PB(反向)、PEG(反向)
+  k_momentum 动量 10% ← 近1年收益、近1年最大回撤(反向)、近1年夏普
+  k_all = 加权和（缺失维度按权重重新归一化；成长与质量任一缺失则 k_all 置空）
+  风控股（ST/退市/停牌/次新/连续2年亏损）**保留并置底标记**（risk_flag），不删不置空。
+
+【行情】腾讯 qt.gtimg.cn 批量报价（sh/sz/bj/hk）；K 线：A 股走新浪（北交所唯一可用），港股走腾讯。
 
 用法：
-  export SUPABASE_PAT="$(grep -E '^SUPABASE_PAT=' allfund/.env.local | cut -d= -f2-)"
-  python3 scripts/fetch_stock_scores.py
+  export SUPABASE_PAT="$(grep -E '^SUPABASE_PAT=' .env.local | cut -d= -f2-)"
+  python3 scripts/fetch_stock_scores.py [--limit N] [--no-kline] [--kline-budget 900]
 """
 import os
 import re
@@ -32,6 +42,7 @@ import sys
 import json
 import math
 import time
+import bisect
 import datetime
 import subprocess
 import argparse
@@ -41,235 +52,399 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ===== 凭证 =====
 PAT = os.environ.get("SUPABASE_PAT") or os.environ.get("SUPABASE_MGMT_TOKEN")
 if not PAT:
-    raise SystemExit("缺少 SUPABASE_PAT 环境变量（沙箱陈旧 SUPABASE_MGMT_TOKEN 会污染，请显式覆盖）。")
+    raise SystemExit("缺少 SUPABASE_PAT 环境变量")
 REF = "tqhtegazxykkqfcpejky"
 MGMT_API = f"https://api.supabase.com/v1/projects/{REF}/database/query"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 HEADERS_EM = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Referer': 'https://quote.eastmoney.com/',
+    'Referer': 'https://data.eastmoney.com/',
     'Accept': '*/*', 'Accept-Language': 'zh-CN,zh;q=0.9',
 }
 HEADERS_TX = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://gu.qq.com/', 'Accept': '*/*'}
 HEADERS_SINA = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.sina.com.cn/', 'Accept': '*/*'}
 
-# 成分股指数（东财 INDEX_CODE，无交易所后缀）
-INDEX_CODES = ["000300", "000905", "000852"]
-EXCHANGE_OF_SUFFIX = {"SH": "SH", "SZ": "SZ", "BJ": "BJ"}
+EM_BASE = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 
-# 交易日近似值（用于区间收益回溯）
 TD_1M, TD_3M, TD_6M, TD_1Y, TD_3Y = 21, 63, 126, 252, 756
 
+# 五维权重（用户 2026-10-02 拍板：推荐版）
+WEIGHTS = [('k_growth', 0.30), ('k_quality', 0.25), ('k_safety', 0.20),
+           ('k_value', 0.15), ('k_momentum', 0.10)]
+
+_SESS = requests.Session()
+_adapter = requests.adapters.HTTPAdapter(pool_connections=64, pool_maxsize=64)
+_SESS.mount('https://', _adapter)
+_SESS.mount('http://', _adapter)
+
+
+def log(*a):
+    print(' '.join(str(x) for x in a), flush=True)
+
 
 # ============================================================
-# 通用 HTTP（带重试）
+# 通用 HTTP
 # ============================================================
-def http_get(url, headers, timeout=20, tries=3):
-    last = None
-    for _ in range(tries):
+def http_get(url, headers, timeout=20, tries=3, session=None):
+    s = session or _SESS
+    for i in range(tries):
         try:
-            r = requests.get(url, headers=headers, timeout=timeout)
+            r = s.get(url, headers=headers, timeout=timeout)
             if r.status_code == 200:
                 return r.text
-            last = r.status_code
-        except Exception as e:  # noqa
-            last = e
-        time.sleep(1.0)
+        except Exception:
+            pass
+        time.sleep(0.6 * (i + 1))
     return None
 
 
-# ============================================================
-# 1) 成分股（东财 datacenter，稳定）
-# ============================================================
-def fetch_constituents():
-    """返回 [(code, name, secucode, exchange), ...] 去重并集。"""
-    out = {}
-    for idx in INDEX_CODES:
-        u = ("https://datacenter-web.eastmoney.com/api/data/v1/get"
-             f"?reportName=RPT_INDEX_CONSTITUENT&columns=SECURITY_CODE,SECURITY_NAME_ABBR,SECUCODE,INDEX_CODE"
-             f"&filter=(INDEX_CODE=%22{idx}%22)&pageSize=2000&sortColumns=SECURITY_CODE&sortTypes=1&source=WEB")
-        txt = http_get(u, HEADERS_EM, timeout=25)
-        if not txt:
-            print(f"  [WARN] 成分股接口失败 INDEX={idx}", flush=True)
-            continue
-        try:
-            j = json.loads(txt)
-        except Exception:
-            print(f"  [WARN] 成分股 JSON 解析失败 INDEX={idx}", flush=True)
-            continue
-        rows = (j.get('result') or {}).get('data') or []
-        for r in rows:
-            code = (r.get('SECURITY_CODE') or '').strip()
-            name = (r.get('SECURITY_NAME_ABBR') or '').strip()
-            secu = (r.get('SECUCODE') or '').strip()  # 如 600519.SH
-            if not code:
-                continue
-            # 仅限 A 股：沪 60/68、深 00/30、京 8 开头
-            if not re.match(r'^(60|68|00|30|8)', code):
-                continue
-            suffix = secu.split('.')[-1] if '.' in secu else ('SH' if code[:1] in '68' else ('BJ' if code[:1] == '8' else 'SZ'))
-            exch = EXCHANGE_OF_SUFFIX.get(suffix, 'SH' if code[:1] in '68' else ('BJ' if code[:1] == '8' else 'SZ'))
-            out[code] = (code, name, secu, exch)
-    print(f"  [成分股] 沪深300+中证500+中证1000 去重后 A 股成分股: {len(out)} 只", flush=True)
-    return list(out.values())
-
-
-# ============================================================
-# 2) 二级行业映射（东财行业板块，best-effort）
-# ============================================================
-def fetch_industry_map():
-    """返回 {code: industry}。东财行业板块 → 成员，best-effort，失败返回空字典。"""
-    m = {}
-    t0 = time.time()
-    BUDGET = 150  # 秒预算，超时即放弃剩余板块
-    # 行业板块列表（东财行业）
-    u = ("https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=300&po=1&fltt=2&invt=2&fid=f3"
-         "&fs=m:90+t:2&fields=f12,f13,f14")
-    txt = http_get(u, HEADERS_EM, timeout=20, tries=2)
-    if not txt:
-        print("  [行业] 板块列表获取失败，industry 留空", flush=True)
-        return m
+def http_json(url, headers, timeout=25, tries=3):
+    t = http_get(url, headers, timeout=timeout, tries=tries)
+    if not t:
+        return None
     try:
-        boards = (json.loads(txt).get('data') or {}).get('diff') or []
+        return json.loads(t)
     except Exception:
-        print("  [行业] 板块列表解析失败，industry 留空", flush=True)
-        return m
-    print(f"  [行业] 共 {len(boards)} 个东财行业板块，开始映射成员...", flush=True)
-    for b in boards:
-        if time.time() - t0 > BUDGET:
-            print("  [行业] 超时预算，停止剩余板块映射", flush=True)
-            break
-        bk = (b.get('f12') or '').strip()      # 板块代码 BKxxxx
-        bname = (b.get('f14') or '').strip()   # 板块名称 = 二级行业
-        if not bk:
-            continue
-        # 翻页取该板块全部成员
-        pn = 1
-        while True:
-            if time.time() - t0 > BUDGET:
-                break
-            ub = ("https://push2.eastmoney.com/api/qt/clist/get?pn=%d&pz=500&po=1&fltt=2&invt=2&fid=f3"
-                  f"&fs=b:{bk}&fields=f12,f13,f14" % pn)
-            tb = http_get(ub, HEADERS_EM, timeout=20, tries=2)
-            if not tb:
-                break
-            try:
-                dd = json.loads(tb).get('data') or {}
-                mem = dd.get('diff') or []
-                tot = dd.get('total') or 0
-            except Exception:
-                break
-            for x in mem:
-                mc = (x.get('f12') or '').strip()
-                if mc:
-                    m[mc] = bname
-            if len(mem) < 500 or pn * 500 >= (tot or 0):
-                break
-            pn += 1
-            time.sleep(0.25)
-        time.sleep(0.2)
-    print(f"  [行业] 映射完成，覆盖 {len(m)} 只股票行业", flush=True)
-    return m
+        return None
 
 
 # ============================================================
-# 3) 行情报价（腾讯 qt.gtimg.cn，稳定批量）
+# 东财 datacenter 分页拉取
+# ============================================================
+def em_fetch(report, filt="", page_size=500, max_pages=60, sort="SECURITY_CODE", tag=""):
+    """返回 (rows, count)。success=False 时返回 ([], 0)。"""
+    out = []
+    total = 0
+    page = 1
+    while page <= max_pages:
+        u = (f"{EM_BASE}?reportName={report}&columns=ALL&pageSize={page_size}"
+             f"&pageNumber={page}&source=WEB&client=WEB")
+        if filt:
+            u += f"&filter={filt}"
+        if sort:
+            u += f"&sortColumns={sort}&sortTypes=1"
+        j = http_json(u, HEADERS_EM, timeout=30, tries=3)
+        if not j or j.get('success') is False:
+            if page == 1:
+                log(f"  [EM] {tag or report} 失败: {(j or {}).get('message')}")
+            break
+        res = j.get('result') or {}
+        rows = res.get('data') or []
+        total = res.get('count') or total
+        if not rows:
+            break
+        out.extend(rows)
+        if len(rows) < page_size:
+            break
+        page += 1
+        time.sleep(0.12)
+    return out, total
+
+
+def latest_periods(today):
+    """按当前日期推测可选的最新报告期（由新到旧）"""
+    y = today.year
+    if today.month >= 11:
+        return [f"{y}-09-30", f"{y}-06-30", f"{y}-03-31", f"{y-1}-12-31"]
+    if today.month >= 8:
+        return [f"{y}-06-30", f"{y}-03-31", f"{y-1}-12-31", f"{y-1}-09-30"]
+    if today.month >= 5:
+        return [f"{y}-03-31", f"{y-1}-12-31", f"{y-1}-09-30", f"{y-1}-06-30"]
+    return [f"{y-1}-12-31", f"{y-1}-09-30", f"{y-1}-06-30", f"{y-1}-03-31"]
+
+
+def annual_periods(today, n=4):
+    """最近 n 个「已披露」年报期，由新到旧。
+    Y 年年报在 Y+1 年 1–4 月披露：5 月起最新年报为 Y-1 年，4 月前为 Y-2 年。"""
+    y = today.year - 1 if today.month >= 5 else today.year - 2
+    return [f"{y - i}-12-31" for i in range(n)]
+
+
+def latest_annual_year(today):
+    return today.year - 1 if today.month >= 5 else today.year - 2
+
+
+def pick_period(report, cands, date_col, tag=""):
+    """依次尝试报告期，返回第一个有数据的 (period, rows)"""
+    for p in cands:
+        rows, cnt = em_fetch(report, filt=f"({date_col}='{p}')", tag=f"{tag}@{p}")
+        if rows:
+            log(f"  [EM] {tag} 采用报告期 {p}（{len(rows)} 行 / count={cnt}）")
+            return p, rows
+    return None, []
+
+
+# ============================================================
+# A 股
+# ============================================================
+A_CODE_RE = re.compile(r'^(6|0|3|4|8|9)')
+# 实测 2026-10-02：RPT_LICO_FN_CPD 单期 11449 行 = A股 5578 + 三板股 5791 + B股 79 + CDR 1
+# 只保留 SECURITY_TYPE='A股'（沪 2319 + 深 2908 + 京 351），新三板/老三板/B股一律剔除
+A_SECURITY_TYPE = 'A股'
+
+
+def is_a_share(r):
+    """判定是否为沪深京 A 股（排除三板股/B股/存托凭证）"""
+    return (r.get('SECURITY_TYPE') or '').strip() == A_SECURITY_TYPE
+
+
+def exchange_of_a(code):
+    # 注意：北交所已整体启用 920xxx 代码（沪B 为 900xxx，需区分）
+    if code.startswith('6'):
+        return 'SH'
+    if code.startswith('0') or code.startswith('3'):
+        return 'SZ'
+    if code.startswith('92'):
+        return 'BJ'
+    if code.startswith('4') or code.startswith('8'):
+        return 'BJ'
+    return None
+
+
+def fetch_a_universe(today):
+    """返回 (period, {code: row}) 与 (bal_period, {code: row})"""
+    cands = latest_periods(today)
+    period, rows = pick_period("RPT_LICO_FN_CPD", cands, "REPORTDATE", "A股业绩报表")
+    fin = {}
+    kept = 0
+    for r in rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if not code or not A_CODE_RE.match(code):
+            continue
+        if exchange_of_a(code) is None:
+            continue
+        if not is_a_share(r):
+            continue          # 剔除新三板/老三板/B股/CDR
+        kept += 1
+        prev = fin.get(code)
+        score = (1 if str(r.get('ISNEW')) == '1' else 0)
+        if prev is None or score > prev[0]:
+            fin[code] = (score, r)
+    fin = {k: v[1] for k, v in fin.items()}
+    log(f"  [A股] 业绩报表 A股 {kept} 条 → 去重后 {len(fin)} 只（报告期 {period}）")
+
+    # 年报期（用于 ROE/毛利率/负债率，与港股年报口径可比）
+    ann_cands = annual_periods(today, 4)
+    ann_period, ann_rows = pick_period("RPT_LICO_FN_CPD", ann_cands, "REPORTDATE", "A股年报业绩")
+    ann = {}
+    for r in ann_rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if code and A_CODE_RE.match(code) and exchange_of_a(code) and is_a_share(r):
+            ann[code] = r
+    log(f"  [A股] 年报业绩 {len(ann)} 只（报告期 {ann_period}）")
+
+    # 资产负债表（仅作查询用，不参与 universe）
+    bal_period, bal_rows = pick_period("RPT_DMSK_FN_BALANCE", cands + ann_cands,
+                                       "REPORT_DATE", "A股资产负债表")
+    bal = {}
+    for r in bal_rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if code and A_CODE_RE.match(code) and exchange_of_a(code):
+            bal[code] = r
+    log(f"  [A股] 资产负债表 {len(bal)} 只（报告期 {bal_period}）")
+
+    # 年报归母净利（2022–2025）→ CAGR / 连续亏损
+    profits = {}
+    for y in ann_cands[::-1][:4]:
+        rr, _ = em_fetch("RPT_LICO_FN_CPD", filt=f"(REPORTDATE='{y}')", tag=f"A股年报{y}")
+        m = {}
+        for r in rr:
+            code = (r.get('SECURITY_CODE') or '').strip()
+            if code and A_CODE_RE.match(code) and is_a_share(r):
+                m[code] = r.get('PARENT_NETPROFIT')
+        profits[y[:4]] = m
+        log(f"  [A股] 年报 {y[:4]} 归母净利 {len(m)} 只")
+        time.sleep(0.1)
+
+    return period, fin, ann_period, ann, bal_period, bal, profits
+
+
+# ============================================================
+# 港股
+# ============================================================
+def fetch_hk_list():
+    rows, _ = em_fetch("RPT_HKF10_INFO_ORGPROFILE", page_size=500, max_pages=40,
+                       sort="SECURITY_CODE", tag="港股公司资料")
+    out = {}
+    for r in rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if not code or not re.match(r'^\d{5}$', code):
+            continue
+        out[code] = {
+            'name': (r.get('SECURITY_NAME_ABBR') or '').strip(),
+            'industry': (r.get('BELONG_INDUSTRY') or '').strip() or None,
+            'list_date': (r.get('LISTING_DATE') or '')[:10] or None,
+            'market': (r.get('BELONG_MARKET') or '').strip() or None,
+        }
+    log(f"  [港股] 公司资料 {len(out)} 只")
+    return out
+
+
+def fetch_hk_fin(today):
+    """返回 (period, {code: row}) 与 {year: {code: netprofit}}"""
+    ay = latest_annual_year(today)
+    cands = [f"{ay}-12-31", f"{ay - 1}-12-31"]
+    period, rows = pick_period("RPT_HKF10_FN_MAININDICATOR", cands, "REPORT_DATE", "港股F10")
+    fin = {}
+    for r in rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if code and re.match(r'^\d{5}$', code):
+            fin[code] = r
+    log(f"  [港股] F10 主要指标 {len(fin)} 只（报告期 {period}）")
+
+    profits = {}
+    ys = [str(ay - i) for i in range(4)]
+    for y in ys:
+        rr, _ = em_fetch("RPT_HKF10_FN_MAININDICATOR", filt=f"(REPORT_DATE='{y}-12-31')",
+                         tag=f"港股年报{y}")
+        m = {}
+        for r in rr:
+            code = (r.get('SECURITY_CODE') or '').strip()
+            if code:
+                m[code] = r.get('HOLDER_PROFIT')
+        profits[y] = m
+        log(f"  [港股] 年报 {y} 归母净利 {len(m)} 只")
+        time.sleep(0.1)
+    return period, fin, profits
+
+
+# ============================================================
+# 腾讯批量报价
 # ============================================================
 def sym_of(code, exch):
-    p = {'SH': 'sh', 'SZ': 'sz', 'BJ': 'bj'}.get(exch, 'sh')
-    return f"{p}{code}"
+    return {'SH': 'sh', 'SZ': 'sz', 'BJ': 'bj', 'HK': 'hk'}.get(exch, 'sh') + code
 
 
-def tx_field_map(parts):
-    """解析腾讯 qt 字段（~ 分隔）。返回 dict。"""
+def parse_quote(parts, exch):
     def g(i):
         try:
             return parts[i]
         except Exception:
             return ''
-    return {
-        'name': g(1),
-        'code': g(2),
-        'close': g(3),
-        'change_pct': g(32),   # 涨跌%
-        'turnover': g(38),     # 换手率%
-        'pe_ttm': g(39),       # 市盈率(TTM)
-        'mktcap': g(44),       # 总市值(亿元)
-        'circ_mktcap': g(45),  # 流通市值(亿元)
-        'pb': g(46),           # 市净率
+    d = {
+        'name': g(1), 'close': g(3), 'change_pct': g(32),
+        'turnover': g(38), 'pe_ttm': g(39),
+        'mktcap': g(44), 'circ_mktcap': g(45),
     }
+    if exch == 'HK':
+        # 港股第 46 位是英文简称，不是 PB；PB 由东财 F10 的 PB_TTM 提供
+        d['pb'] = None
+    else:
+        d['pb'] = g(46)
+    return d
 
 
-def fetch_quotes_batch(syms):
-    """syms: list of 腾讯 symbol。返回 {sym: fieldmap}。"""
+def fetch_quotes_batch(syms, exch):
     if not syms:
         return {}
-    s = ','.join(syms)
-    u = "https://qt.gtimg.cn/q=" + s
+    u = "https://qt.gtimg.cn/q=" + ','.join(syms)
     txt = http_get(u, HEADERS_TX, timeout=20, tries=3)
     res = {}
     if not txt:
         return res
+    try:
+        txt = txt.encode('latin-1').decode('gbk', errors='ignore')
+    except Exception:
+        pass
     for line in txt.strip().split('\n'):
         if '="' not in line:
             continue
         try:
-            prefix = line.split('="')[0]            # v_sh600519
-            sym = prefix.split('_')[-1]
+            sym = line.split('="')[0].split('_')[-1]
             body = line.split('="')[1].rstrip('";')
-            parts = body.split('~')
-            res[sym] = tx_field_map(parts)
+            res[sym] = parse_quote(body.split('~'), exch)
         except Exception:
             continue
     return res
 
 
 # ============================================================
-# 4) 日线 K 线（新浪，稳定）→ 收益/回撤/夏普/上市日
+# K 线
 # ============================================================
-def fetch_kline(sym):
-    """返回 close 价格列表（旧→新）与首日期字符串；失败返回 (None, None)。"""
-    u = ("https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
-         f"CN_MarketData.getKLineData?symbol={sym}&scale=240&ma=no&datalen=800")
-    txt = http_get(u, HEADERS_SINA, timeout=20, tries=3)
-    if not txt:
-        return None, None
-    try:
-        bars = json.loads(txt)
-    except Exception:
-        return None, None
-    if not bars:
-        return None, None
-    closes = []
-    first_date = None
-    for b in bars:
+def kline_tx(sym, n=260):
+    """A 股日线（前复权）。"""
+    u = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={sym},day,,,{n},qfq"
+    j = http_json(u, HEADERS_TX, timeout=15, tries=2)
+    if not j:
+        return None
+    d = j.get('data') or {}
+    k = d.get(sym) or {}
+    day = k.get('qfqday') or k.get('day') or []
+    if len(day) < 2:
+        return None
+    out = []
+    for b in day:
         try:
-            closes.append(float(b['close']))
-            if first_date is None:
-                first_date = b.get('day', '')[:10]
+            out.append(float(b[2]))
         except Exception:
             pass
-    if not closes:
-        return None, None
-    return closes, first_date
+    return out or None
 
 
+def kline_tx_hk(sym, n=260):
+    """港股日线必须用 hkfqkline 端点：通用 fqkline 对港股返回非 JSON，会全部失败。"""
+    u = f"https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get?param={sym},day,,,{n},qfq"
+    j = http_json(u, HEADERS_TX, timeout=15, tries=2)
+    if not j:
+        return None
+    d = j.get('data') or {}
+    k = d.get(sym) or {}
+    day = k.get('qfqday') or k.get('day') or []
+    if len(day) < 2:
+        return None
+    out = []
+    for b in day:
+        try:
+            out.append(float(b[2]))
+        except Exception:
+            pass
+    return out or None
+
+
+def kline_sina(sym, n=260):
+    u = ("https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/"
+         f"CN_MarketData.getKLineData?symbol={sym}&scale=240&ma=no&datalen={n}")
+    t = http_get(u, HEADERS_SINA, timeout=15, tries=2)
+    if not t:
+        return None
+    try:
+        bars = json.loads(t)
+    except Exception:
+        return None
+    out = []
+    for b in bars or []:
+        try:
+            out.append(float(b['close']))
+        except Exception:
+            pass
+    return out or None
+
+
+def fetch_kline(sym, exch):
+    if exch == 'HK':
+        return kline_tx_hk(sym) or kline_tx(sym)
+    c = kline_tx(sym)
+    if c and len(c) >= 20:
+        return c
+    return kline_sina(sym)
+
+
+# ============================================================
+# 指标
+# ============================================================
 def pct_return(closes, bars_back):
-    if len(closes) <= bars_back:
+    if not closes or len(closes) <= bars_back:
         return None
     old = closes[-(bars_back + 1)]
-    new = closes[-1]
-    if old in (0, None):
+    if not old:
         return None
-    return (new - old) / old * 100.0
+    return (closes[-1] - old) / old * 100.0
 
 
 def max_drawdown(closes, bars_back):
-    if len(closes) <= bars_back:
-        window = closes
-    else:
-        window = closes[-(bars_back + 1):]
+    if not closes:
+        return None
+    window = closes[-(bars_back + 1):] if len(closes) > bars_back else closes
     if len(window) < 2:
         return None
     peak = window[0]
@@ -281,14 +456,13 @@ def max_drawdown(closes, bars_back):
             dd = (p - peak) / peak
             if dd < mdd:
                 mdd = dd
-    return mdd * 100.0  # 负值
+    return mdd * 100.0
 
 
 def sharpe(closes, bars_back):
-    if len(closes) <= bars_back:
-        window = closes
-    else:
-        window = closes[-(bars_back + 1):]
+    if not closes:
+        return None
+    window = closes[-(bars_back + 1):] if len(closes) > bars_back else closes
     if len(window) < 3:
         return None
     rets = []
@@ -305,54 +479,55 @@ def sharpe(closes, bars_back):
     return (mean / std) * math.sqrt(252)
 
 
-# ============================================================
-# 5) 分位计算
-# ============================================================
-def percentile_ranks(values):
-    """values: list of (key, num|None)。返回 {key: 0-100 百分位}。"""
-    valid = [(k, v) for k, v in values if v is not None and not (isinstance(v, float) and math.isnan(v))]
+def percentile_ranks(pairs):
+    """pairs: [(key, val|None)] → {key: 0-100 百分位}（并列取平均秩）"""
+    valid = [(k, v) for k, v in pairs if v is not None and not (isinstance(v, float) and
+             (math.isnan(v) or math.isinf(v)))]
+    out = {k: None for k, _ in pairs}
     if not valid:
-        return {k: None for k, _ in values}
+        return out
     vs = sorted(v for _, v in valid)
     n = len(vs)
-    out = {}
+    if n == 1:
+        out[valid[0][0]] = 50.0
+        return out
     for k, v in valid:
-        # 线性插值百分位
-        lo, hi = 0, n - 1
-        # 用 bisect 风格计数
-        cnt_le = sum(1 for x in vs if x <= v)
-        # rank-based percentile (0-100)
-        pct = (cnt_le - 1) / (n - 1) * 100.0 if n > 1 else 50.0
-        out[k] = round(pct, 2)
-    for k, v in values:
-        if v is None or (isinstance(v, float) and math.isnan(v)):
-            out[k] = None
+        lo = bisect.bisect_left(vs, v)
+        hi = bisect.bisect_right(vs, v)
+        rank = lo + (hi - lo - 1) / 2.0
+        out[k] = round(rank / (n - 1) * 100.0, 2)
     return out
 
 
-# ============================================================
-# 6) 风控标记
-# ============================================================
-def risk_flags(name, list_date, daily_change, volume_zero=False):
-    name_u = (name or '').upper()
-    is_st = ('ST' in name_u)
-    is_delisted = ('退' in (name or ''))  # 退市 / 退市整理
-    # 停牌：宽松判定 —— 涨跌幅为空且非交易时间，或名称含「停」
-    is_suspended = (('停' in (name or '')) or
-                    (daily_change is None and volume_zero))
-    listed_recent = False
-    if list_date:
-        try:
-            ld = datetime.date.fromisoformat(list_date)
-            if (datetime.date.today() - ld).days < 60:
-                listed_recent = True
-        except Exception:
-            pass
-    return is_st, is_delisted, is_suspended, listed_recent
+def build_dim(rows, factors):
+    """factors: [(attr, reverse), ...] 返回 {code: 0-100}（各因子分位取平均）"""
+    pcts = []
+    for attr, rev in factors:
+        pairs = [(r['code'], (None if r[attr] is None else -r[attr]) if rev else r[attr])
+                 for r in rows]
+        pcts.append(percentile_ranks(pairs))
+    out = {}
+    for r in rows:
+        vals = [p.get(r['code']) for p in pcts]
+        vals = [v for v in vals if v is not None]
+        out[r['code']] = round(sum(vals) / len(vals), 2) if vals else None
+    return out
+
+
+def fnum(x):
+    try:
+        if x is None or x == '':
+            return None
+        v = float(x)
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return v
+    except Exception:
+        return None
 
 
 # ============================================================
-# 7) 写库（Management API / curl 绕过 Cloudflare）
+# 写库
 # ============================================================
 def pg(sql, timeout=600):
     payload = json.dumps({'query': sql})
@@ -362,7 +537,7 @@ def pg(sql, timeout=600):
          '-H', 'Content-Type: application/json', '-d', payload],
         capture_output=True, text=True, timeout=timeout + 30)
     if r.returncode != 0:
-        raise RuntimeError(f'curl fail: {r.stderr[:100]}')
+        raise RuntimeError(f'curl fail: {r.stderr[:150]}')
     t = r.stdout.strip()
     if not t:
         return []
@@ -387,41 +562,45 @@ def sql_str(v):
     return "'" + str(v).replace("'", "''") + "'"
 
 
+def sql_bool(v):
+    return 'true' if v else 'false'
+
+
+COLS = ["code", "name", "industry", "industry_code", "exchange", "secid", "close",
+        "pe_ttm", "pb", "mktcap", "circ_mktcap", "turnover_rate",
+        "return_1m", "return_3m", "return_6m", "return_1y", "return_3y",
+        "daily_change", "max_drawdown", "sharpe",
+        "k_ret", "k_drawdown", "k_sharpe", "k_all",
+        "is_st", "is_delisted", "is_suspended", "list_date", "updated_at",
+        "rev_yoy", "profit_yoy", "profit_cagr_3y", "roe", "gross_margin",
+        "ocf_to_profit", "debt_ratio", "loss_years", "peg", "fin_period", "risk_flag",
+        "k_growth", "k_quality", "k_safety", "k_value", "k_momentum"]
+
+
 def write_staging(rows):
-    """rows: list of dict。TRUNCATE 后分批 INSERT。"""
-    pg(f"TRUNCATE TABLE public.stock_scores_staging;")
-    cols = ["code", "name", "industry", "industry_code", "exchange", "secid", "close",
-            "pe_ttm", "pb", "mktcap", "circ_mktcap", "turnover_rate",
-            "return_1m", "return_3m", "return_6m", "return_1y", "return_3y",
-            "daily_change", "max_drawdown", "sharpe",
-            "k_ret", "k_drawdown", "k_sharpe", "k_all",
-            "is_st", "is_delisted", "is_suspended", "list_date", "updated_at"]
-    BATCH = 150
+    pg("TRUNCATE TABLE public.stock_scores_staging;")
+    BATCH = 120
     now = datetime.datetime.now().isoformat()
     total = 0
     for i in range(0, len(rows), BATCH):
         chunk = rows[i:i + BATCH]
-        val_parts = []
+        parts = []
         for r in chunk:
-            vals = [sql_str(r.get('code')), sql_str(r.get('name')), sql_str(r.get('industry')),
-                    sql_str(r.get('industry_code')), sql_str(r.get('exchange')), sql_str(r.get('secid')),
-                    sql_num(r.get('close')), sql_num(r.get('pe_ttm')), sql_num(r.get('pb')),
-                    sql_num(r.get('mktcap')), sql_num(r.get('circ_mktcap')), sql_num(r.get('turnover_rate')),
-                    sql_num(r.get('return_1m')), sql_num(r.get('return_3m')), sql_num(r.get('return_6m')),
-                    sql_num(r.get('return_1y')), sql_num(r.get('return_3y')), sql_num(r.get('daily_change')),
-                    sql_num(r.get('max_drawdown')), sql_num(r.get('sharpe')),
-                    sql_num(r.get('k_ret')), sql_num(r.get('k_drawdown')), sql_num(r.get('k_sharpe')),
-                    sql_num(r.get('k_all')),
-                    'true' if r.get('is_st') else 'false', 'true' if r.get('is_delisted') else 'false',
-                    'true' if r.get('is_suspended') else 'false', sql_str(r.get('list_date')), sql_str(now)]
-            val_parts.append("(" + ",".join(vals) + ")")
-        sql = (f"INSERT INTO public.stock_scores_staging ({','.join(cols)}) VALUES "
-               + ",".join(val_parts) + ";")
+            vals = [sql_str(r.get(c)) if c in ('code', 'name', 'industry', 'industry_code',
+                                               'exchange', 'secid', 'list_date',
+                                               'fin_period', 'risk_flag')
+                    else ('true' if r.get(c) else 'false') if c in ('is_st', 'is_delisted', 'is_suspended')
+                    else sql_str(now) if c == 'updated_at'
+                    else sql_num(r.get(c))
+                    for c in COLS]
+            parts.append("(" + ",".join(vals) + ")")
+        sql = (f"INSERT INTO public.stock_scores_staging ({','.join(COLS)}) VALUES "
+               + ",".join(parts) + ";")
         try:
             pg(sql, timeout=300)
             total += len(chunk)
         except Exception as e:
-            print(f"  [ERR] 批量写入失败(跳过该批): {e}", flush=True)
+            log(f"  [ERR] 批次写入失败（跳过）：{str(e)[:160]}")
     return total
 
 
@@ -430,11 +609,11 @@ def write_etl_log(rows, status, detail):
     now = datetime.datetime.now().isoformat()
     sql = (f"INSERT INTO public.etl_run_log (run_date, step_name, status, start_time, end_time, "
            f"rows_affected, error_message) VALUES ('{today}','fetch_stock_scores','{status}','{now}','{now}',"
-           f"{rows},'{detail.replace(chr(39), chr(39)*2)}');")
+           f"{rows},'{detail.replace(chr(39), chr(39) * 2)}');")
     try:
         pg(sql, timeout=120)
     except Exception as e:
-        print(f"  [WARN] etl_run_log 写入失败: {e}", flush=True)
+        log(f"  [WARN] etl_run_log 写入失败: {e}")
 
 
 # ============================================================
@@ -442,139 +621,305 @@ def write_etl_log(rows, status, detail):
 # ============================================================
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--limit', type=int, default=0, help='限制处理的成分股数量（调试用）')
-    ap.add_argument('--skip-industry', action='store_true', help='跳过行业映射')
+    ap.add_argument('--limit', type=int, default=0, help='调试：限制处理数量')
+    ap.add_argument('--no-kline', action='store_true', help='跳过 K 线（动量维度留空）')
+    ap.add_argument('--kline-budget', type=int, default=1200, help='K 线总时间预算（秒）')
     args = ap.parse_args()
 
-    print('=' * 64, flush=True)
-    print(' 抓取 A 股股票数据 → stock_scores_staging', flush=True)
-    print('=' * 64, flush=True)
+    today = datetime.date.today()
+    t_start = time.time()
+    log('=' * 66)
+    log(' 沪深京港全市场 · 靠谱成长指数 v1 → stock_scores_staging')
+    log('=' * 66)
 
-    constituents = fetch_constituents()
-    if not constituents:
-        print('  [ERR] 成分股为空，终止', flush=True)
-        write_etl_log(0, 'failed', '成分股接口返回空')
-        sys.exit(1)
+    # ---------- 1. 基本面 ----------
+    log('\n[1/6] 抓取 A 股财务数据...')
+    a_period, a_fin, a_ann_period, a_ann, a_bal_period, a_bal, a_profits = fetch_a_universe(today)
+    log('\n[2/6] 抓取港股财务数据...')
+    hk_list = fetch_hk_list()
+    hk_period, hk_fin, hk_profits = fetch_hk_fin(today)
 
-    industry_map = {} if args.skip_industry else fetch_industry_map()
+    # ---------- 2. 组装 universe ----------
+    universe = {}   # code -> dict(exchange, name, ...)
+    # A 股 universe 只取「业绩报表 + 年报业绩」中 SECURITY_TYPE='A股' 的代码，
+    # 资产负债表仅作指标查询，不参与 universe（否则会混入新三板）
+    for code in a_fin:
+        exch = exchange_of_a(code)
+        if exch:
+            universe[code] = {'exchange': exch, 'src': 'A'}
+    for code in a_ann:
+        exch = exchange_of_a(code)
+        if exch and code not in universe:
+            universe[code] = {'exchange': exch, 'src': 'A'}
+    for code in hk_list:
+        universe[code] = {'exchange': 'HK', 'src': 'HK'}
+    log(f"\n[3/6] universe 合计 {len(universe)} 只"
+        f"（A股 {sum(1 for v in universe.values() if v['src'] == 'A')} / "
+        f"港股 {sum(1 for v in universe.values() if v['src'] == 'HK')}）")
 
-    # 行情（腾讯批量）
-    print('  [行情] 腾讯批量报价...', flush=True)
-    syms = [sym_of(c, e) for (c, n, s, e) in constituents]
+    # ---------- 3. 行情 ----------
+    log('\n[4/6] 腾讯批量报价...')
     quote_map = {}
-    for i in range(0, len(syms), 50):
-        batch = syms[i:i + 50]
-        q = fetch_quotes_batch(batch)
-        quote_map.update(q)
-        time.sleep(0.15)
-    print(f'  [行情] 获取到 {len(quote_map)} 只报价', flush=True)
+    for exch in ('SH', 'SZ', 'BJ', 'HK'):
+        syms = [sym_of(c, v['exchange']) for c, v in universe.items() if v['exchange'] == exch]
+        got = 0
+        for i in range(0, len(syms), 50):
+            q = fetch_quotes_batch(syms[i:i + 50], exch)
+            quote_map.update(q)
+            got += len(q)
+            time.sleep(0.12)
+        log(f"  [{exch}] 请求 {len(syms)} 只，取到 {got} 只")
 
-    # K 线 + 指标（新浪，并发）
-    print('  [K线] 新浪日线计算收益/回撤/夏普...', flush=True)
+    # 过滤无有效报价（退市/长期停牌）
+    alive = {}
+    for code, meta in universe.items():
+        sym = sym_of(code, meta['exchange'])
+        q = quote_map.get(sym) or {}
+        if fnum(q.get('close')):
+            alive[code] = meta
+    log(f"  有有效报价 {len(alive)} 只（剔除 {len(universe) - len(alive)} 只无报价）")
+
+    codes = sorted(alive.keys())
+    if args.limit:
+        codes = codes[:args.limit]
+
+    # ---------- 4. K 线 ----------
     kline_cache = {}
-    with ThreadPoolExecutor(max_workers=12) as ex:
-        fut = {ex.submit(fetch_kline, sym): sym for sym in syms}
-        for f in as_completed(fut):
-            sym = fut[f]
-            try:
-                closes, first_date = f.result()
-                kline_cache[sym] = (closes, first_date)
-            except Exception:
-                kline_cache[sym] = (None, None)
-    print(f'  [K线] 获取到 {sum(1 for v in kline_cache.values() if v[0])} 只有效 K 线', flush=True)
+    if not args.no_kline:
+        log(f'\n[5/6] 日线 K 线（预算 {args.kline_budget}s，32 并发）...')
+        t0 = time.time()
+        todo = [(c, alive[c]['exchange']) for c in codes]
+        done = 0
+        with ThreadPoolExecutor(max_workers=32) as ex:
+            futs = {ex.submit(fetch_kline, sym_of(c, e), e): c for c, e in todo}
+            for f in as_completed(futs):
+                code = futs[f]
+                done += 1
+                try:
+                    kline_cache[code] = f.result()
+                except Exception:
+                    kline_cache[code] = None
+                if done % 1000 == 0:
+                    log(f"    K线进度 {done}/{len(todo)}，用时 {time.time() - t0:.0f}s")
+                if time.time() - t0 > args.kline_budget:
+                    log(f"    K线超出预算，停止（已完成 {done}/{len(todo)}）")
+                    break
+        ok = sum(1 for v in kline_cache.values() if v)
+        log(f"  K线有效 {ok} 只，用时 {time.time() - t0:.0f}s")
+    else:
+        log('\n[5/6] 跳过 K 线')
 
+    # ---------- 5. 组装 + 评分 ----------
+    log('\n[6/6] 组装指标并计算五维评分...')
     rows = []
-    ok = 0
-    for (code, name, secu, exch) in constituents:
-        if args.limit and ok >= args.limit:
-            break
+    for code in codes:
+        meta = alive[code]
+        exch = meta['exchange']
         sym = sym_of(code, exch)
-        q = quote_map.get(sym, {})
-        closes, first_date = kline_cache.get(sym, (None, None))
-        # 名称优先用腾讯（更准），否则用成分股名
-        nm = (q.get('name') or name or '').strip()
-        if not nm:
-            continue
-        # 数值解析
-        def fnum(x):
-            try:
-                return float(x)
-            except Exception:
-                return None
-        close = fnum(q.get('close'))
-        daily_change = fnum(q.get('change_pct'))
-        pe = fnum(q.get('pe_ttm'))
-        pb = fnum(q.get('pb'))
-        mktcap = fnum(q.get('mktcap'))
-        circ = fnum(q.get('circ_mktcap'))
-        turnover = fnum(q.get('turnover'))
-        # K 线指标
-        r1m = pct_return(closes, TD_1M) if closes else None
-        r3m = pct_return(closes, TD_3M) if closes else None
-        r6m = pct_return(closes, TD_6M) if closes else None
-        r1y = pct_return(closes, TD_1Y) if closes else None
-        r3y = pct_return(closes, TD_3Y) if closes else None
-        mdd = max_drawdown(closes, TD_1Y) if closes else None
-        shp = sharpe(closes, TD_1Y) if closes else None
-        # 数据质量 sanity guard（A 股单日涨跌幅限 ±10%，故区间收益存在物理上界；
-        # 超出者多为 K 线复权/新股基数失真，置空避免污染评分与展示）
-        r1m = None if (r1m is not None and abs(r1m) > 100) else r1m
-        r3m = None if (r3m is not None and abs(r3m) > 200) else r3m
-        r6m = None if (r6m is not None and abs(r6m) > 350) else r6m
-        r1y = None if (r1y is not None and abs(r1y) > 400) else r1y
-        r3y = None if (r3y is not None and abs(r3y) > 1000) else r3y
-        mdd = None if (mdd is not None and (mdd > 0 or mdd < -100)) else mdd
-        # secid：沪 1.code / 深 0.code / 京 0.code
-        secid_prefix = '1' if exch == 'SH' else '0'
-        secid = f"{secid_prefix}.{code}"
-        is_st, is_delisted, is_suspended, listed_recent = risk_flags(nm, first_date, daily_change)
-        industry = industry_map.get(code)
-        rows.append({
-            'code': f"{code}.{exch}", 'name': nm, 'industry': industry, 'industry_code': None,
-            'exchange': exch, 'secid': secid, 'close': close, 'pe_ttm': pe, 'pb': pb,
-            'mktcap': mktcap, 'circ_mktcap': circ, 'turnover_rate': turnover,
-            'return_1m': r1m, 'return_3m': r3m, 'return_6m': r6m, 'return_1y': r1y, 'return_3y': r3y,
-            'daily_change': daily_change, 'max_drawdown': mdd, 'sharpe': shp,
-            'k_ret': None, 'k_drawdown': None, 'k_sharpe': None, 'k_all': None,
-            'is_st': is_st, 'is_delisted': is_delisted, 'is_suspended': is_suspended,
-            'list_date': first_date,
-        })
-        ok += 1
+        q = quote_map.get(sym) or {}
+        nm = (q.get('name') or '').strip()
 
-    print(f'  [合并] 构建 {len(rows)} 行（含 K 线 {sum(1 for r in rows if r["return_3y"] is not None)} 只）', flush=True)
+        rec = {c: None for c in COLS}
+        rec['code'] = f"{code}.{exch}"
+        rec['exchange'] = exch
+        rec['secid'] = ('116.' + code) if exch == 'HK' else (('1.' if exch == 'SH' else '0.') + code)
+        rec['close'] = fnum(q.get('close'))
+        rec['daily_change'] = fnum(q.get('change_pct'))
+        rec['turnover_rate'] = fnum(q.get('turnover')) or None
+        rec['mktcap'] = fnum(q.get('mktcap'))
+        rec['circ_mktcap'] = fnum(q.get('circ_mktcap'))
+        rec['pe_ttm'] = fnum(q.get('pe_ttm'))
+        rec['pb'] = fnum(q.get('pb'))
+        rec['name'] = nm
+        rec['industry'] = None
+        rec['industry_code'] = None
+        rec['list_date'] = None
+        fin_period = None
 
-    # 风控过滤标记（仅标记，不删除；promote 阶段再过滤）
-    # 计算分位
-    kret_pairs = [(r['code'], r['return_3y']) for r in rows]   # k_ret 以 return_3y 为代表
-    kdd_pairs = [(r['code'], (-r['max_drawdown']) if r['max_drawdown'] is not None else None) for r in rows]
-    ksh_pairs = [(r['code'], r['sharpe']) for r in rows]
-    pr_ret = percentile_ranks(kret_pairs)
-    pr_dd = percentile_ranks(kdd_pairs)
-    pr_sh = percentile_ranks(ksh_pairs)
-    for r in rows:
-        kr = pr_ret.get(r['code'])
-        kd = pr_dd.get(r['code'])
-        ks = pr_sh.get(r['code'])
-        r['k_ret'] = kr
-        r['k_drawdown'] = kd
-        r['k_sharpe'] = ks
-        if kr is not None and kd is not None and ks is not None:
-            r['k_all'] = round(0.5 * kr + 0.25 * kd + 0.25 * ks, 2)
+        if exch == 'HK':
+            info = hk_list.get(code, {})
+            if not nm:
+                nm = info.get('name') or ''
+            rec['name'] = nm
+            rec['industry'] = info.get('industry')
+            rec['list_date'] = info.get('list_date')
+            f = hk_fin.get(code, {})
+            if f:
+                fin_period = (f.get('REPORT_DATE') or '')[:10] or None
+                rec['rev_yoy'] = fnum(f.get('OPERATE_INCOME_YOY'))
+                rec['profit_yoy'] = fnum(f.get('HOLDER_PROFIT_YOY'))
+                rec['roe'] = fnum(f.get('ROE_AVG'))
+                rec['gross_margin'] = fnum(f.get('GROSS_PROFIT_RATIO'))
+                rec['debt_ratio'] = fnum(f.get('DEBT_ASSET_RATIO'))
+                eps = fnum(f.get('BASIC_EPS'))
+                ocf = fnum(f.get('PER_NETCASH_OPERATE'))
+                if eps and eps > 0 and ocf is not None:
+                    rec['ocf_to_profit'] = round(ocf / eps, 3)
+                if rec['pe_ttm'] is None:
+                    rec['pe_ttm'] = fnum(f.get('PE_TTM'))
+                rec['pb'] = fnum(f.get('PB_TTM'))
+                if rec['mktcap'] is None:
+                    rec['mktcap'] = fnum(f.get('TOTAL_MARKET_CAP'))
+            pmap = hk_profits
         else:
+            f_new = a_fin.get(code, {})
+            f_ann = a_ann.get(code, {})
+            b = a_bal.get(code, {})
+            rec['industry'] = (b.get('INDUSTRY_NAME') or f_new.get('BOARD_NAME') or
+                               f_ann.get('BOARD_NAME') or None)
+            rec['industry_code'] = b.get('INDUSTRY_CODE')
+            # 同比用最新期，ROE/毛利率/负债率用年报（与港股口径一致）
+            if f_new:
+                fin_period = (f_new.get('REPORTDATE') or '')[:10] or None
+                rec['rev_yoy'] = fnum(f_new.get('YSTZ'))
+                rec['profit_yoy'] = fnum(f_new.get('SJLTZ'))
+            if f_ann:
+                if fin_period is None:
+                    fin_period = (f_ann.get('REPORTDATE') or '')[:10] or None
+                if rec['rev_yoy'] is None:
+                    rec['rev_yoy'] = fnum(f_ann.get('YSTZ'))
+                if rec['profit_yoy'] is None:
+                    rec['profit_yoy'] = fnum(f_ann.get('SJLTZ'))
+                rec['roe'] = fnum(f_ann.get('WEIGHTAVG_ROE'))
+                rec['gross_margin'] = fnum(f_ann.get('XSMLL'))
+                eps = fnum(f_ann.get('BASIC_EPS'))
+                ocf = fnum(f_ann.get('MGJYXJJE'))
+                if eps and eps > 0 and ocf is not None:
+                    rec['ocf_to_profit'] = round(ocf / eps, 3)
+            if b:
+                rec['debt_ratio'] = fnum(b.get('DEBT_ASSET_RATIO'))
+            pmap = a_profits
+        rec['fin_period'] = fin_period
+
+        # 年报净利 → CAGR / 连续亏损年数
+        years = sorted(pmap.keys(), reverse=True)[:4]
+        if years:
+            seq = []
+            for y in years:
+                seq.append(fnum((pmap.get(y) or {}).get(code)))
+            latest = seq[0]
+            oldest = seq[-1]
+            if latest is not None and oldest is not None and oldest > 0 and latest > 0 and len(years) >= 4:
+                try:
+                    rec['profit_cagr_3y'] = round(((latest / oldest) ** (1.0 / (len(years) - 1)) - 1) * 100, 2)
+                except Exception:
+                    rec['profit_cagr_3y'] = None
+            ly = 0
+            for v in seq:
+                if v is None:
+                    break
+                if v < 0:
+                    ly += 1
+                else:
+                    break
+            rec['loss_years'] = ly
+
+        # PEG
+        if rec['pe_ttm'] is not None and rec['pe_ttm'] > 0 and rec['profit_yoy'] is not None \
+                and rec['profit_yoy'] > 0:
+            rec['peg'] = round(rec['pe_ttm'] / rec['profit_yoy'], 3)
+
+        # 估值反向百分位：亏损股 PE<=0 无意义
+        if rec['pe_ttm'] is not None and rec['pe_ttm'] <= 0:
+            rec['pe_ttm'] = None
+
+        # K 线指标
+        closes = kline_cache.get(code)
+        if closes:
+            r1m = pct_return(closes, TD_1M)
+            r3m = pct_return(closes, TD_3M)
+            r6m = pct_return(closes, TD_6M)
+            r1y = pct_return(closes, TD_1Y)
+            r3y = pct_return(closes, TD_3Y)
+            mdd = max_drawdown(closes, TD_1Y)
+            shp = sharpe(closes, TD_1Y)
+            r1m = None if (r1m is not None and abs(r1m) > 100) else r1m
+            r3m = None if (r3m is not None and abs(r3m) > 200) else r3m
+            r6m = None if (r6m is not None and abs(r6m) > 350) else r6m
+            r1y = None if (r1y is not None and abs(r1y) > 400) else r1y
+            r3y = None if (r3y is not None and abs(r3y) > 1000) else r3y
+            mdd = None if (mdd is not None and (mdd > 0 or mdd < -100)) else mdd
+            rec['return_1m'], rec['return_3m'], rec['return_6m'] = r1m, r3m, r6m
+            rec['return_1y'], rec['return_3y'] = r1y, r3y
+            rec['max_drawdown'], rec['sharpe'] = mdd, shp
+
+        # 风控标记
+        flags = []
+        name_u = (nm or '').upper()
+        is_st = 'ST' in name_u
+        is_delisted = '退' in (nm or '')
+        is_suspended = ('停' in (nm or '')) or (rec['close'] is not None and rec['turnover_rate'] == 0)
+        listed_recent = False
+        if rec['list_date']:
+            try:
+                ld = datetime.date.fromisoformat(rec['list_date'])
+                if (today - ld).days < 60:
+                    listed_recent = True
+            except Exception:
+                pass
+        rec['is_st'], rec['is_delisted'], rec['is_suspended'] = is_st, is_delisted, is_suspended
+        if is_st:
+            flags.append('ST')
+        if is_delisted:
+            flags.append('DELISTED')
+        if is_suspended:
+            flags.append('SUSPENDED')
+        if listed_recent:
+            flags.append('NEW')
+        if (rec['loss_years'] or 0) >= 2:
+            flags.append('LOSS2')
+        rec['risk_flag'] = ','.join(flags) or None
+        rows.append(rec)
+
+    log(f"  组装 {len(rows)} 行")
+
+    # ---- 五维分位 ----
+    kg = build_dim(rows, [('rev_yoy', False), ('profit_yoy', False), ('profit_cagr_3y', False)])
+    kq = build_dim(rows, [('roe', False), ('gross_margin', False), ('ocf_to_profit', False)])
+    ks = build_dim(rows, [('debt_ratio', True), ('loss_years', True)])
+    kv = build_dim(rows, [('pe_ttm', True), ('pb', True), ('peg', True)])
+    # 动量：近1年收益 + 回撤(反向) + 夏普
+    km = build_dim(rows, [('return_1y', False), ('max_drawdown', True), ('sharpe', False)])
+    # 兼容旧列
+    pr_ret = percentile_ranks([(r['code'], r['return_3y']) for r in rows])
+    pr_dd = percentile_ranks([(r['code'], (-r['max_drawdown']) if r['max_drawdown'] is not None else None)
+                              for r in rows])
+    pr_sh = percentile_ranks([(r['code'], r['sharpe']) for r in rows])
+
+    for r in rows:
+        c = r['code']
+        r['k_growth'], r['k_quality'], r['k_safety'] = kg.get(c), kq.get(c), ks.get(c)
+        r['k_value'], r['k_momentum'] = kv.get(c), km.get(c)
+        r['k_ret'], r['k_drawdown'], r['k_sharpe'] = pr_ret.get(c), pr_dd.get(c), pr_sh.get(c)
+        # 核心基本面（成长+质量）必须齐全，否则不给总分
+        if r['k_growth'] is None or r['k_quality'] is None:
             r['k_all'] = None
+            continue
+        num = 0.0
+        den = 0.0
+        for name, w in WEIGHTS:
+            v = r.get(name)
+            if v is not None:
+                num += w * v
+                den += w
+        r['k_all'] = round(num / den, 2) if den > 0 else None
 
     scored = sum(1 for r in rows if r['k_all'] is not None)
-    print(f'  [分位] k_all 非空 {scored}/{len(rows)}', flush=True)
+    log(f"  k_all 非空 {scored}/{len(rows)}")
 
-    # 写 staging
-    print('  [写入] stock_scores_staging ...', flush=True)
+    n_a = sum(1 for r in rows if r['exchange'] != 'HK')
+    n_hk = sum(1 for r in rows if r['exchange'] == 'HK')
+    log(f"  A股 {n_a} / 港股 {n_hk}")
+
     written = write_staging(rows)
-    print(f'  [写入] 完成，staging 写入 {written} 行', flush=True)
+    log(f"  写入 stock_scores_staging {written} 行，总耗时 {time.time() - t_start:.0f}s")
 
-    status = 'ok' if written >= 1500 else ('partial' if written > 0 else 'failed')
-    detail = f"成分股{len(constituents)}只, 报价{len(quote_map)}只, K线有效{sum(1 for r in rows if r['return_3y'] is not None)}只, 行业覆盖{len(industry_map)}只, k_all非空{scored}只"
+    status = 'ok' if written >= 5000 else ('partial' if written > 0 else 'failed')
+    detail = (f"universe{len(universe)}只, 有报价{len(alive)}只, 写入{written}只, "
+              f"A股{n_a}/港股{n_hk}, k_all非空{scored}, "
+              f"A股财报{a_period or 'NA'}|年报{a_ann_period or 'NA'}, 港股财报{hk_period or 'NA'}")
     write_etl_log(written, status, detail)
-    print(f'\n=== 抓取完成：status={status}, rows={written} ===', flush=True)
+    log(f"\n=== 完成 status={status} rows={written} ===")
 
 
 if __name__ == '__main__':

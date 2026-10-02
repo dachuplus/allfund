@@ -33,7 +33,61 @@ const baseFetch = (typeof fetch !== 'undefined' ? fetch : (...a) => Promise.reje
 const SUPABASE_HOST = 'tqhtegazxykkqfcpejky.supabase.co'
 const PROXY_BASE = 'https://dachu.me/api/sb-proxy'
 
-function rewriteToProxy(input) {
+/**
+ * ⚠️ EdgeOne CDN 对带 Range 头的请求会在边缘层直接返回 416
+ * （响应头 EO-Cache-Status: Return Directly，请求根本到不了 sb-proxy 函数），
+ * 导致 supabase-js 的 .range(from,to) 经代理一律失败。
+ * 这里把 Range 头等价改写成 PostgREST 的 offset/limit 查询参数，并删掉 Range 头。
+ * 返回 { targetPath, headers }（headers 为原对象，已就地删除 Range）。
+ */
+function convertRangeToOffsetLimit(targetPath, headers) {
+  let rangeVal = null
+  try {
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+      rangeVal = headers.get('range')
+    } else if (Array.isArray(headers)) {
+      const p = headers.find(([k]) => String(k).toLowerCase() === 'range')
+      rangeVal = p ? p[1] : null
+    } else if (headers && typeof headers === 'object') {
+      rangeVal = headers.range || headers.Range || null
+    }
+  } catch (_) {
+    rangeVal = null
+  }
+  if (!rangeVal) return { targetPath, headers }
+
+  // 删除 Range / Range-Unit，避免 CDN 再次判 416
+  try {
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+      headers.delete('range')
+      headers.delete('range-unit')
+    } else if (Array.isArray(headers)) {
+      for (let i = headers.length - 1; i >= 0; i--) {
+        const k = String(headers[i][0] || '').toLowerCase()
+        if (k === 'range' || k === 'range-unit') headers.splice(i, 1)
+      }
+    } else if (headers && typeof headers === 'object') {
+      delete headers.range
+      delete headers.Range
+      delete headers['range-unit']
+      delete headers['Range-Unit']
+    }
+  } catch (_) { /* 只读 headers 时忽略 */ }
+
+  const m = /(?:items=)?\s*(\d+)\s*-\s*(\d*)/.exec(String(rangeVal).trim())
+  if (!m) return { targetPath, headers }
+  const from = parseInt(m[1], 10)
+  const toStr = m[2]
+  const to = toStr === '' || toStr == null ? null : parseInt(toStr, 10)
+  if (Number.isNaN(from)) return { targetPath, headers }
+  const [p, qs] = targetPath.split('?')
+  const usp = new URLSearchParams(qs || '')
+  usp.set('offset', String(from))
+  usp.set('limit', String(to === null ? 1 : Math.max(0, to - from + 1)))
+  return { targetPath: p + '?' + usp.toString(), headers }
+}
+
+function rewriteToProxy(input, init) {
   let str
   if (typeof input === 'string') str = input
   else if (input && typeof input.url === 'string') str = input.url
@@ -45,7 +99,10 @@ function rewriteToProxy(input) {
   } catch (_) {
     return input
   }
-  const targetPath = u.pathname + u.search
+  let targetPath = u.pathname + u.search
+  if (init && init.headers) {
+    targetPath = convertRangeToOffsetLimit(targetPath, init.headers).targetPath
+  }
   return `${PROXY_BASE}?path=${encodeURIComponent(targetPath)}`
 }
 
@@ -98,7 +155,8 @@ function timeoutFetch(input, init = {}) {
     p = raceAuthFetch(input, init, controller.signal)
   } else {
     // 其他端点：继续走代理（沿用之前的优化链路，等 EdgeOne→Supabase 骨干网恢复）
-    const rewritten = rewriteToProxy(input)
+    // 传 init 以便把 supabase-js 的 Range 头改写为 offset/limit（CDN 会拦截 Range 返 416）
+    const rewritten = rewriteToProxy(input, init)
     p = baseFetch(rewritten, { ...init, signal: controller.signal })
   }
   return p.finally(() => clearTimeout(timer))

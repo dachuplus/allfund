@@ -29,12 +29,21 @@ MGMT_API = 'https://api.supabase.com/v1/projects/tqhtegazxykkqfcpejky/database/q
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# stock_scores 全部数据列（含 k_all 等，不含 code 由生产表主键）
+# stock_scores 全部数据列（含五维分与基本面因子，v2 全市场版）
 PROMOTE_COLS = (
     'code,name,industry,industry_code,exchange,secid,close,pe_ttm,pb,mktcap,circ_mktcap,'
     'turnover_rate,return_1m,return_3m,return_6m,return_1y,return_3y,daily_change,'
-    'max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,is_st,is_delisted,is_suspended,list_date,updated_at'
+    'max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,is_st,is_delisted,is_suspended,list_date,'
+    'updated_at,rev_yoy,profit_yoy,profit_cagr_3y,roe,gross_margin,ocf_to_profit,debt_ratio,'
+    'loss_years,peg,fin_period,risk_flag,k_growth,k_quality,k_safety,k_value,k_momentum'
 )
+
+# 全市场（沪深京 A 股 + 港股）校验阈值
+MIN_TOTAL = 5000          # 全市场覆盖下限
+MIN_KALL_RATE = 0.60      # 港股中部分标的可无财报，k_all 允许留空
+MIN_PE_RATE = 0.50
+MIN_PB_RATE = 0.50
+MIN_HK = 800              # 港股覆盖下限（防止港股源静默失效被 A 股掩盖）
 
 
 def pg(sql, timeout=300):
@@ -91,20 +100,38 @@ def main():
         sys.exit(1)
 
     ok = True
-    # 1. staging 必须有足够数据
-    ok &= check(staging_total >= 1500, f'staging 数据量充足 (>=1500): {staging_total}')
+    # 1. staging 必须有足够数据（全市场口径）
+    ok &= check(staging_total >= MIN_TOTAL, f'staging 数据量充足 (>={MIN_TOTAL}): {staging_total}')
 
-    # 2. k_all 非空率
+    # 2. 市场分布（沪深京 + 港）
+    mk = pg("SELECT exchange, count(*) AS c FROM public.stock_scores_staging GROUP BY exchange")
+    mkv = {r['exchange']: r['c'] for r in mk}
+    print(f'  [市场] ' + ', '.join(f"{k or 'NULL'}={v}" for k, v in sorted(mkv.items())), flush=True)
+    ok &= check((mkv.get('HK') or 0) >= MIN_HK,
+                f'港股覆盖 >= {MIN_HK}: {mkv.get("HK") or 0}')
+
+    # 3. k_all 非空率
     kall = pg("SELECT count(*) AS tot, count(k_all) AS scored FROM public.stock_scores_staging")[0]
     kall_rate = (kall['scored'] / kall['tot']) if kall['tot'] else 0
-    ok &= check(kall_rate >= 0.90, f'整体 k_all 非空率 >=90%: {kall_rate*100:.1f}% ({kall["scored"]}/{kall["tot"]})')
+    ok &= check(kall_rate >= MIN_KALL_RATE,
+                f'整体 k_all 非空率 >={MIN_KALL_RATE*100:.0f}%: {kall_rate*100:.1f}% ({kall["scored"]}/{kall["tot"]})')
 
-    # 3. pe/pb 非空率（宽松，展示字段允许部分为空）
+    # 4. 基本面因子非空率（成长/质量为模型核心，必须有覆盖）
+    fac = pg("SELECT count(*) AS tot, count(rev_yoy) AS rv, count(profit_yoy) AS py, count(roe) AS roe "
+             "FROM public.stock_scores_staging")[0]
+    ok &= check((fac['rv'] / fac['tot'] if fac['tot'] else 0) >= MIN_KALL_RATE,
+                f'rev_yoy 非空率 >={MIN_KALL_RATE*100:.0f}%: '
+                f'{(fac["rv"] / fac["tot"] * 100 if fac["tot"] else 0):.1f}%')
+    ok &= check((fac['roe'] / fac['tot'] if fac['tot'] else 0) >= MIN_KALL_RATE,
+                f'roe 非空率 >={MIN_KALL_RATE*100:.0f}%: '
+                f'{(fac["roe"] / fac["tot"] * 100 if fac["tot"] else 0):.1f}%')
+
+    # 5. pe/pb 非空率（宽松，展示字段允许部分为空）
     pepb = pg("SELECT count(*) AS tot, count(pe_ttm) AS pe, count(pb) AS pb FROM public.stock_scores_staging")[0]
     pe_rate = (pepb['pe'] / pepb['tot']) if pepb['tot'] else 0
     pb_rate = (pepb['pb'] / pepb['tot']) if pepb['tot'] else 0
-    ok &= check(pe_rate >= 0.50, f'pe_ttm 非空率 >=50%: {pe_rate*100:.1f}%')
-    ok &= check(pb_rate >= 0.50, f'pb 非空率 >=50%: {pb_rate*100:.1f}%')
+    ok &= check(pe_rate >= MIN_PE_RATE, f'pe_ttm 非空率 >={MIN_PE_RATE*100:.0f}%: {pe_rate*100:.1f}%')
+    ok &= check(pb_rate >= MIN_PB_RATE, f'pb 非空率 >={MIN_PB_RATE*100:.0f}%: {pb_rate*100:.1f}%')
 
     # 4. 各行业数量基本均衡（容差宽松：仅校验总条数达标；分行业天然不均，不因某行业少而拒绝）
     ind = pg("SELECT industry, count(*) AS cnt FROM public.stock_scores_staging GROUP BY industry ORDER BY cnt DESC")

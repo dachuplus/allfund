@@ -502,38 +502,96 @@ export async function fetchPEHistory(indexCode = '000300') {
 }
 
 // ========== 股票选品评分（stock_scores）==========
-// 数据来源：沪深300+中证500+中证1000 成分股；腾讯报价 + 新浪K线计算收益/回撤/夏普；
-// k_all = 0.5·k_ret + 0.25·k_drawdown + 0.25·k_sharpe（横截面百分位 0-100）。
+// 2026-10-02 重构：覆盖面由「沪深300+中证500+中证1000 成分股」升级为
+// **沪深京 A 股 + 港股全市场**；评分由基金式（收益/回撤/夏普）改为股票专属五维模型。
+// 五维（横截面百分位 0-100）：
+//   k_growth 成长 30% ← 营收同比、净利同比、近3年净利复合增速
+//   k_quality 质量 25% ← ROE、毛利率、经营现金流含金量
+//   k_safety  健康 20% ← 资产负债率(反向)、连续亏损年数(反向)
+//   k_value   估值 15% ← PE_TTM(反向)、PB(反向)、PEG(反向)
+//   k_momentum 动量 10% ← 近1年收益、近1年最大回撤(反向)、近1年夏普
+//   k_all = 加权和（缺失维度按权重归一化；成长/质量任一缺失则 k_all 为 NULL）
 // 注意：return_*/max_drawdown 在库中已为「百分比数值」（如 return_1y=361.22 表示 +361.22%），
 // 故前端展示时直接 toFixed(2)+'%'，切勿再用 fmtRet（会把小数×100）。
 const STOCK_SCORES_COLS =
-  'code,name,exchange,industry,pe_ttm,pb,mktcap,return_1m,return_3m,return_6m,return_1y,return_3y,max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,updated_at'
+  'code,name,exchange,industry,close,pe_ttm,pb,mktcap,return_1y,return_3y,max_drawdown,sharpe,' +
+  'rev_yoy,profit_yoy,profit_cagr_3y,roe,gross_margin,ocf_to_profit,debt_ratio,loss_years,peg,' +
+  'fin_period,risk_flag,k_growth,k_quality,k_safety,k_value,k_momentum,k_all,updated_at'
 
+function applyStockFilters(query, params) {
+  const { search = '', exchange = '' } = params
+  let q = query
+  if (search) {
+    q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+  }
+  if (exchange && exchange !== 'ALL') {
+    q = q.eq('exchange', exchange)
+  }
+  return q
+}
+
+/**
+ * 取总数。
+ * ⚠️ 不能用 PostgREST 的 Prefer: count=exact —— 实测经 /api/sb-proxy 一律 502
+ * （EdgeOne 平台层拦截，与表大小无关）。改用 SECURITY DEFINER 的 RPC
+ * public.stock_scores_stats(p_search, p_exchange, p_only_scored) 精确计数。
+ */
+async function fetchStockCount(client, params) {
+  const { search = '', exchange = '', onlyScored = false } = params
+  try {
+    const { data, error } = await client.rpc('stock_scores_stats', {
+      p_search: search || null,
+      p_exchange: exchange && exchange !== 'ALL' ? exchange : null,
+      p_only_scored: !!onlyScored,
+    })
+    if (!error && Array.isArray(data) && data.length) {
+      return Number(data[0].total) || 0
+    }
+  } catch (e) {
+    console.warn('[fetchStockScores] 总数获取失败，降级为不显示总数:', e)
+  }
+  return null
+}
+
+/**
+ * 分页查询。返回 { rows, total, hasMore }
+ * 说明：supabase-js 的 .range() 会发 Range 头，而 EdgeOne CDN 在边缘层对 Range 请求
+ * 直接返回 416；src/api/supabase.js 已把 Range 等价改写为 offset/limit，此处照常使用 .range()。
+ * 多取 1 行用于判断 hasMore（total 为 null 时的兜底）。
+ */
 export async function fetchStockScores(params = {}) {
-  // 股票评分读取优先走 sb-proxy（同域，绕开国内→新加坡直连 RESET/丢包）
   const client = supabase || supabaseDirect
-  if (!client) return []
-  const { search = '', exchange = '', sortKey = 'k_all', sortAsc = false, limit = 1000 } = params
+  if (!client) return { rows: [], total: 0, hasMore: false }
+  const {
+    search = '', exchange = '', sortKey = 'k_all', sortAsc = false,
+    page = 1, pageSize = 50, bottomRisk = true, onlyScored = false,
+  } = params
+  const from = Math.max(0, (page - 1) * pageSize)
+  const to = from + pageSize // 多取 1 行判断 hasMore
   const maxRetries = 2
+
+  const total = await fetchStockCount(client, { search, exchange, onlyScored })
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      query = applyStockFilters(query, { search, exchange })
+      if (onlyScored) query = query.not('k_all', 'is', null)
+      // 风险股（risk_flag 非空）置底：先按 risk_flag 升序且 NULL 排最前，再按目标列排序
+      if (bottomRisk && sortKey === 'k_all') {
+        query = query.order('risk_flag', { ascending: true, nullsFirst: true })
       }
-      if (exchange && exchange !== 'ALL') {
-        query = query.eq('exchange', exchange)
-      }
-      query = query.order(sortKey, { ascending: sortAsc })
-      if (limit) query = query.limit(limit)
-      const { data, error } = await query
+      query = query.order(sortKey, { ascending: sortAsc, nullsFirst: false })
+      const { data, error } = await query.range(from, to)
       if (error) throw error
-      return data || []
+      const all = data || []
+      const hasMore = all.length > pageSize
+      return { rows: hasMore ? all.slice(0, pageSize) : all, total, hasMore }
     } catch (e) {
       console.warn(`[fetchStockScores] 第 ${attempt + 1} 次失败:`, e)
       if (attempt === maxRetries) throw e
       await new Promise((r) => setTimeout(r, 600 * (attempt + 1)))
     }
   }
-  return []
+  return { rows: [], total, hasMore: false }
 }
