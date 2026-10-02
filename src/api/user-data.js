@@ -211,7 +211,7 @@ export async function updateFundWeight(portfolioId, code, weight) {
 
 // ========== localStorage 兜底（未登录时使用） ==========
 
-const LS_PORTFOLIO = 'dachu_portfolio'
+const LS_PORTFOLIO = 'allfund_portfolio'
 const LS_PORTFOLIO_LEGACY = 'allfund_portfolio'
 
 // 读取本地组合：兼容旧 key，并在首次读取时迁移到新 key

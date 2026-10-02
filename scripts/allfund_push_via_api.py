@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 REPO_OWNER = os.environ.get("REPO_OWNER", "dachuplus")
-REPO_NAME = os.environ.get("REPO_NAME", "dachu")
+REPO_NAME = os.environ.get("REPO_NAME", "allfund")
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
 if not TOKEN:
     print("❌ 未找到 GITHUB_TOKEN"); sys.exit(1)

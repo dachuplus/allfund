@@ -9,7 +9,7 @@
 # ============================================================
 set -e
 
-PROJECT_DIR="$HOME/WorkBuddy/20260405093252/dachu"
+PROJECT_DIR="$HOME/WorkBuddy/20260405093252/allfund"
 cd "$PROJECT_DIR"
 
 # 创建日志目录

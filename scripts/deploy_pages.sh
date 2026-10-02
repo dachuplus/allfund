@@ -10,7 +10,7 @@
 #
 set -euo pipefail
 
-# 切到脚本所在目录的上一级（项目根 dachu/）
+# 切到脚本所在目录的上一级（项目根 allfund/）
 cd "$(dirname "$0")/.."
 
 # 载入 .env.local 中的密钥（EDGEONE_PAGES_API_TOKEN 等）
@@ -64,7 +64,7 @@ echo 'export const DEEPSEEK_API_KEY = ""' > dist/functions/api/_deepseek_key.js
 echo "==> 3/4 写入 dist/package.json（激活 Pages Functions 必需）"
 cat > dist/package.json <<'JSON'
 {
-  "name": "dachu-pages-functions",
+  "name": "allfund-pages-functions",
   "version": "1.0.0",
   "private": true
 }
@@ -98,7 +98,7 @@ import re, sys
 path = 'dist/index.html'
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
-script = '<script>(function(){try{var K="dachu_app_version",x=new XMLHttpRequest();x.open("GET","/version.json?_="+Date.now(),false);x.send();if(x.status!==200)return;var d=JSON.parse(x.responseText);if(!d||!d.h)return;var s=localStorage.getItem(K);if(s&&s!==d.h){localStorage.setItem(K,d.h);window.location.reload();}else if(!s){localStorage.setItem(K,d.h);}}catch(e){}})();</script>'
+script = '<script>(function(){try{var K="allfund_app_version",x=new XMLHttpRequest();x.open("GET","/version.json?_="+Date.now(),false);x.send();if(x.status!==200)return;var d=JSON.parse(x.responseText);if(!d||!d.h)return;var s=localStorage.getItem(K);if(s&&s!==d.h){localStorage.setItem(K,d.h);window.location.reload();}else if(!s){localStorage.setItem(K,d.h);}}catch(e){}})();</script>'
 # 在 <script type="module" crossorigin src="/assets/index- 之前插入
 new_content, n = re.subn(
     r'(<script type="module"[^>]*src="/assets/index-[^"]+\.js")',

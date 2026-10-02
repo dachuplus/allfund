@@ -3,7 +3,7 @@
 ALLFUND EdgeOne Pages 部署脚本
 - 读 .env.local 拿 EDGEONE_PAGES_API_TOKEN
 - 用 token 调 `npx edgeone pages deploy dist -n dachu -a overseas`
-- 与 dachu_push_via_api.py（推 GitHub）同级：走项目内白名单路径，broker 不拦
+- 与 allfund_push_via_api.py（推 GitHub）同级：走项目内白名单路径，broker 不拦
 """
 import os, re, subprocess, sys
 
@@ -43,7 +43,7 @@ def main():
     # 部署（用环境变量传 token，避免 token 出现在 ps）
     env = os.environ.copy()
     env['EDGEONE_PAGES_API_TOKEN'] = tok
-    cmd = ['npx', 'edgeone', 'pages', 'deploy', DIST_DIR, '-n', 'dachu', '-a', 'overseas']
+    cmd = ['npx', 'edgeone', 'pages', 'deploy', DIST_DIR, '-n', 'allfund', '-a', 'overseas']
     print('▶', ' '.join(cmd[:5]) + ' ... (token 已通过 env 注入)')
     p = subprocess.run(cmd, env=env, cwd=ROOT)
     sys.exit(p.returncode)

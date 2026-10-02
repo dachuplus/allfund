@@ -170,13 +170,13 @@
         <div class="intro-row">
           <div class="intro-key">GitHub 保存路径</div>
           <div class="intro-val">
-            网站仓库：<code>github.com/dachuplus/dachu</code>。本地与远程仓库保持逐字节一致，推送使用受控脚本（非 git push 直推）。
+            网站仓库：<code>github.com/dachuplus/allfund</code>。本地与远程仓库保持逐字节一致，推送使用受控脚本（非 git push 直推）。
           </div>
         </div>
         <div class="intro-row">
           <div class="intro-key">本地构建与部署</div>
           <div class="intro-val">
-            网站：<code>cd dachu &amp;&amp; npm install &amp;&amp; npm run build</code> → <code>npx edgeone makers deploy dist.zip -n dachu -a overseas -t $EDGEONE_PAGES_API_TOKEN</code>。数据更新：<code>python3 scripts/sync_tag_performance.py</code> 等由 GitHub Actions 自动调度，详见仓库 <code>.github/workflows</code>。
+            网站：<code>cd allfund &amp;&amp; npm install &amp;&amp; npm run build</code> → <code>npx edgeone makers deploy dist.zip -n dachu -a overseas -t $EDGEONE_PAGES_API_TOKEN</code>。数据更新：<code>python3 scripts/sync_tag_performance.py</code> 等由 GitHub Actions 自动调度，详见仓库 <code>.github/workflows</code>。
           </div>
         </div>
       </div>

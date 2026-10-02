@@ -55,7 +55,7 @@ SINGLE_PUT_MAX = 4 * 1024 * 1024
 CHUNK_SIZE = 3 * 1024 * 1024
 
 XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-UA = 'dachu-upload-downloads/1.0'
+UA = 'allfund-upload-downloads/1.0'
 
 SKIP_NAMES = {'.DS_Store', 'Thumbs.db'}
 
@@ -316,7 +316,7 @@ def main() -> int:
     ap.add_argument('--source-dir', default=DEFAULT_SOURCE)
     ap.add_argument('--bucket', default=DEFAULT_BUCKET)
     ap.add_argument('--endpoint', choices=['auto', 'direct', 'proxy'], default='auto')
-    ap.add_argument('--proxy-url', default=os.environ.get('DACHU_PROXY_URL', DEFAULT_PROXY))
+    ap.add_argument('--proxy-url', default=os.environ.get('allfund_PROXY_URL', DEFAULT_PROXY))
     ap.add_argument('--only', default='', help='只上传指定文件名，逗号分隔')
     ap.add_argument('--force', action='store_true', help='忽略增量比对')
     ap.add_argument('--prune', action='store_true', help='删除桶内源目录已不存在的对象')

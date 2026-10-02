@@ -53,7 +53,7 @@ jobs:
         if: ${{ !inputs.skip_deploy }}
         run: |
           rm -rf dist/functions && cp -r functions dist/functions
-          printf '{\n  "name": "dachu-pages-functions",\n  "version": "1.0.0",\n  "private": true\n}\n' > dist/package.json
+          printf '{\n  "name": "allfund-pages-functions",\n  "version": "1.0.0",\n  "private": true\n}\n' > dist/package.json
           echo "--- dist/functions/api ---"; ls dist/functions/api
           echo "--- dist/package.json ---"; cat dist/package.json
 

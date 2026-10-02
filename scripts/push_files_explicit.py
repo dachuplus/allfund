@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 REPO_OWNER = "dachuplus"
-REPO_NAME = "dachu"
+REPO_NAME = "allfund"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

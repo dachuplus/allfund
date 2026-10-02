@@ -77,6 +77,12 @@
       />
     </div>
 
+    <!-- 工具二级 Tab：进位制转换 -->
+    <div v-else-if="category === 'tool'" class="cp-tool">
+      <h2 class="cp-tool-title">进位制转换</h2>
+      <BaseConverterTool />
+    </div>
+
     <!-- 博客：文章列表 -->
     <template v-else>
     <div v-if="canManageContent" class="cp-viewswitch">
@@ -135,6 +141,7 @@ import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
+import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
 import MustEatBoard from '../../components/rank/MustEatBoard.vue'
 import { FILM_RANK, FILM_DIMS } from '../../data/filmRank.js'
@@ -169,13 +176,14 @@ const slowHint = ref(false)  // 加载超过 5s 时给出"网络较慢"提示
 let slowTimer = null
 const view = ref('published')
 
-// 二级分类导航：博客 / 影视 / 美食 / 游戏（默认「博客」）
+// 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具（默认「博客」）
 const category = ref('blog')
 const categories = [
   { key: 'blog', label: '博客' },
   { key: 'film', label: '影视' },
   { key: 'food', label: '美食' },
   { key: 'game', label: '游戏' },
+  { key: 'tool', label: '工具' },
 ]
 /** 分类 key → 中文标签（缺省回退「博客」） */
 function catLabel(c) {
@@ -193,8 +201,8 @@ function setCategory(c) {
 const canManageContent = computed(() => isOwner.value)
 
 async function load() {
-  // 游戏 Tab 展示小游戏，不需要拉取文章列表
-  if (category.value === 'game') {
+  // 游戏 / 工具 Tab 不需要拉取文章列表
+  if (category.value === 'game' || category.value === 'tool') {
     articles.value = []
     loadError.value = ''
     loading.value = false
@@ -323,6 +331,13 @@ watch(() => route.fullPath, () => {
 }
 .cp-tab-list { display: flex; }
 .cp-games { margin-top: var(--space-sm); }
+.cp-tool { margin-top: var(--space-sm); }
+.cp-tool-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 18px;
+}
 .cp-subblock { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
 .cp-subblock-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
 /* 三级 Tab：比二级 Tab 更轻（字号小一档、下划线更细），窄屏可横向滑动 */

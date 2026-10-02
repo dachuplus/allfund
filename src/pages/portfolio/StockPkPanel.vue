@@ -384,7 +384,7 @@ const DEFAULT_SYSTEM_PROMPT =
   '只基于给出的真实行情数据做判断，不要引用任何表外或网络信息，不编造、不模拟。'
 
 // 匿名用户标识（localStorage），后续接登录后可替换为手机号/用户ID
-const USER_ID_KEY = 'dachu_anon_uid'
+const USER_ID_KEY = 'allfund_anon_uid'
 const USER_ID_KEY_LEGACY = 'allfund_anon_uid'
 function getUserId() {
   let id = ''

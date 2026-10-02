@@ -121,7 +121,7 @@ export function isNetworkError(e) {
 
 /** 缓存 TTL：5 分钟。Supabase（新加坡）偶发延迟高时，缓存命中 = 零等待 */
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY_PREFIX = 'dachu_articles_'
+const CACHE_KEY_PREFIX = 'allfund_articles_'
 
 /**
  * 从 localStorage 读缓存。

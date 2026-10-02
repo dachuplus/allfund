@@ -18,7 +18,7 @@ import { upsertUserProfile, getMyPortfolios } from '../api/user-data'
 
 // 会话最长有效期：1 周（用户要求从默认 30 天缩短）
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
-const LS_LOGIN_AT = 'dachu_auth_login_at'
+const LS_LOGIN_AT = 'allfund_auth_login_at'
 const LS_LOGIN_AT_LEGACY = 'allfund_auth_login_at'
 
 // 数据中心（数据下载 / 用户权限管理）唯一授权管理员账户

@@ -432,7 +432,7 @@ cd .. && export $(grep -v '^#' .env.local | xargs) && npx edgeone makers deploy 
 
 - [基金分类体系](./fund-classification.md) — 恒生聚源六级分类说明
 - 靠谱指数算法说明（见 MEMORY.md）
-- 每日更新流水线（dachu/scripts/daily_supabase_update.sh）
+- 每日更新流水线（allfund/scripts/daily_supabase_update.sh）
 
 ---
 

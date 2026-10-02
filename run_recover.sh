@@ -1,7 +1,7 @@
 #!/bin/bash
 # allfund fund_manager recovery + redeploy runner
 set -u
-DIR=$HOME/WorkBuddy/20260405093252/dachu
+DIR=$HOME/WorkBuddy/20260405093252/allfund
 PY=$HOME/.workbuddy/binaries/python/envs/default/bin/python
 NPX=$HOME/.workbuddy/binaries/node/versions/22.12.0/bin/npx
 # 密钥从 gitignored 的 .env.local 读取，禁止硬编码（避免被 GitHub push protection 拦截 & 泄露）

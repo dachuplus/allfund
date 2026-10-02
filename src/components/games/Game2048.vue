@@ -34,7 +34,7 @@
 import { ref, computed, onMounted } from 'vue'
 
 const SIZE = 4
-const BEST_KEY = 'dachu_2048_best'
+const BEST_KEY = 'allfund_2048_best'
 
 const board = ref([])
 const score = ref(0)

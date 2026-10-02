@@ -713,7 +713,7 @@ const aiGenerating = ref(false)
 const aiStatusText = ref('')
 const aiPortfolio = ref(null)
 const aiHistory = ref([])
-const AI_STORAGE_KEY = 'dachu_ai_portfolios'
+const AI_STORAGE_KEY = 'allfund_ai_portfolios'
 const AI_STORAGE_KEY_LEGACY = 'allfund_ai_portfolios'
 
 function loadAiHistory() {
