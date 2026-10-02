@@ -500,3 +500,28 @@ export async function fetchPEHistory(indexCode = '000300') {
   }
   return []
 }
+
+// ========== 股票选品评分（stock_scores）==========
+// 数据来源：沪深300+中证500+中证1000 成分股；腾讯报价 + 新浪K线计算收益/回撤/夏普；
+// k_all = 0.5·k_ret + 0.25·k_drawdown + 0.25·k_sharpe（横截面百分位 0-100）。
+// 注意：return_*/max_drawdown 在库中已为「百分比数值」（如 return_1y=361.22 表示 +361.22%），
+// 故前端展示时直接 toFixed(2)+'%'，切勿再用 fmtRet（会把小数×100）。
+const STOCK_SCORES_COLS =
+  'code,name,exchange,industry,pe_ttm,pb,mktcap,return_1m,return_3m,return_6m,return_1y,return_3y,max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,updated_at'
+
+export async function fetchStockScores(params = {}) {
+  if (!supabase) return []
+  const { search = '', exchange = '', sortKey = 'k_all', sortAsc = false, limit = 2000 } = params
+  let query = supabase.from('stock_scores').select(STOCK_SCORES_COLS)
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+  }
+  if (exchange && exchange !== 'ALL') {
+    query = query.eq('exchange', exchange)
+  }
+  query = query.order(sortKey, { ascending: sortAsc })
+  if (limit) query = query.limit(limit)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
