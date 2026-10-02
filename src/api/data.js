@@ -510,20 +510,30 @@ const STOCK_SCORES_COLS =
   'code,name,exchange,industry,pe_ttm,pb,mktcap,return_1m,return_3m,return_6m,return_1y,return_3y,max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,updated_at'
 
 export async function fetchStockScores(params = {}) {
-  // 股票评分读取走直连，绕过 sb-proxy（代理近期对 GET /rest/v1/* 返回 502）
-  const client = supabaseDirect || supabase
+  // 股票评分读取优先走 sb-proxy（同域，绕开国内→新加坡直连 RESET/丢包）
+  const client = supabase || supabaseDirect
   if (!client) return []
-  const { search = '', exchange = '', sortKey = 'k_all', sortAsc = false, limit = 2000 } = params
-  let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+  const { search = '', exchange = '', sortKey = 'k_all', sortAsc = false, limit = 1000 } = params
+  const maxRetries = 2
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      }
+      if (exchange && exchange !== 'ALL') {
+        query = query.eq('exchange', exchange)
+      }
+      query = query.order(sortKey, { ascending: sortAsc })
+      if (limit) query = query.limit(limit)
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    } catch (e) {
+      console.warn(`[fetchStockScores] 第 ${attempt + 1} 次失败:`, e)
+      if (attempt === maxRetries) throw e
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)))
+    }
   }
-  if (exchange && exchange !== 'ALL') {
-    query = query.eq('exchange', exchange)
-  }
-  query = query.order(sortKey, { ascending: sortAsc })
-  if (limit) query = query.limit(limit)
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
+  return []
 }
