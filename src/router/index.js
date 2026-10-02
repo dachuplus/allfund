@@ -26,13 +26,53 @@ const routes = [
   },
   {
     path: '/tools',
-    component: () => import('../pages/tools/ToolsPage.vue'),
+    component: () => import('../pages/tools/SelectionPage.vue'),
     meta: {
       tab: 'tools',
       title: '选品',
-      description: '靠谱指数工具：靠谱基金指数评分、投顾产品公开信息、智能组合与数据中心的入口。',
-      keywords: '靠谱指数工具,基金评分,投顾产品,智能组合'
-    }
+      description: '选品：基金、股票、期货的多资产配置与筛选工具入口。当前提供基金靠谱指数选品，股票与期货功能开发中。',
+      keywords: '选品,基金选品,股票选品,期货选品'
+    },
+    children: [
+      {
+        path: '',
+        redirect: { name: 'tools-fund' }
+      },
+      {
+        path: 'fund',
+        name: 'tools-fund',
+        component: () => import('../pages/fund-rank/FundRankPage.vue'),
+        meta: {
+          tab: 'tools',
+          feature: 'fund-rank',
+          title: '选品 · 基金',
+          description: '靠谱指数工具：覆盖全市场近2万只公募基金，按收益率、最大回撤、夏普比率综合折算为 0~100 分，支持分类、份额、ETF/LOF 等多维筛选。',
+          keywords: '靠谱指数工具,基金评分,基金筛选,基金靠谱指数'
+        }
+      },
+      {
+        path: 'stock',
+        name: 'tools-stock',
+        component: () => import('../pages/tools/StockPage.vue'),
+        meta: {
+          tab: 'tools',
+          title: '选品 · 股票',
+          description: '股票选品：股票筛选、排序与对比工具（开发中）。',
+          keywords: '股票选品,股票筛选'
+        }
+      },
+      {
+        path: 'futures',
+        name: 'tools-futures',
+        component: () => import('../pages/tools/FuturesPage.vue'),
+        meta: {
+          tab: 'tools',
+          title: '选品 · 期货',
+          description: '期货选品：期货筛选、排序与对比工具（开发中）。',
+          keywords: '期货选品,期货筛选'
+        }
+      }
+    ]
   },
   {
     path: '/tools/tougu',
@@ -46,14 +86,7 @@ const routes = [
   },
   {
     path: '/tools/fund-rank',
-    component: () => import('../pages/fund-rank/FundRankPage.vue'),
-    meta: {
-      tab: 'tools',
-      feature: 'fund-rank',
-      title: '选品',
-      description: '靠谱指数工具：覆盖全市场近2万只公募基金，按收益率、最大回撤、夏普比率综合折算为 0~100 分，支持分类、份额、ETF/LOF 等多维筛选。',
-      keywords: '靠谱指数工具,基金评分,基金筛选,基金靠谱指数'
-    }
+    redirect: '/tools'
   },
   {
     path: '/portfolio',

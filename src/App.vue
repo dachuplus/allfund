@@ -62,7 +62,7 @@
             :key="item.path"
             :to="item.path"
             class="govuk-header__nav-item"
-            :class="{ 'govuk-header__nav-item--active': route.path === item.path || route.path.startsWith(item.path + '/') }"
+            :class="{ 'govuk-header__nav-item--active': isActiveNav(item) }"
           >
             {{ item.label }}
           </router-link>
@@ -266,7 +266,7 @@ function handleRequestAccess() {
 const quickLinks = [
   { path: '/content',          label: '想法', feature: 'content' },
   { path: '/signal',           label: '策略', feature: 'signal' },
-  { path: '/tools/fund-rank',  label: '选品', feature: 'fund-rank' },
+  { path: '/tools',  label: '选品', feature: 'fund-rank' },
   { path: '/portfolio',        label: '组合', feature: 'portfolio' },
 ]
 // 按全局开关过滤可见的金刚区入口（全部展示，权限由路由级 routeAllowed 拦截）
@@ -277,6 +277,20 @@ const visibleQuickLinks = computed(() =>
     return featureEnabled(f)               // 全局开关开着就显示，权限由路由守卫控制
   })
 )
+
+/* 顶部导航高亮：默认按「精确匹配或前缀匹配」判定；
+ * 选品（/tools）特殊：仅其三个二级 tab（基金/股票/期货）高亮，不含 /tools/tougu（投顾为独立入口） */
+function isActiveNav(item) {
+  if (item.path === '/tools') {
+    return (
+      route.path === '/tools' ||
+      route.path.startsWith('/tools/fund') ||
+      route.path.startsWith('/tools/stock') ||
+      route.path.startsWith('/tools/futures')
+    )
+  }
+  return route.path === item.path || route.path.startsWith(item.path + '/')
+}
 
 /* ---- 当前路由的功能权限拦截（未授权功能显示「无访问权限」） ---- */
 const routeAllowed = computed(() => {
