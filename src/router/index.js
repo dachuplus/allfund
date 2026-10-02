@@ -8,9 +8,9 @@ const routes = [
     meta: {
       tab: 'home',
       feature: 'content',
-      title: '博客',
-      description: 'ALLFUND-个人博客：分享个人投资研究观点与方法论，仅代表个人观点，不构成投资建议或金融产品营销。',
-      keywords: 'ALLFUND,个人博客,投资观点,研究方法,独立思考'
+      title: '靠谱工具',
+      description: 'ALLFUND-靠谱工具：提供公开市场数据的整理、评分与筛选工具，仅代表个人观点，不构成投资建议或金融产品营销。',
+      keywords: 'ALLFUND,靠谱工具,评分工具,数据工具,独立研究'
     }
   },
   {
@@ -30,8 +30,8 @@ const routes = [
     meta: {
       tab: 'tools',
       title: '选品',
-      description: '选品：基金、股票、期货的多资产配置与筛选工具入口。当前提供基金靠谱指数选品，股票与期货功能开发中。',
-      keywords: '选品,基金选品,股票选品,期货选品'
+      description: '选品：多资产评分与筛选工具入口，支持股票、指数等公开市场数据的整理、对比与筛选。',
+      keywords: '选品,评分工具,数据筛选,股票选品'
     },
     children: [
       {
@@ -45,9 +45,9 @@ const routes = [
         meta: {
           tab: 'tools',
           feature: 'fund-rank',
-          title: '选品 · 基金',
-          description: '靠谱指数工具：覆盖全市场近2万只公募基金，按收益率、最大回撤、夏普比率综合折算为 0~100 分，支持分类、份额、ETF/LOF 等多维筛选。',
-          keywords: '靠谱指数工具,基金评分,基金筛选,基金靠谱指数'
+          title: '选品 · 靠谱指数',
+          description: '靠谱指数工具：覆盖全市场近2万只产品，按收益率、最大回撤、夏普比率综合折算为 0~100 分，支持分类、份额、ETF/LOF 等多维筛选。',
+          keywords: '靠谱指数工具,靠谱工具,评分工具,数据筛选'
         }
       },
       {
@@ -81,7 +81,7 @@ const routes = [
       tab: 'tools',
       title: '投顾产品公开信息',
       description: '公开披露高收益、稳健、养老三类投顾产品的近3月、近1年收益与最大回撤等历史数据，供客观查阅。',
-      keywords: '投顾产品,基金投顾,稳健理财,养老储蓄'
+      keywords: '投顾产品,公开信息,稳健理财,养老储蓄'
     }
   },
   {
@@ -105,9 +105,9 @@ const routes = [
     meta: {
       tab: 'tools',
       feature: 'fund-rank',
-      title: '基金详情',
-      description: '单只基金详情：靠谱指数综合评分、分值档位与各周期收益数据。',
-      keywords: '基金详情,基金评分,基金收益'
+      title: '评分详情',
+      description: '单只产品详情：靠谱指数综合评分、分值档位与各周期收益数据。',
+      keywords: '评分详情,靠谱指数,收益数据'
     }
   },
   {
@@ -116,8 +116,8 @@ const routes = [
     meta: {
       tab: 'profile',
       title: '我的关注',
-      description: '自选关注基金列表：快速查看评分与各周期收益。',
-      keywords: '自选基金,关注列表,基金关注'
+      description: '自选关注列表：快速查看评分与各周期收益。',
+      keywords: '自选关注,关注列表,评分跟踪'
     }
   },
   {
@@ -125,9 +125,9 @@ const routes = [
     component: () => import('../pages/compare/CompareToolPage.vue'),
     meta: {
       tab: 'tools',
-      title: '基金对比',
-      description: '多只基金同维度对比：评分、收益与回撤数据。',
-      keywords: '基金对比,基金比较,基金筛选'
+      title: '数据对比',
+      description: '多只产品同维度对比：评分、收益与回撤数据。',
+      keywords: '数据对比,评分比较,数据筛选'
     }
   },
   {
@@ -136,8 +136,8 @@ const routes = [
     meta: {
       tab: 'tools',
       title: '定投计算器',
-      description: '基金定投收益计算器：输入定投金额与期限，估算期末本息与总收益。',
-      keywords: '定投计算器,基金定投,收益计算'
+      description: '定投收益计算器：输入定投金额与期限，估算期末本息与总收益。',
+      keywords: '定投计算器,收益计算,复利估算'
     }
   },
   {
@@ -149,7 +149,7 @@ const routes = [
       ownerOnly: true,
       title: '管理',
       description: '管理：提供数据中心的数据下载与用户管理（含权限申请审批）等功能。',
-      keywords: '管理中心,基金数据,数据中心,基金基本信息,宏观数据'
+      keywords: '管理中心,数据中心,数据下载,宏观数据'
     }
   },
   {
@@ -159,10 +159,10 @@ const routes = [
       tab: 'profile',
       title: '我的',
       description: '我的：管理自选智能组合、查看历史 AI 组合推荐与账户信息。',
-      keywords: '我的,自选基金,基金账户'
+      keywords: '我的,自选关注,账户信息'
     }
   },
-  // ===== 我的内容（个人博客栏目，类公众号）=====
+  // ===== 我的内容（个人内容栏目，类公众号）=====
   // 权限模型（站长明确）：
   //  - 阅读：公开可读（任何登录用户均可查看，仅代表个人观点）；
   //  - 写/发布/编辑/删除：仅管理员可操作（ownerOnly），其他用户无任何写入口。
@@ -172,9 +172,9 @@ const routes = [
     meta: {
       tab: 'content',
       feature: 'content',
-      title: '想法 · 个人观点',
-      description: 'ALLFUND-想法：分享个人投资研究观点与方法论，仅代表个人观点，不构成投资建议。',
-      keywords: 'ALLFUND,想法,投资观点,研究方法'
+      title: '娱乐 · 个人观点',
+      description: 'ALLFUND-娱乐：分享个人观点、影视、美食、游戏与工具等内容，仅代表个人观点，不构成投资建议。',
+      keywords: 'ALLFUND,娱乐,个人观点,影视,美食,游戏,工具'
     }
   },
   {
@@ -184,8 +184,8 @@ const routes = [
       tab: 'content',
       feature: 'content',
       title: '文章详情',
-      description: 'ALLFUND-个人博客文章详情。',
-      keywords: 'ALLFUND,个人博客,投资观点'
+      description: 'ALLFUND-文章详情：个人观点与内容分享。',
+      keywords: 'ALLFUND,文章详情,个人观点'
     }
   },
   {
@@ -194,9 +194,9 @@ const routes = [
     meta: {
       tab: 'content',
       ownerOnly: true,
-      title: '博客-写文章',
+      title: '写文章',
       description: '撰写独立性研究文章。',
-      keywords: '博客-写文章,独立研究'
+      keywords: '写文章,独立研究'
     }
   },
   {
@@ -281,16 +281,16 @@ async function _trackVisit(path) {
 }
 
 router.afterEach((to) => {
-  const baseTitle = 'ALLFUND-娱乐'
-  document.title = (to.meta?.title || '娱乐') + ' | ' + baseTitle
+  const baseTitle = 'ALLFUND-靠谱工具'
+  document.title = (to.meta?.title || '靠谱工具') + ' | ' + baseTitle
 
   // 动态注入 SEO meta（description / keywords）
   const meta = to.meta || {}
-  setMeta('description', meta.description || 'ALLFUND-娱乐 — 分享个人观点、影视、美食、游戏与工具等内容，仅代表个人观点，不构成投资建议。')
-  setMeta('keywords', meta.keywords || 'ALLFUND,娱乐,个人观点,影视,美食,游戏,工具')
+  setMeta('description', meta.description || 'ALLFUND-靠谱工具 — 提供公开市场数据的整理、评分与筛选工具，仅代表个人观点，不构成投资建议。')
+  setMeta('keywords', meta.keywords || 'ALLFUND,靠谱工具,评分工具,数据工具')
   // Open Graph（社交分享卡片）
   setMeta('og:title', document.title, 'property')
-  setMeta('og:description', meta.description || 'ALLFUND-娱乐，分享个人观点、影视、美食、游戏与工具等内容，仅代表个人观点，不构成投资建议。', 'property')
+  setMeta('og:description', meta.description || 'ALLFUND-靠谱工具，提供公开市场数据的整理、评分与筛选，仅代表个人观点，不构成投资建议。', 'property')
   setMeta('og:type', 'website', 'property')
   setMeta('og:url', location.origin + to.fullPath, 'property')
   // 记录访问（异步，不阻塞导航）
