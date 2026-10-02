@@ -195,7 +195,7 @@
             <tr>
               <td><strong>v4.0.15</strong></td>
               <td>2026-10-02</td>
-              <td><code>PENDING</code></td>
+              <td><code>7f1c48e8</code></td>
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
