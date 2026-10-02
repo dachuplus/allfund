@@ -1,6 +1,6 @@
 <template>
   <div class="content-page">
-    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具，右侧放「写文章」按钮 -->
+    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具，右侧放「博客-写文章」按钮 -->
     <div class="cp-tabs">
       <div class="cp-tab-list">
         <div

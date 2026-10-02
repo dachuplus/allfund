@@ -1,7 +1,7 @@
 <template>
   <div class="ed-page">
     <header class="ed-header">
-      <h1 class="ed-title">{{ isEdit ? '编辑文章' : '写文章' }}</h1>
+      <h1 class="ed-title">{{ isEdit ? '编辑文章' : '博客-写文章' }}</h1>
       <button class="ed-cancel" @click="goBack">取消</button>
     </header>
 

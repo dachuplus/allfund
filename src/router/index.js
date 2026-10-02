@@ -194,9 +194,9 @@ const routes = [
     meta: {
       tab: 'content',
       ownerOnly: true,
-      title: '写文章',
+      title: '博客-写文章',
       description: '撰写独立性研究文章。',
-      keywords: '写文章,独立研究'
+      keywords: '博客-写文章,独立研究'
     }
   },
   {
@@ -281,16 +281,16 @@ async function _trackVisit(path) {
 }
 
 router.afterEach((to) => {
-  const baseTitle = 'ALLFUND-想法'
-  document.title = (to.meta?.title || '想法') + ' | ' + baseTitle
+  const baseTitle = 'ALLFUND-娱乐'
+  document.title = (to.meta?.title || '娱乐') + ' | ' + baseTitle
 
   // 动态注入 SEO meta（description / keywords）
   const meta = to.meta || {}
-  setMeta('description', meta.description || 'ALLFUND-想法 — 分享个人投资研究观点与方法论，仅代表个人观点，不构成投资建议。')
-  setMeta('keywords', meta.keywords || 'ALLFUND,想法,投资观点')
+  setMeta('description', meta.description || 'ALLFUND-娱乐 — 分享个人观点、影视、美食、游戏与工具等内容，仅代表个人观点，不构成投资建议。')
+  setMeta('keywords', meta.keywords || 'ALLFUND,娱乐,个人观点,影视,美食,游戏,工具')
   // Open Graph（社交分享卡片）
   setMeta('og:title', document.title, 'property')
-  setMeta('og:description', meta.description || 'ALLFUND-想法，分享独立投资研究观点与方法论，仅代表个人观点，不构成投资建议。', 'property')
+  setMeta('og:description', meta.description || 'ALLFUND-娱乐，分享个人观点、影视、美食、游戏与工具等内容，仅代表个人观点，不构成投资建议。', 'property')
   setMeta('og:type', 'website', 'property')
   setMeta('og:url', location.origin + to.fullPath, 'property')
   // 记录访问（异步，不阻塞导航）

@@ -18,7 +18,10 @@ const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 // 否则 supabase-js 拿到 HTML 无法解析 → error.message 空 → UI 看不到真实错误。
 // 因此用 Promise.race 形式：超时立即拒绝、不等底层 fetch 收尾；并随即 abort 底层 fetch 以释放资源。
 // 同时不允许任何重试 —— 一次慢就是真慢，重试只会把总耗时推到 30s+，必触发平台强杀。
-const UPSTREAM_TIMEOUT_MS = 8000
+// 原 8000ms 对「EdgeOne(海外)→Supabase 新加坡」慢链路过于苛刻：连接/握手常需 3-8s，
+// 一旦超过 8s 即被我们主动 502，前端表现为「暂无数据」。平台函数上限约 15-17s，
+// 14s 是安全天花板 —— 单次慢查询最多等到 14s，既不误杀、也不触发平台强杀。
+const UPSTREAM_TIMEOUT_MS = 14000
 const RETRY_ON_NETWORK_ERROR = 0
 
 // 不应转发给上游的逐跳（hop-by-hop）及代理相关头

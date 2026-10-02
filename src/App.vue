@@ -94,8 +94,8 @@
       <div v-if="!routeAllowed" class="no-feature-access">
         <p class="no-feature-access__title">无访问权限</p>
         <p class="no-feature-access__desc">您暂无「{{ currentFeatureLabel }}」功能的访问权限。</p>
-        <p class="no-feature-access__account">当前登录账号：{{ user?.email || '未知' }}</p>
         <button class="no-feature-access__btn" @click="handleRequestAccess">申请访问权限</button>
+        <p class="no-feature-access__account">当前登录账号：{{ user?.email || '未知' }}</p>
       </div>
       <router-view v-else v-slot="{ Component }">
         <keep-alive :include="['FundRankPage']">
@@ -264,7 +264,7 @@ function handleRequestAccess() {
 
 /* ---- 全局金刚区 ---- */
 const quickLinks = [
-  { path: '/content',          label: '想法', feature: 'content' },
+  { path: '/content',          label: '娱乐', feature: 'content' },
   { path: '/signal',           label: '策略', feature: 'signal' },
   { path: '/tools',  label: '选品', feature: 'fund-rank' },
   { path: '/portfolio',        label: '组合', feature: 'portfolio' },
