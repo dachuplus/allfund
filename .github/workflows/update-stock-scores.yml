@@ -1,0 +1,66 @@
+name: 股票全市场评分每日更新
+
+# 沪深京 A 股 + 港股全市场「靠谱成长指数 v1」每日刷新。
+# 与 update-scores.yml（基金，北京 21:30）、update-allocation-quarterly.yml（22:30）错峰，
+# 放在北京 23:20（UTC 15:20），避免同抢 Supabase 连接与东财接口配额。
+#
+# 安全性：脚本只写 stock_scores_staging；本 workflow 第二步 promote_stock_scores.py 会做
+# （总量 >=5000 / 港股 >=800 / k_all 非空率 >=60% / 基本面覆盖率）校验，
+# 任一不通过即拒绝切换，生产表保持不变 —— 抓取失败不会污染线上。
+
+on:
+  schedule:
+    - cron: '20 15 * * *'   # 北京时间每日 23:20
+  workflow_dispatch:
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  update-stock-scores:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PAT: ${{ secrets.SUPABASE_PAT }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 验证环境变量
+        run: |
+          if [ -z "$SUPABASE_PAT" ]; then
+            echo "ERROR: SUPABASE_PAT 未设置！请在 GitHub Secrets 中配置。"
+            exit 1
+          fi
+          echo "SUPABASE_PAT 已配置: ${#SUPABASE_PAT} 字符"
+
+      - name: 步骤1 — 抓取全市场行情 + 财务并计算五维评分（写 stock_scores_staging）
+        run: |
+          echo "============================================"
+          echo "  步骤1: fetch_stock_scores（沪深京 A 股 + 港股全市场）"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          pip install requests
+          python scripts/fetch_stock_scores.py --dump /tmp/stock_rows.json
+          echo "抓取完成: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: 步骤2 — 校验并原子切换到生产 stock_scores
+        run: |
+          echo "============================================"
+          echo "  步骤2: promote_stock_scores"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          pip install requests
+          # 若步骤1 写库曾因网络抖动丢批，先用转储回灌一次再校验切换
+          if [ -f /tmp/stock_rows.json ]; then
+            python scripts/fetch_stock_scores.py --from-dump /tmp/stock_rows.json || echo "[WARN] 回灌跳过"
+          fi
+          python scripts/promote_stock_scores.py
+          echo "切换完成: $(date '+%Y-%m-%d %H:%M:%S')"

@@ -577,30 +577,63 @@ COLS = ["code", "name", "industry", "industry_code", "exchange", "secid", "close
         "k_growth", "k_quality", "k_safety", "k_value", "k_momentum"]
 
 
+def _insert_batch(chunk):
+    """插入一批，返回成功写入行数。失败抛异常。"""
+    parts = []
+    for r in chunk:
+        vals = [sql_str(r.get(c)) if c in ('code', 'name', 'industry', 'industry_code',
+                                           'exchange', 'secid', 'list_date',
+                                           'fin_period', 'risk_flag')
+                else ('true' if r.get(c) else 'false') if c in ('is_st', 'is_delisted', 'is_suspended')
+                else sql_str(r.get('updated_at')) if c == 'updated_at'
+                else sql_num(r.get(c))
+                for c in COLS]
+        parts.append("(" + ",".join(vals) + ")")
+    sql = (f"INSERT INTO public.stock_scores_staging ({','.join(COLS)}) VALUES "
+           + ",".join(parts) + ";")
+    pg(sql, timeout=300)
+    return len(chunk)
+
+
+def _insert_with_retry(chunk, depth=0):
+    """带重试的批次写入：失败重试 3 次，仍失败则对半拆分再各自重试（最多拆 3 层）。"""
+    last = None
+    for attempt in range(3):
+        try:
+            return _insert_batch(chunk)
+        except Exception as e:
+            last = e
+            time.sleep(2 * (attempt + 1))
+    if depth < 3 and len(chunk) > 1:
+        mid = len(chunk) // 2
+        ok = 0
+        for half in (chunk[:mid], chunk[mid:]):
+            try:
+                ok += _insert_with_retry(half, depth + 1)
+            except Exception:
+                pass
+        if ok:
+            return ok
+    raise last if last else RuntimeError('批次写入失败')
+
+
 def write_staging(rows):
     pg("TRUNCATE TABLE public.stock_scores_staging;")
     BATCH = 120
     now = datetime.datetime.now().isoformat()
+    for r in rows:
+        r['updated_at'] = now
     total = 0
+    failed = 0
     for i in range(0, len(rows), BATCH):
         chunk = rows[i:i + BATCH]
-        parts = []
-        for r in chunk:
-            vals = [sql_str(r.get(c)) if c in ('code', 'name', 'industry', 'industry_code',
-                                               'exchange', 'secid', 'list_date',
-                                               'fin_period', 'risk_flag')
-                    else ('true' if r.get(c) else 'false') if c in ('is_st', 'is_delisted', 'is_suspended')
-                    else sql_str(now) if c == 'updated_at'
-                    else sql_num(r.get(c))
-                    for c in COLS]
-            parts.append("(" + ",".join(vals) + ")")
-        sql = (f"INSERT INTO public.stock_scores_staging ({','.join(COLS)}) VALUES "
-               + ",".join(parts) + ";")
         try:
-            pg(sql, timeout=300)
-            total += len(chunk)
+            total += _insert_with_retry(chunk)
         except Exception as e:
-            log(f"  [ERR] 批次写入失败（跳过）：{str(e)[:160]}")
+            failed += len(chunk)
+            log(f"  [ERR] 批次写入最终失败（丢失 {len(chunk)} 行）: {str(e)[:160]}")
+    if failed:
+        log(f"  [WARN] 共丢失 {failed} 行")
     return total
 
 
@@ -624,6 +657,9 @@ def main():
     ap.add_argument('--limit', type=int, default=0, help='调试：限制处理数量')
     ap.add_argument('--no-kline', action='store_true', help='跳过 K 线（动量维度留空）')
     ap.add_argument('--kline-budget', type=int, default=1200, help='K 线总时间预算（秒）')
+    ap.add_argument('--dump', default='', help='把组装+评分后的结果转储为 JSON（便于写库失败后快速回灌）')
+    ap.add_argument('--from-dump', default='',
+                    help='从 JSON 转储恢复并直接写库（跳过全部抓取，用于写库失败后补救）')
     args = ap.parse_args()
 
     today = datetime.date.today()
@@ -631,6 +667,17 @@ def main():
     log('=' * 66)
     log(' 沪深京港全市场 · 靠谱成长指数 v1 → stock_scores_staging')
     log('=' * 66)
+
+    # ---------- 0. 从转储恢复（写库失败后的补救路径）----------
+    if args.from_dump:
+        with open(args.from_dump, encoding='utf-8') as fh:
+            rows = json.load(fh)
+        log(f'  [回灌] 从 {args.from_dump} 载入 {len(rows)} 行')
+        written = write_staging(rows)
+        log(f'  [回灌] 写入 stock_scores_staging {written} 行')
+        write_etl_log(written, 'ok' if written >= 5000 else 'partial',
+                      f'from-dump 回灌，载入{len(rows)}行，写入{written}行')
+        return
 
     # ---------- 1. 基本面 ----------
     log('\n[1/6] 抓取 A 股财务数据...')
@@ -910,6 +957,15 @@ def main():
     n_a = sum(1 for r in rows if r['exchange'] != 'HK')
     n_hk = sum(1 for r in rows if r['exchange'] == 'HK')
     log(f"  A股 {n_a} / 港股 {n_hk}")
+
+    # 转储（写库失败可 --from-dump 秒级回灌，无需重跑抓取）
+    if args.dump:
+        try:
+            with open(args.dump, 'w', encoding='utf-8') as fh:
+                json.dump(rows, fh, ensure_ascii=False)
+            log(f'  [转储] 已写入 {args.dump}（{len(rows)} 行）')
+        except Exception as e:
+            log(f'  [WARN] 转储失败: {e}')
 
     written = write_staging(rows)
     log(f"  写入 stock_scores_staging {written} 行，总耗时 {time.time() - t_start:.0f}s")
