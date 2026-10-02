@@ -139,6 +139,7 @@ async function load() {
     rows.value = data || []
     currentPage.value = 1
   } catch (e) {
+    console.error('[StockPage] 加载股票评分失败:', e)
     rows.value = []
   } finally {
     loading.value = false

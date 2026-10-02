@@ -110,7 +110,28 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     })
   : null
 
+/**
+ * 直连 Supabase 客户端：不走 /api/sb-proxy 代理，用于只读查询。
+ * 背景：sb-proxy 近期对 GET /rest/v1/* 返回 502，导致股票评分等页面拿不到数据；
+ * 浏览器直连新加坡 PostgREST 实测可达，读取端点用直连更稳。
+ */
+function directTimeoutFetch(input, init = {}) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  if (init.signal && typeof init.signal.addEventListener === 'function') {
+    init.signal.addEventListener('abort', () => controller.abort())
+  }
+  return baseFetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
+export const supabaseDirect = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { fetch: directTimeoutFetch },
+    })
+  : null
+
 export const isSupabaseReady = () => !!supabase
+export const isSupabaseDirectReady = () => !!supabaseDirect
 
 /**
  * 暴露 anon key（供直接 fetch Edge Function 时作为 apikey header 用）

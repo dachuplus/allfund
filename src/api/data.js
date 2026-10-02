@@ -3,7 +3,7 @@
  * - 仅从 Supabase 云数据库读取真实数据
  * - 未配置 Supabase 时：返回空结果（前端显示「暂无数据 / --」），绝不展示伪造示例数据
  */
-import { supabase } from './supabase.js'
+import { supabase, supabaseDirect } from './supabase.js'
 import { withCache } from '../utils/cache.js'
 
 // ========== 工具函数 ==========
@@ -510,9 +510,11 @@ const STOCK_SCORES_COLS =
   'code,name,exchange,industry,pe_ttm,pb,mktcap,return_1m,return_3m,return_6m,return_1y,return_3y,max_drawdown,sharpe,k_ret,k_drawdown,k_sharpe,k_all,updated_at'
 
 export async function fetchStockScores(params = {}) {
-  if (!supabase) return []
+  // 股票评分读取走直连，绕过 sb-proxy（代理近期对 GET /rest/v1/* 返回 502）
+  const client = supabaseDirect || supabase
+  if (!client) return []
   const { search = '', exchange = '', sortKey = 'k_all', sortAsc = false, limit = 2000 } = params
-  let query = supabase.from('stock_scores').select(STOCK_SCORES_COLS)
+  let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
   if (search) {
     query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
   }
