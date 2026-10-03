@@ -34,6 +34,27 @@
         <input v-model="onlyScored" type="checkbox" @change="load" />
         <span>仅看有评分</span>
       </label>
+      <label class="sp-filter-item">
+        <span class="sp-filter-label">靠谱指数 ≥</span>
+        <input v-model="kAllMin" class="sp-num" type="number" min="0" max="100" step="1" placeholder="0" @change="onFilterChange" />
+      </label>
+      <label class="sp-filter-item">
+        <span class="sp-filter-label">总市值(亿)</span>
+        <select v-model="mktcapPreset" class="sp-sel" @change="onMktcapPreset">
+          <option value="all">全部</option>
+          <option value="large">大盘 ≥200</option>
+          <option value="mid">中盘 50–200</option>
+          <option value="small">小盘 &lt;50</option>
+        </select>
+      </label>
+      <label class="sp-filter-item">
+        <span class="sp-filter-label">风险</span>
+        <select v-model="riskMode" class="sp-sel" @change="onFilterChange">
+          <option value="all">全部</option>
+          <option value="clean">排除风险股</option>
+          <option value="risk">仅看风险股</option>
+        </select>
+      </label>
       <button class="sp-toggle" type="button" @click="toggleCols">
         {{ allCols ? '精简列' : '全部列' }}
       </button>
@@ -79,6 +100,7 @@
                 <span v-else>{{ cleanName(row.name) }}</span>
               </td>
               <td v-else-if="c.key === 'exchange'" class="col-exch">{{ exchLabel(row.exchange) }}</td>
+              <td v-else-if="c.key === 'mktcap'" class="num">{{ fmtMktcap(row.mktcap) }}</td>
               <td v-else-if="c.key === 'industry'" class="col-ind">{{ row.industry || '--' }}</td>
               <td v-else-if="c.key === 'k_all'" class="num col-score">
                 <span class="score-val" :style="scoreColor(row.k_all)">{{ fmtScore(row.k_all) }}</span>
@@ -162,6 +184,7 @@ const COLUMNS = [
   { key: 'code', label: '代码', num: false, group: 'base' },
   { key: 'name', label: '名称', num: false, group: 'base' },
   { key: 'exchange', label: '市场', num: false, group: 'base' },
+  { key: 'mktcap', label: '总市值(亿)', num: true, group: 'base' },
   { key: 'k_all', label: '靠谱指数', num: true, group: 'base' },
   { key: 'k_growth', label: '成长', num: true, group: 'base' },
   { key: 'k_quality', label: '质量', num: true, group: 'base' },
@@ -196,6 +219,12 @@ const hasMore = ref(false)
 const search = ref('')
 const exchange = ref('ALL')
 const onlyScored = ref(false)
+const kAllMin = ref('')
+const kAllMax = ref('')
+const mktcapPreset = ref('all')
+const mktcapMin = ref(null)
+const mktcapMax = ref(null)
+const riskMode = ref('all')
 const sortKey = ref('k_all')
 const sortAsc = ref(false)
 const currentPage = ref(1)
@@ -232,6 +261,11 @@ async function load() {
       pageSize: pageSize.value,
       bottomRisk: true,
       onlyScored: onlyScored.value,
+      kAllMin: kAllMin.value,
+      kAllMax: kAllMax.value,
+      mktcapMin: mktcapMin.value,
+      mktcapMax: mktcapMax.value,
+      riskMode: riskMode.value,
     })
     rows.value = res.rows || []
     total.value = res.total
@@ -254,6 +288,18 @@ function onSearchInput() {
 function setExchange(key) { exchange.value = key; currentPage.value = 1; load() }
 function goPage(p) { currentPage.value = Math.max(1, p); load() }
 function toggleCols() { allCols.value = !allCols.value }
+function onFilterChange() { currentPage.value = 1; load() }
+function onMktcapPreset() {
+  const m = {
+    all: [null, null],
+    large: [200, null],
+    mid: [50, 200],
+    small: [null, 50],
+  }[mktcapPreset.value] || [null, null]
+  mktcapMin.value = m[0]
+  mktcapMax.value = m[1]
+  onFilterChange()
+}
 function sortBy(key) {
   if (sortKey.value === key) sortAsc.value = !sortAsc.value
   else { sortKey.value = key; sortAsc.value = false }
@@ -265,6 +311,12 @@ function sortCls(key) {
 }
 
 function cleanName(n) { return (n || '').replace(/\s+/g, '') }
+function fmtMktcap(v) {
+  if (v == null || v === '') return '—'
+  const n = parseFloat(v)
+  if (isNaN(n)) return '—'
+  return n.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+}
 function exchLabel(e) { return { SH: '沪', SZ: '深', BJ: '京', HK: '港' }[e] || e || '--' }
 
 /**
@@ -380,6 +432,32 @@ watch(pageSize, () => { currentPage.value = 1 })
   color: var(--text-primary, #0b0c0c);
   cursor: pointer;
 }
+.sp-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-primary, #0b0c0c);
+  white-space: nowrap;
+}
+.sp-filter-label { color: var(--text-secondary, #505a5f); }
+.sp-num {
+  width: 72px;
+  border: 2px solid #0b0c0c;
+  padding: 7px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+.sp-num:focus { outline: 3px solid #ffdd00; outline-offset: 0; }
+.sp-sel {
+  border: 2px solid #0b0c0c;
+  padding: 7px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+.sp-sel:focus { outline: 3px solid #ffdd00; outline-offset: 0; }
 .sp-toggle {
   border: 2px solid #0b0c0c;
   background: #fff;

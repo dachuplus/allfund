@@ -519,7 +519,11 @@ const STOCK_SCORES_COLS =
   'fin_period,risk_flag,k_growth,k_quality,k_safety,k_value,k_momentum,k_all,updated_at'
 
 function applyStockFilters(query, params) {
-  const { search = '', exchange = '' } = params
+  const {
+    search = '', exchange = '', onlyScored = false,
+    kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
+    riskMode = 'all',
+  } = params
   let q = query
   if (search) {
     q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
@@ -527,6 +531,13 @@ function applyStockFilters(query, params) {
   if (exchange && exchange !== 'ALL') {
     q = q.eq('exchange', exchange)
   }
+  if (onlyScored) q = q.not('k_all', 'is', null)
+  if (kAllMin != null && kAllMin !== '') q = q.gte('k_all', Number(kAllMin))
+  if (kAllMax != null && kAllMax !== '') q = q.lte('k_all', Number(kAllMax))
+  if (mktcapMin != null && mktcapMin !== '') q = q.gte('mktcap', Number(mktcapMin))
+  if (mktcapMax != null && mktcapMax !== '') q = q.lte('mktcap', Number(mktcapMax))
+  if (riskMode === 'risk') q = q.not('risk_flag', 'is', null)
+  if (riskMode === 'clean') q = q.is('risk_flag', null)
   return q
 }
 
@@ -537,12 +548,21 @@ function applyStockFilters(query, params) {
  * public.stock_scores_stats(p_search, p_exchange, p_only_scored) 精确计数。
  */
 async function fetchStockCount(client, params) {
-  const { search = '', exchange = '', onlyScored = false } = params
+  const {
+    search = '', exchange = '', onlyScored = false,
+    kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
+    riskMode = 'all',
+  } = params
   try {
     const { data, error } = await client.rpc('stock_scores_stats', {
       p_search: search || null,
       p_exchange: exchange && exchange !== 'ALL' ? exchange : null,
       p_only_scored: !!onlyScored,
+      p_k_all_min: kAllMin != null && kAllMin !== '' ? Number(kAllMin) : null,
+      p_k_all_max: kAllMax != null && kAllMax !== '' ? Number(kAllMax) : null,
+      p_mktcap_min: mktcapMin != null && mktcapMin !== '' ? Number(mktcapMin) : null,
+      p_mktcap_max: mktcapMax != null && mktcapMax !== '' ? Number(mktcapMax) : null,
+      p_risk_mode: riskMode || 'all',
     })
     if (!error && Array.isArray(data) && data.length) {
       return Number(data[0].total) || 0
@@ -565,17 +585,23 @@ export async function fetchStockScores(params = {}) {
   const {
     search = '', exchange = '', sortKey = 'k_all', sortAsc = false,
     page = 1, pageSize = 50, bottomRisk = true, onlyScored = false,
+    kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
+    riskMode = 'all',
   } = params
   const from = Math.max(0, (page - 1) * pageSize)
   const to = from + pageSize // 多取 1 行判断 hasMore
   const maxRetries = 2
 
-  const total = await fetchStockCount(client, { search, exchange, onlyScored })
+  const total = await fetchStockCount(client, {
+    search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode,
+  })
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
-      query = applyStockFilters(query, { search, exchange })
+      query = applyStockFilters(query, {
+        search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode,
+      })
       if (onlyScored) query = query.not('k_all', 'is', null)
       // 风险股（risk_flag 非空）置底：先按 risk_flag 升序且 NULL 排最前，再按目标列排序
       if (bottomRisk && sortKey === 'k_all') {
