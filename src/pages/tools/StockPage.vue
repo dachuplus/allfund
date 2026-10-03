@@ -25,9 +25,10 @@
         <button
           v-for="e in exchanges"
           :key="e.key"
-          :class="['sp-seg-btn', { active: exchange === e.key }]"
+          :class="['sp-seg-btn', { active: isMarketActive(e.key) }]"
           type="button"
-          @click="setExchange(e.key)"
+          :title="e.key === 'ALL' ? '清空市场选择（看全部）' : '点击选中 / 取消'"
+          @click="toggleMarket(e.key)"
         >{{ e.label }}</button>
       </div>
       <label class="sp-check">
@@ -64,7 +65,7 @@
         </select>
       </label>
       <span class="sp-count2">
-        筛选结果 <b>{{ totalLabel }}</b> 只<template v-if="industries.length">（行业 {{ industries.length }} 个）</template>
+        筛选结果 <b>{{ totalLabel }}</b> 只<template v-if="filterDesc">（{{ filterDesc }}）</template>
         <template v-if="hasAnyFilter">
           <button class="sp-clear" type="button" @click="resetFilters">清空筛选</button>
         </template>
@@ -261,7 +262,7 @@ const marketTotal = ref(null)   // 四市场全量（顶部固定展示，不随
 const total = ref(null)         // 当前筛选条件下的结果数（展示在筛选行）
 const hasMore = ref(false)
 const search = ref('')
-const exchange = ref('ALL')
+const pickedMarkets = ref([])   // 多选市场，空数组 = 全部
 const onlyScored = ref(false)
 const kAllMin = ref('')
 const kAllMax = ref('')
@@ -281,10 +282,20 @@ const pageSize = ref(50)
 const totalLabel = computed(() => (total.value == null ? '—' : total.value.toLocaleString()))
 const marketTotalLabel = computed(() => (marketTotal.value == null ? '—' : marketTotal.value.toLocaleString()))
 const hasAnyFilter = computed(() =>
-  !!search.value.trim() || exchange.value !== 'ALL' || onlyScored.value ||
+  !!search.value.trim() || pickedMarkets.value.length > 0 || onlyScored.value ||
   (kAllMin.value !== '' && kAllMin.value != null) ||
   mktcapPreset.value !== 'all' || riskMode.value !== 'all' || industries.value.length > 0
 )
+// 筛选行右侧的筛选条件摘要（市场多选 + 行业多选）
+const MKT_LABEL = { SH: '沪', SZ: '深', BJ: '京', HK: '港' }
+const filterDesc = computed(() => {
+  const parts = []
+  if (pickedMarkets.value.length) {
+    parts.push('市场 ' + pickedMarkets.value.map((k) => MKT_LABEL[k] || k).join('+'))
+  }
+  if (industries.value.length) parts.push('行业 ' + industries.value.length + ' 个')
+  return parts.join(' · ')
+})
 const totalPages = computed(() => {
   if (total.value != null) return Math.max(1, Math.ceil(total.value / pageSize.value))
   // 总数不可得时（RPC 异常）退化为「有无下一页」
@@ -353,7 +364,7 @@ function clearIndustries() {
 }
 function resetFilters() {
   search.value = ''
-  exchange.value = 'ALL'
+  pickedMarkets.value = []
   onlyScored.value = false
   kAllMin.value = ''
   mktcapPreset.value = 'all'
@@ -370,7 +381,7 @@ async function load() {
   try {
     const res = await fetchStockScores({
       search: search.value.trim(),
-      exchange: exchange.value,
+      exchanges: pickedMarkets.value,
       sortKey: sortKey.value,
       sortAsc: sortAsc.value,
       page: currentPage.value,
@@ -402,7 +413,21 @@ function onSearchInput() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => { currentPage.value = 1; load() }, 300)
 }
-function setExchange(key) { exchange.value = key; currentPage.value = 1; load() }
+/** 市场多选：点击切换选中态；「全部」= 清空选择 */
+function isMarketActive(key) {
+  return key === 'ALL' ? pickedMarkets.value.length === 0 : pickedMarkets.value.includes(key)
+}
+function toggleMarket(key) {
+  if (key === 'ALL') {
+    pickedMarkets.value = []
+  } else {
+    const i = pickedMarkets.value.indexOf(key)
+    if (i >= 0) pickedMarkets.value.splice(i, 1)
+    else pickedMarkets.value.push(key)
+  }
+  currentPage.value = 1
+  load()
+}
 function goPage(p) { currentPage.value = Math.max(1, p); load() }
 function toggleCols() { allCols.value = !allCols.value }
 function onFilterChange() { currentPage.value = 1; load() }
