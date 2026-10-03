@@ -294,9 +294,9 @@ const scopeLabel = computed(() => EXCH_SCOPE[exchange.value] || '全市场')
 // 报告期：A 股走最新季度、港股 F10 只提供年报，故按当前市场分别展示
 const dataPeriod = computed(() => {
   if (!finPeriod.value) return ''
-  if (exchange.value === 'HK') return '最新报告期：' + finPeriod.value + '（年报）'
-  if (exchange.value === 'ALL') return '最新报告期：A 股 2026-06-30 / 港股 2025-12-31'
-  return '最新报告期：' + finPeriod.value
+  if (exchange.value === 'HK') return finPeriod.value + '（年报）'
+  if (exchange.value === 'ALL') return 'A 股 2026-06-30 / 港股 2025-12-31'
+  return finPeriod.value
 })
 
 // 行业多选：搜索框按输入过滤候选，勾选后即时重查
