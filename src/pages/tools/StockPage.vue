@@ -34,6 +34,14 @@
         <input v-model="onlyScored" type="checkbox" @change="load" />
         <span>仅看有评分</span>
       </label>
+      <button class="sp-toggle" type="button" @click="toggleCols">
+        {{ allCols ? '精简列' : '全部列' }}
+      </button>
+      <span class="sp-count">显示 {{ rows.length }} 条</span>
+    </div>
+
+    <!-- 高级筛选行 -->
+    <div class="sp-filters sp-filters-2">
       <label class="sp-filter-item">
         <span class="sp-filter-label">靠谱指数 ≥</span>
         <input v-model="kAllMin" class="sp-num" type="number" min="0" max="100" step="1" placeholder="0" @change="onFilterChange" />
@@ -55,10 +63,6 @@
           <option value="risk">仅看风险股</option>
         </select>
       </label>
-      <button class="sp-toggle" type="button" @click="toggleCols">
-        {{ allCols ? '精简列' : '全部列' }}
-      </button>
-      <span class="sp-count">显示 {{ rows.length }} 条</span>
     </div>
 
     <!-- 表格 -->
@@ -400,6 +404,11 @@ watch(pageSize, () => { currentPage.value = 1 })
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
+}
+.sp-filters-2 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  padding-top: 2px;
 }
 .sp-search {
   flex: 1;
