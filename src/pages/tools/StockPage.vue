@@ -6,9 +6,11 @@
       <div class="sp-meta">
         <span v-if="dataDate">数据日期：{{ dataDate }}</span>
         <span class="sp-sep">·</span>
-        <span>沪深京 A 股 + 港股全市场，共 {{ totalLabel }} 只</span>
-        <span v-if="finPeriod" class="sp-sep">·</span>
-        <span v-if="finPeriod">最新报告期：{{ finPeriod }}</span>
+        <span>{{ scopeLabel }}，共 {{ totalLabel }} 只</span>
+        <span v-if="dataPeriod" class="sp-sep">·</span>
+        <span v-if="dataPeriod">最新报告期：{{ dataPeriod }}</span>
+        <span v-if="industries.length" class="sp-sep">·</span>
+        <span v-if="industries.length">行业筛选：{{ industries.length }} 个</span>
       </div>
     </div>
 
@@ -65,6 +67,24 @@
       </label>
     </div>
 
+    <!-- 行业筛选弹层 -->
+    <div v-if="showIndustryPanel" class="sp-ind-panel">
+      <div class="sp-ind-head">
+        <input v-model="industrySearch" class="sp-ind-search" type="text" placeholder="搜索行业" />
+        <button class="sp-ind-btn" type="button" @click="selectAllIndustries">全选</button>
+        <button class="sp-ind-btn" type="button" @click="clearIndustries">清空</button>
+        <button class="sp-ind-btn" type="button" @click="showIndustryPanel = false">收起</button>
+        <span class="sp-ind-stat">已选 {{ industries.length }} / {{ industryList.length }}</span>
+      </div>
+      <div class="sp-ind-list">
+        <label v-for="ind in filteredIndustries" :key="ind" class="sp-ind-opt">
+          <input type="checkbox" :value="ind" v-model="industries" @change="onIndChange" />
+          <span>{{ ind }}</span>
+        </label>
+        <div v-if="!filteredIndustries.length" class="sp-ind-empty">无匹配行业</div>
+      </div>
+    </div>
+
     <!-- 表格 -->
     <div class="sp-tablewrap">
       <table class="sp-table">
@@ -73,9 +93,13 @@
             <th
               v-for="c in cols"
               :key="c.key"
-              :class="[c.num ? 'num' : '', c.key === 'k_all' ? 'col-score' : '', 'sortable', sortCls(c.key)]"
-              @click="sortBy(c.key)"
-            >{{ c.label }}</th>
+              :class="[c.num ? 'num' : '', c.key === 'k_all' ? 'col-score' : '', 'sortable', sortCls(c.key), { 'col-filterable': c.filterable, 'col-filter-on': c.filterable && industries.length }]"
+              @click="onHeaderClick(c.key)"
+            >
+              <span class="th-label">{{ c.label }}</span>
+              <span v-if="c.filterable && industries.length" class="th-badge">{{ industries.length }}</span>
+              <span v-else-if="c.filterable" class="th-filter-ico" aria-hidden="true">▾</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -164,7 +188,8 @@
       </p>
       <p class="sp-note-p">
         <b>行情跳转</b>：点击表格中的<b>代码</b>或<b>名称</b>可在新标签页打开东方财富对应行情页
-        （A 股 quote.eastmoney.com/sh600988.html，港股 quote.eastmoney.com/q/116.01815.html），跳转目标为第三方公开行情页。
+        （沪 quote.eastmoney.com/sh600519.html、深 quote.eastmoney.com/sz300750.html、
+        京 quote.eastmoney.com/bj/920045.html、港 quote.eastmoney.com/hk/01815.html），跳转目标为第三方公开行情页。
       </p>
     </div>
   </div>
@@ -172,8 +197,16 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { fetchStockScores } from '../../api/data.js'
+import { fetchStockScores, fetchStockIndustries } from '../../api/data.js'
 import { fmtScore, fmtNum, fmtDD, fmtSR, scoreColor } from '../../utils/format.js'
+
+const EXCH_SCOPE = {
+  ALL: '沪深京 A 股 + 港股全市场',
+  SH: '上海市场',
+  SZ: '深圳市场',
+  BJ: '北京市场',
+  HK: '香港市场',
+}
 
 const exchanges = [
   { key: 'ALL', label: '全部' },
@@ -188,6 +221,7 @@ const COLUMNS = [
   { key: 'code', label: '代码', num: false, group: 'base' },
   { key: 'name', label: '名称', num: false, group: 'base' },
   { key: 'exchange', label: '市场', num: false, group: 'base' },
+  { key: 'industry', label: '行业', num: false, group: 'base', filterable: true },
   { key: 'mktcap', label: '总市值(亿)', num: true, group: 'base' },
   { key: 'k_all', label: '靠谱指数', num: true, group: 'base' },
   { key: 'k_growth', label: '成长', num: true, group: 'base' },
@@ -202,13 +236,11 @@ const COLUMNS = [
   { key: 'debt_ratio', label: '负债率%', num: true, group: 'base' },
   { key: 'return_1y', label: '近1年%', num: true, group: 'base' },
   { key: 'risk_flag', label: '风险', num: false, group: 'base' },
-  { key: 'industry', label: '行业', num: false, group: 'extra' },
   { key: 'profit_cagr_3y', label: '3年净利复合%', num: true, group: 'extra' },
   { key: 'peg', label: 'PEG', num: true, group: 'extra' },
   { key: 'ocf_to_profit', label: '现金流/净利', num: true, group: 'extra' },
   { key: 'pe_ttm', label: 'PE(TTM)', num: true, group: 'extra' },
   { key: 'pb', label: 'PB', num: true, group: 'extra' },
-  { key: 'mktcap', label: '总市值(亿)', num: true, group: 'extra' },
   { key: 'max_drawdown', label: '最大回撤%', num: true, group: 'extra' },
   { key: 'sharpe', label: '夏普', num: true, group: 'extra' },
 ]
@@ -229,6 +261,10 @@ const mktcapPreset = ref('all')
 const mktcapMin = ref(null)
 const mktcapMax = ref(null)
 const riskMode = ref('all')
+const industries = ref([])
+const industryList = ref([])
+const showIndustryPanel = ref(false)
+const industrySearch = ref('')
 const sortKey = ref('k_all')
 const sortAsc = ref(false)
 const currentPage = ref(1)
@@ -253,6 +289,48 @@ const finPeriod = computed(() => {
   return ''
 })
 
+// 覆盖范围随「市场」分段按钮联动，避免全市场文案在只看港股时误导
+const scopeLabel = computed(() => EXCH_SCOPE[exchange.value] || '全市场')
+// 报告期：A 股走最新季度、港股 F10 只提供年报，故按当前市场分别展示
+const dataPeriod = computed(() => {
+  if (!finPeriod.value) return ''
+  if (exchange.value === 'HK') return '最新报告期：' + finPeriod.value + '（年报）'
+  if (exchange.value === 'ALL') return '最新报告期：A 股 2026-06-30 / 港股 2025-12-31'
+  return '最新报告期：' + finPeriod.value
+})
+
+// 行业多选：搜索框按输入过滤候选，勾选后即时重查
+const filteredIndustries = computed(() => {
+  const kw = industrySearch.value.trim().toLowerCase()
+  if (!kw) return industryList.value
+  return industryList.value.filter((i) => String(i).toLowerCase().includes(kw))
+})
+
+async function loadIndustryList() {
+  try {
+    industryList.value = await fetchStockIndustries()
+  } catch (e) {
+    console.warn('[StockPage] 行业列表加载失败:', e)
+  }
+}
+
+function onHeaderClick(key) {
+  if (key === 'industry') {
+    showIndustryPanel.value = !showIndustryPanel.value
+    return
+  }
+  sortBy(key)
+}
+function onIndChange() { currentPage.value = 1; load() }
+function selectAllIndustries() {
+  industries.value = filteredIndustries.value.slice()
+  onIndChange()
+}
+function clearIndustries() {
+  industries.value = []
+  onIndChange()
+}
+
 async function load() {
   loading.value = true
   try {
@@ -270,6 +348,7 @@ async function load() {
       mktcapMin: mktcapMin.value,
       mktcapMax: mktcapMax.value,
       riskMode: riskMode.value,
+      industries: industries.value,
     })
     rows.value = res.rows || []
     total.value = res.total
@@ -324,9 +403,11 @@ function fmtMktcap(v) {
 function exchLabel(e) { return { SH: '沪', SZ: '深', BJ: '京', HK: '港' }[e] || e || '--' }
 
 /**
- * 东方财富行情页链接（代码 / 名称两列共用）。
- *   A 股：https://quote.eastmoney.com/sh600988.html （沪 sh / 深 sz / 京 bj）
- *   港股：https://quote.eastmoney.com/q/116.01815.html （116 = 东财港股市场号）
+ * 东方财富行情页链接（代码 / 名称两列共用）。2026-10 实测各市场可用格式：
+ *   沪 A  https://quote.eastmoney.com/sh600519.html
+ *   深 A  https://quote.eastmoney.com/sz300750.html
+ *   京 A  https://quote.eastmoney.com/bj/920045.html   ⚠️ 北交所有斜杠，bj920045 已 404
+ *   港股  https://quote.eastmoney.com/hk/01815.html     ⚠️ 旧式 /q/116.01815 已废弃
  * 代码后缀与 exchange 字段互为兜底：任一缺失都能推出市场，推不出则返回空串（降级为纯文本）。
  */
 function emUrl(row) {
@@ -336,15 +417,13 @@ function emUrl(row) {
   const m = raw.match(/\.(SH|SZ|BJ|HK)$/i)
   const suffix = m ? m[1].toUpperCase() : ''
   if (!ex && suffix) ex = suffix
-  if (ex === 'HK' || (!ex && suffix === 'HK')) {
-    const c = raw.replace(/\.HK$/i, '')
-    return c ? 'https://quote.eastmoney.com/q/116.' + c + '.html' : ''
-  }
-  if (!ex && !suffix) return ''
-  const pref = ex === 'SH' ? 'sh' : ex === 'SZ' ? 'sz' : ex === 'BJ' ? 'bj' : String(suffix).toLowerCase()
+  if (!ex) return ''
+  const c = raw.replace(/\.(SH|SZ|BJ|HK)$/i, '').trim()
+  if (!c) return ''
+  if (ex === 'HK') return 'https://quote.eastmoney.com/hk/' + c + '.html'
+  const pref = ex === 'SH' ? 'sh' : ex === 'SZ' ? 'sz' : ex === 'BJ' ? 'bj/' : ''
   if (!pref) return ''
-  const c = raw.replace(/\.(SH|SZ|BJ)$/i, '')
-  return c ? 'https://quote.eastmoney.com/' + pref + c + '.html' : ''
+  return 'https://quote.eastmoney.com/' + pref + c + '.html'
 }
 /** 基本面/估值等无量纲列：保留两位小数，不补 %（表头已标注单位） */
 function fmtPct2(v) {
@@ -372,7 +451,7 @@ function riskLabel(flag) {
   return String(flag).split(',').map((k) => RISK_MAP[k] || k).join('·')
 }
 
-onMounted(load)
+onMounted(() => { load(); loadIndustryList() })
 watch(pageSize, () => { currentPage.value = 1 })
 </script>
 
@@ -565,6 +644,79 @@ watch(pageSize, () => { currentPage.value = 1 })
 }
 .sp-note-p { margin: 0 0 8px; }
 .sp-note-p:last-child { margin-bottom: 0; }
+
+/* 表头可筛选列 */
+.sp-table thead th.col-filterable { cursor: pointer; user-select: none; }
+.sp-table thead th.col-filterable:hover { color: #1d70b8; }
+.sp-table thead th.col-filter-on { background: #1d70b8; color: #fff; }
+.sp-table thead th.col-filter-on:hover { color: #fff; }
+.th-label { white-space: nowrap; }
+.th-filter-ico { margin-left: 4px; font-size: 10px; opacity: 0.75; }
+.th-badge {
+  display: inline-block;
+  margin-left: 5px;
+  min-width: 16px;
+  padding: 0 4px;
+  background: #ffdd00;
+  color: #0b0c0c;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+/* 行业多选弹层 */
+.sp-ind-panel {
+  border: 2px solid #0b0c0c;
+  background: #fff;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+}
+.sp-ind-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sp-ind-search {
+  flex: 1;
+  min-width: 160px;
+  border: 2px solid #0b0c0c;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.sp-ind-search:focus { outline: 3px solid #ffdd00; outline-offset: 0; }
+.sp-ind-btn {
+  border: 2px solid #0b0c0c;
+  background: #fff;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0b0c0c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sp-ind-btn:hover { background: #f3f2f1; }
+.sp-ind-stat { font-size: 13px; color: #505a5f; margin-left: auto; }
+.sp-ind-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.sp-ind-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #0b0c0c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sp-ind-empty { font-size: 13px; color: #505a5f; padding: 6px 0; }
+
 @media (max-width: 768px) {
   .sp-title { font-size: 20px; }
   .sp-count { width: 100%; margin-left: 0; }

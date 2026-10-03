@@ -522,7 +522,7 @@ function applyStockFilters(query, params) {
   const {
     search = '', exchange = '', onlyScored = false,
     kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
-    riskMode = 'all',
+    riskMode = 'all', industries = null,
   } = params
   let q = query
   if (search) {
@@ -530,6 +530,9 @@ function applyStockFilters(query, params) {
   }
   if (exchange && exchange !== 'ALL') {
     q = q.eq('exchange', exchange)
+  }
+  if (Array.isArray(industries) && industries.length) {
+    q = q.in('industry', industries)
   }
   if (onlyScored) q = q.not('k_all', 'is', null)
   if (kAllMin != null && kAllMin !== '') q = q.gte('k_all', Number(kAllMin))
@@ -551,7 +554,7 @@ async function fetchStockCount(client, params) {
   const {
     search = '', exchange = '', onlyScored = false,
     kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
-    riskMode = 'all',
+    riskMode = 'all', industries = null,
   } = params
   try {
     const { data, error } = await client.rpc('stock_scores_stats', {
@@ -563,6 +566,7 @@ async function fetchStockCount(client, params) {
       p_mktcap_min: mktcapMin != null && mktcapMin !== '' ? Number(mktcapMin) : null,
       p_mktcap_max: mktcapMax != null && mktcapMax !== '' ? Number(mktcapMax) : null,
       p_risk_mode: riskMode || 'all',
+      p_industries: Array.isArray(industries) && industries.length ? industries : null,
     })
     if (!error && Array.isArray(data) && data.length) {
       return Number(data[0].total) || 0
@@ -586,21 +590,21 @@ export async function fetchStockScores(params = {}) {
     search = '', exchange = '', sortKey = 'k_all', sortAsc = false,
     page = 1, pageSize = 50, bottomRisk = true, onlyScored = false,
     kAllMin = null, kAllMax = null, mktcapMin = null, mktcapMax = null,
-    riskMode = 'all',
+    riskMode = 'all', industries = null,
   } = params
   const from = Math.max(0, (page - 1) * pageSize)
   const to = from + pageSize // 多取 1 行判断 hasMore
   const maxRetries = 2
 
   const total = await fetchStockCount(client, {
-    search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode,
+    search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode, industries,
   })
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       let query = client.from('stock_scores').select(STOCK_SCORES_COLS)
       query = applyStockFilters(query, {
-        search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode,
+        search, exchange, onlyScored, kAllMin, kAllMax, mktcapMin, mktcapMax, riskMode, industries,
       })
       if (onlyScored) query = query.not('k_all', 'is', null)
       // 风险股（risk_flag 非空）置底：先按 risk_flag 升序且 NULL 排最前，再按目标列排序
@@ -620,4 +624,21 @@ export async function fetchStockScores(params = {}) {
     }
   }
   return { rows: [], total, hasMore: false }
+}
+
+/**
+ * 取 stock_scores 全量去重行业列表（供表头多选筛选）。
+ * 走 SECURITY DEFINER RPC public.stock_distinct_industries() —— 直接在前端对 9055 行
+ * 做 select('industry') 会撞 PostgREST 1000 行上限，且不保证去重排序。
+ */
+export async function fetchStockIndustries() {
+  const client = supabase || supabaseDirect
+  if (!client) return []
+  try {
+    const { data, error } = await client.rpc('stock_distinct_industries')
+    if (!error && Array.isArray(data)) return data.filter(Boolean)
+  } catch (e) {
+    console.warn('[fetchStockIndustries] 行业列表获取失败:', e)
+  }
+  return []
 }
