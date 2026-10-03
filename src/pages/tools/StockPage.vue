@@ -56,8 +56,28 @@
         <tbody>
           <tr v-for="row in rows" :key="row.code">
             <template v-for="c in cols" :key="c.key">
-              <td v-if="c.key === 'code'" class="col-code">{{ row.code }}</td>
-              <td v-else-if="c.key === 'name'" class="col-name">{{ cleanName(row.name) }}</td>
+              <td v-if="c.key === 'code'" class="col-code">
+                <a
+                  v-if="emUrl(row)"
+                  class="sp-link"
+                  :href="emUrl(row)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :title="'在东方财富查看 ' + cleanName(row.name) + ' 行情'"
+                >{{ row.code }}</a>
+                <span v-else>{{ row.code }}</span>
+              </td>
+              <td v-else-if="c.key === 'name'" class="col-name">
+                <a
+                  v-if="emUrl(row)"
+                  class="sp-link"
+                  :href="emUrl(row)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :title="'在东方财富查看 ' + cleanName(row.name) + ' 行情'"
+                >{{ cleanName(row.name) }}</a>
+                <span v-else>{{ cleanName(row.name) }}</span>
+              </td>
               <td v-else-if="c.key === 'exchange'" class="col-exch">{{ exchLabel(row.exchange) }}</td>
               <td v-else-if="c.key === 'industry'" class="col-ind">{{ row.industry || '--' }}</td>
               <td v-else-if="c.key === 'k_all'" class="num col-score">
@@ -115,6 +135,10 @@
       <p class="sp-note-p">
         <b>风险标记</b>：ST / 退市 / 停牌 / 上市未满60日 / 连续两年亏损的股票<b>保留展示但排序置底</b>，并在此列标注。
         评分仅反映公开历史数据的相对位置，不构成任何投资建议，不代表未来表现。
+      </p>
+      <p class="sp-note-p">
+        <b>行情跳转</b>：点击表格中的<b>代码</b>或<b>名称</b>可在新标签页打开东方财富对应行情页
+        （A 股 quote.eastmoney.com/sh600988.html，港股 quote.eastmoney.com/q/116.01815.html），跳转目标为第三方公开行情页。
       </p>
     </div>
   </div>
@@ -242,6 +266,30 @@ function sortCls(key) {
 
 function cleanName(n) { return (n || '').replace(/\s+/g, '') }
 function exchLabel(e) { return { SH: '沪', SZ: '深', BJ: '京', HK: '港' }[e] || e || '--' }
+
+/**
+ * 东方财富行情页链接（代码 / 名称两列共用）。
+ *   A 股：https://quote.eastmoney.com/sh600988.html （沪 sh / 深 sz / 京 bj）
+ *   港股：https://quote.eastmoney.com/q/116.01815.html （116 = 东财港股市场号）
+ * 代码后缀与 exchange 字段互为兜底：任一缺失都能推出市场，推不出则返回空串（降级为纯文本）。
+ */
+function emUrl(row) {
+  const raw = String((row && row.code) || '').trim()
+  if (!raw) return ''
+  let ex = String((row && row.exchange) || '').toUpperCase()
+  const m = raw.match(/\.(SH|SZ|BJ|HK)$/i)
+  const suffix = m ? m[1].toUpperCase() : ''
+  if (!ex && suffix) ex = suffix
+  if (ex === 'HK' || (!ex && suffix === 'HK')) {
+    const c = raw.replace(/\.HK$/i, '')
+    return c ? 'https://quote.eastmoney.com/q/116.' + c + '.html' : ''
+  }
+  if (!ex && !suffix) return ''
+  const pref = ex === 'SH' ? 'sh' : ex === 'SZ' ? 'sz' : ex === 'BJ' ? 'bj' : String(suffix).toLowerCase()
+  if (!pref) return ''
+  const c = raw.replace(/\.(SH|SZ|BJ)$/i, '')
+  return c ? 'https://quote.eastmoney.com/' + pref + c + '.html' : ''
+}
 /** 基本面/估值等无量纲列：保留两位小数，不补 %（表头已标注单位） */
 function fmtPct2(v) {
   if (v == null || v === '') return '--'
@@ -361,7 +409,15 @@ watch(pageSize, () => { currentPage.value = 1 })
 .sp-table th.num,
 .sp-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .sp-table tbody tr:hover { background: #f8f8f8; }
-.col-code { color: var(--text-secondary, #505a5f); }
+.col-code { color: var(--text-secondary, #505a5f); white-space: nowrap; }
+.sp-link {
+  color: #1d70b8;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.sp-link:hover { text-decoration-thickness: 3px; color: #003078; }
+.sp-link:focus { outline: 3px solid #ffdd00; outline-offset: 0; background: #ffdd00; }
 .col-ind { color: var(--text-secondary, #505a5f); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .col-score { width: 84px; text-align: center !important; }
 .col-score .score-val { font-weight: 700; font-size: 14px; }
