@@ -281,16 +281,42 @@ def fetch_hk_list():
 
 
 def fetch_hk_fin(today):
-    """返回 (period, {code: row}) 与 {year: {code: netprofit}}"""
-    ay = latest_annual_year(today)
-    cands = [f"{ay}-12-31", f"{ay - 1}-12-31"]
-    period, rows = pick_period("RPT_HKF10_FN_MAININDICATOR", cands, "REPORT_DATE", "港股F10")
+    """返回 (最新期, {code: row}, 年报期, {code: row}) 与 {year: {code: netprofit}}
+
+    ⚠️ 2026-10-03 修正（此前结论错误，勿再回退）：
+    港股 F10 **并非「只有年报」**。`RPT_HKF10_FN_MAININDICATOR` 同时提供年报（12-31）与
+    中报（06-30），实测 2026-06-30 中报 **2,225 只** 有数据、2026-03-31 有 770 只。
+    旧代码把候选期写死成 `latest_annual_year()` 的 12-31，导致港股永远停在上一年的年报 ——
+    这是**脚本逻辑限制，不是数据源限制**。
+
+    两个坑：
+    1. 日期 filter 必须**单引号** `(REPORT_DATE='2026-06-30')`；双引号会报
+       「filter字段中日期参数格式错误」（与 SECURITY_CODE 用双引号刚好相反）。
+    2. 港股**没有三季报**（HK 只强制披露中报 + 年报），2026-09-30 查询返回「返回数据为空」。
+
+    口径与 A 股对齐：同比取最新期（中报），ROE / 毛利率 / 资产负债率取年报（半年累计 ROE
+    与全年 ROE 不可比，跨市场横截面排名必须同口径）。
+    """
+    # 最新期：由新到旧尝试（港股会自动跳过不存在的 09-30）
+    cands = latest_periods(today)
+    period, rows = pick_period("RPT_HKF10_FN_MAININDICATOR", cands, "REPORT_DATE", "港股F10最新期")
     fin = {}
     for r in rows:
         code = (r.get('SECURITY_CODE') or '').strip()
         if code and re.match(r'^\d{5}$', code):
             fin[code] = r
-    log(f"  [港股] F10 主要指标 {len(fin)} 只（报告期 {period}）")
+    log(f"  [港股] F10 最新期主要指标 {len(fin)} 只（报告期 {period}）")
+
+    # 年报期：ROE / 毛利率 / 资产负债率
+    ay = latest_annual_year(today)
+    ann_cands = [f"{ay}-12-31", f"{ay - 1}-12-31"]
+    ann_period, ann_rows = pick_period("RPT_HKF10_FN_MAININDICATOR", ann_cands, "REPORT_DATE", "港股F10年报")
+    ann = {}
+    for r in ann_rows:
+        code = (r.get('SECURITY_CODE') or '').strip()
+        if code and re.match(r'^\d{5}$', code):
+            ann[code] = r
+    log(f"  [港股] F10 年报主要指标 {len(ann)} 只（报告期 {ann_period}）")
 
     profits = {}
     ys = [str(ay - i) for i in range(4)]
@@ -305,7 +331,7 @@ def fetch_hk_fin(today):
         profits[y] = m
         log(f"  [港股] 年报 {y} 归母净利 {len(m)} 只")
         time.sleep(0.1)
-    return period, fin, profits
+    return period, fin, ann_period, ann, profits
 
 
 # ============================================================
@@ -684,7 +710,7 @@ def main():
     a_period, a_fin, a_ann_period, a_ann, a_bal_period, a_bal, a_profits = fetch_a_universe(today)
     log('\n[2/6] 抓取港股财务数据...')
     hk_list = fetch_hk_list()
-    hk_period, hk_fin, hk_profits = fetch_hk_fin(today)
+    hk_period, hk_fin, hk_ann_period, hk_ann, hk_profits = fetch_hk_fin(today)
 
     # ---------- 2. 组装 universe ----------
     universe = {}   # code -> dict(exchange, name, ...)
@@ -790,23 +816,34 @@ def main():
             rec['name'] = nm
             rec['industry'] = info.get('industry')
             rec['list_date'] = info.get('list_date')
-            f = hk_fin.get(code, {})
+            f = hk_fin.get(code, {})      # 最新期（中报/年报）→ 同比、估值、市值
+            fa = hk_ann.get(code, {})     # 年报 → ROE / 毛利率 / 资产负债率
             if f:
                 fin_period = (f.get('REPORT_DATE') or '')[:10] or None
                 rec['rev_yoy'] = fnum(f.get('OPERATE_INCOME_YOY'))
                 rec['profit_yoy'] = fnum(f.get('HOLDER_PROFIT_YOY'))
-                rec['roe'] = fnum(f.get('ROE_AVG'))
-                rec['gross_margin'] = fnum(f.get('GROSS_PROFIT_RATIO'))
-                rec['debt_ratio'] = fnum(f.get('DEBT_ASSET_RATIO'))
-                eps = fnum(f.get('BASIC_EPS'))
-                ocf = fnum(f.get('PER_NETCASH_OPERATE'))
-                if eps and eps > 0 and ocf is not None:
-                    rec['ocf_to_profit'] = round(ocf / eps, 3)
                 if rec['pe_ttm'] is None:
                     rec['pe_ttm'] = fnum(f.get('PE_TTM'))
                 rec['pb'] = fnum(f.get('PB_TTM'))
                 if rec['mktcap'] is None:
                     rec['mktcap'] = fnum(f.get('TOTAL_MARKET_CAP'))
+            # ROE / 毛利率 / 负债率统一取年报，与 A 股口径一致（中报 ROE 为半年累计，不可比）
+            src = fa or f
+            if src:
+                rec['roe'] = fnum(src.get('ROE_AVG'))
+                rec['gross_margin'] = fnum(src.get('GROSS_PROFIT_RATIO'))
+                rec['debt_ratio'] = fnum(src.get('DEBT_ASSET_RATIO'))
+                eps = fnum(src.get('BASIC_EPS'))
+                ocf = fnum(src.get('PER_NETCASH_OPERATE'))
+                if eps and eps > 0 and ocf is not None:
+                    rec['ocf_to_profit'] = round(ocf / eps, 3)
+            if fin_period is None and fa:
+                fin_period = (fa.get('REPORT_DATE') or '')[:10] or None
+            # 最新期缺同比（如新上市、中报未披露同比）时回退到年报同比，与 A 股逻辑一致
+            if rec['rev_yoy'] is None and fa:
+                rec['rev_yoy'] = fnum(fa.get('OPERATE_INCOME_YOY'))
+            if rec['profit_yoy'] is None and fa:
+                rec['profit_yoy'] = fnum(fa.get('HOLDER_PROFIT_YOY'))
             pmap = hk_profits
         else:
             f_new = a_fin.get(code, {})

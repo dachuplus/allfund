@@ -6,11 +6,9 @@
       <div class="sp-meta">
         <span v-if="dataDate">数据日期：{{ dataDate }}</span>
         <span class="sp-sep">·</span>
-        <span>{{ scopeLabel }}，共 {{ totalLabel }} 只</span>
+        <span>沪深京 A 股 + 港股全市场，共 {{ marketTotalLabel }} 只</span>
         <span v-if="dataPeriod" class="sp-sep">·</span>
         <span v-if="dataPeriod">最新报告期：{{ dataPeriod }}</span>
-        <span v-if="industries.length" class="sp-sep">·</span>
-        <span v-if="industries.length">行业筛选：{{ industries.length }} 个</span>
       </div>
     </div>
 
@@ -65,6 +63,12 @@
           <option value="risk">仅看风险股</option>
         </select>
       </label>
+      <span class="sp-count2">
+        筛选结果 <b>{{ totalLabel }}</b> 只<template v-if="industries.length">（行业 {{ industries.length }} 个）</template>
+        <template v-if="hasAnyFilter">
+          <button class="sp-clear" type="button" @click="resetFilters">清空筛选</button>
+        </template>
+      </span>
     </div>
 
     <!-- 行业筛选弹层 -->
@@ -180,7 +184,15 @@
       </p>
       <p class="sp-note-p">
         <b>覆盖范围</b>：沪深京 A 股 + 香港市场全市场，剔除无有效报价（退市/长期停牌）标的。
-        财务口径统一为最近一个已披露年报（ROE / 毛利率 / 资产负债率）与最新报告期同比（营收 / 净利）。
+        顶部只数为<b>四市场全量</b>，不随任何筛选变化；筛选后的结果只数显示在<b>筛选条件行右侧</b>。
+      </p>
+      <p class="sp-note-p">
+        <b>报告期口径</b>：营收同比 / 净利同比取<b>最新一期已披露报告</b>；ROE、毛利率、资产负债率
+        取<b>最近一期年报</b>——因半年累计口径的 ROE 与全年 ROE 不可比，跨市场横截面排名必须同口径。
+        <b>香港市场只披露中报（6/30）与年报（12/31），不披露季报</b>；A 股四季齐全。
+        因此「最新报告期」在两地的含义一致但披露节奏不同：每年 1–4 月两地同看上一年度年报，
+        5–8 月后 A 股看季报 / 港股看中报，10 月后 A 股三季报陆续披露而港股仍为中报。
+        单只股票的实际报告期见其财务数据，未披露最新期的沿用上一期年报。
       </p>
       <p class="sp-note-p">
         <b>风险标记</b>：ST / 退市 / 停牌 / 上市未满60日 / 连续两年亏损的股票<b>保留展示但排序置底</b>，并在此列标注。
@@ -197,16 +209,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { fetchStockScores, fetchStockIndustries } from '../../api/data.js'
+import { fetchStockScores, fetchStockIndustries, fetchStockMarketTotal } from '../../api/data.js'
 import { fmtScore, fmtNum, fmtDD, fmtSR, scoreColor } from '../../utils/format.js'
 
-const EXCH_SCOPE = {
-  ALL: '沪深京 A 股 + 港股全市场',
-  SH: '上海市场',
-  SZ: '深圳市场',
-  BJ: '北京市场',
-  HK: '香港市场',
-}
+// 报告期 → 披露口径名称（港股只披露年报与中报，A 股四季齐全）
+const PERIOD_NAME = { '12-31': '年报', '09-30': '三季报', '06-30': '中报', '03-31': '一季报' }
 
 const exchanges = [
   { key: 'ALL', label: '全部' },
@@ -250,7 +257,8 @@ const cols = computed(() => COLUMNS.filter((c) => allCols.value || c.group === '
 
 const loading = ref(false)
 const rows = ref([])
-const total = ref(null)
+const marketTotal = ref(null)   // 四市场全量（顶部固定展示，不随筛选变化）
+const total = ref(null)         // 当前筛选条件下的结果数（展示在筛选行）
 const hasMore = ref(false)
 const search = ref('')
 const exchange = ref('ALL')
@@ -271,6 +279,12 @@ const currentPage = ref(1)
 const pageSize = ref(50)
 
 const totalLabel = computed(() => (total.value == null ? '—' : total.value.toLocaleString()))
+const marketTotalLabel = computed(() => (marketTotal.value == null ? '—' : marketTotal.value.toLocaleString()))
+const hasAnyFilter = computed(() =>
+  !!search.value.trim() || exchange.value !== 'ALL' || onlyScored.value ||
+  (kAllMin.value !== '' && kAllMin.value != null) ||
+  mktcapPreset.value !== 'all' || riskMode.value !== 'all' || industries.value.length > 0
+)
 const totalPages = computed(() => {
   if (total.value != null) return Math.max(1, Math.ceil(total.value / pageSize.value))
   // 总数不可得时（RPC 异常）退化为「有无下一页」
@@ -289,15 +303,22 @@ const finPeriod = computed(() => {
   return ''
 })
 
-// 覆盖范围随「市场」分段按钮联动，避免全市场文案在只看港股时误导
-const scopeLabel = computed(() => EXCH_SCOPE[exchange.value] || '全市场')
-// 报告期：A 股走最新季度、港股 F10 只提供年报，故按当前市场分别展示
+// 覆盖范围在顶部固定写「沪深京 A 股 + 港股全市场」+ 全量只数，不受筛选影响。
+// 报告期：A 股与港股目前同为最新一期已披露报告（中报/季报，随披露进度推进）。
 const dataPeriod = computed(() => {
   if (!finPeriod.value) return ''
-  if (exchange.value === 'HK') return finPeriod.value + '（年报）'
-  if (exchange.value === 'ALL') return 'A 股 2026-06-30 / 港股 2025-12-31'
-  return finPeriod.value
+  const md = finPeriod.value.slice(5)
+  const nm = PERIOD_NAME[md]
+  return nm ? finPeriod.value + '（' + nm + '）' : finPeriod.value
 })
+
+async function loadMarketTotal() {
+  try {
+    marketTotal.value = await fetchStockMarketTotal()
+  } catch (e) {
+    console.warn('[StockPage] 全市场总数获取失败:', e)
+  }
+}
 
 // 行业多选：搜索框按输入过滤候选，勾选后即时重查
 const filteredIndustries = computed(() => {
@@ -329,6 +350,19 @@ function selectAllIndustries() {
 function clearIndustries() {
   industries.value = []
   onIndChange()
+}
+function resetFilters() {
+  search.value = ''
+  exchange.value = 'ALL'
+  onlyScored.value = false
+  kAllMin.value = ''
+  mktcapPreset.value = 'all'
+  mktcapMin.value = null
+  mktcapMax.value = null
+  riskMode.value = 'all'
+  industries.value = []
+  currentPage.value = 1
+  load()
 }
 
 async function load() {
@@ -451,7 +485,7 @@ function riskLabel(flag) {
   return String(flag).split(',').map((k) => RISK_MAP[k] || k).join('·')
 }
 
-onMounted(() => { load(); loadIndustryList() })
+onMounted(() => { load(); loadIndustryList(); loadMarketTotal() })
 watch(pageSize, () => { currentPage.value = 1 })
 </script>
 
@@ -556,6 +590,25 @@ watch(pageSize, () => { currentPage.value = 1 })
   cursor: pointer;
 }
 .sp-count { font-size: 13px; color: var(--text-secondary, #505a5f); margin-left: auto; }
+.sp-count2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary, #505a5f);
+  margin-left: auto;
+}
+.sp-count2 b { color: var(--text-primary, #0b0c0c); font-size: 15px; }
+.sp-clear {
+  border: 2px solid #0b0c0c;
+  background: #fff;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b0c0c;
+  cursor: pointer;
+}
+.sp-clear:hover { background: #f3f2f1; }
 .sp-tablewrap { overflow-x: auto; border: 1px solid var(--border, #d6d6d6); }
 .sp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .sp-table th,

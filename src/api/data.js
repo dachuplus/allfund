@@ -627,6 +627,17 @@ export async function fetchStockScores(params = {}) {
 }
 
 /**
+ * 四个市场的全量总只数（沪+深+京+港，不含任何筛选条件）。
+ * 用于页面顶部「覆盖范围」固定展示 —— 顶部不随筛选/市场分段变化，避免把筛选后的数量
+ * 误读成全市场数量；筛选结果数量单独展示在筛选条件行。
+ */
+export async function fetchStockMarketTotal() {
+  const client = supabase || supabaseDirect
+  if (!client) return null
+  return fetchStockCount(client, {})
+}
+
+/**
  * 取 stock_scores 全量去重行业列表（供表头多选筛选）。
  * 走 SECURITY DEFINER RPC public.stock_distinct_industries() —— 直接在前端对 9055 行
  * 做 select('industry') 会撞 PostgREST 1000 行上限，且不保证去重排序。
