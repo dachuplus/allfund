@@ -3,7 +3,7 @@
     <!-- 24 讲列表 -->
     <div class="g5-nav">
       <div
-        v-for="lec in GRADE5"
+        v-for="lec in data"
         :key="lec.n"
         class="g5-nav-item"
         :class="{ active: cur === lec.n }"
@@ -71,18 +71,33 @@
 
 <script setup>
 /**
- * 五年级 24 讲 —— 兴趣篇 / 拓展篇 / 超越篇 三档。
- * 数据见 grade5Data.js，公式口径见 mathCore.js（有单元测试 + 暴力对拍）。
+ * 小学奥数通用年级面板 —— 三/四/五/六年级共用。
+ * 每讲含「兴趣篇 / 拓展篇 / 超越篇」三档，难度与原书一致。
+ * 数据见 grade3Data.js / grade4Data.js / grade5Data.js / grade6Data.js，
+ * 公式口径见 mathCore.js（有单元测试 + 暴力对拍）。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { GRADE3 } from './grade3Data.js'
+import { GRADE4 } from './grade4Data.js'
 import { GRADE5 } from './grade5Data.js'
+import { GRADE6 } from './grade6Data.js'
+
+const props = defineProps({
+  grade: { type: String, default: 'g5' },
+})
+
+const DATAS = { g3: GRADE3, g4: GRADE4, g5: GRADE5, g6: GRADE6 }
 
 const LVKEY = { 兴趣篇: 'a', 拓展篇: 'b', 超越篇: 'c' }
 
+const data = computed(() => DATAS[props.grade] || GRADE5)
 const cur = ref(1)
 const opened = ref({})
 // ⚠️ 用 computed 而非普通函数：模板里直接 lec.xxx 访问
-const lec = computed(() => GRADE5.find((l) => l.n === cur.value) || GRADE5[0])
+const lec = computed(() => data.value.find((l) => l.n === cur.value) || data.value[0])
+
+// 切换年级时重置到第 1 讲，避免停留在越界讲号上
+watch(() => props.grade, () => { cur.value = 1 })
 
 function toggle(key) {
   opened.value[key] = !opened.value[key]
@@ -148,7 +163,9 @@ function toggle(key) {
   font-size: 13px; font-weight: 700; color: #0b0c0c;
   background: #fff; padding: 2px 8px; margin-bottom: 3px;
 }
-.g5-fd { display: block; font-size: 13px; color: var(--text-secondary); }
+.g5-fd {
+  display: block; font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+}
 
 .g5-levels { display: flex; flex-direction: column; gap: 10px; }
 .g5-lv { border: 1px solid #b1b4b6; padding: 10px 12px; }

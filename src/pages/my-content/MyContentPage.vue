@@ -40,8 +40,7 @@
             @click="!g.disabled && (gradeTab = g.key)"
           >{{ g.label }}</div>
         </div>
-        <Grade5Panel v-if="gradeTab === 'g5'" />
-        <div v-else class="cp-placeholder">该年级内容整理中，敬请期待。</div>
+        <Grade5Panel :grade="gradeTab" />
       </div>
       <JuniorPanel v-else />
     </div>
@@ -229,12 +228,12 @@ const mathTabs = [
 const mathTab = ref('primary')
 
 // 小学奥数按年级纵向铺开（对齐《高思学校竞赛数学导引》3/4/5/6 年级）
-// 当前只做了五年级（小朋友读五年级），其余置灰待补。
+// 四个年级均已按原书真实 24 讲目录整理完毕。
 const gradeTabs = [
-  { key: 'g3', label: '三年级', disabled: true },
-  { key: 'g4', label: '四年级', disabled: true },
-  { key: 'g5', label: '五年级', disabled: false },
-  { key: 'g6', label: '六年级', disabled: true },
+  { key: 'g3', label: '三年级' },
+  { key: 'g4', label: '四年级' },
+  { key: 'g5', label: '五年级' },
+  { key: 'g6', label: '六年级' },
 ]
 const gradeTab = ref('g5')
 /** 切换分类并重新加载列表 */

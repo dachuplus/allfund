@@ -673,3 +673,267 @@ export function pigeonholeGuarantee(n, m, k) { return n > m * (k - 1) }
 
 /** 至少有几组 k 个（把 n 个物体按 m 类分） */
 export function pigeonholeGroups(n, m, k) { return Math.floor(n / k) }
+
+/* ══════════════════════════════════════════════════════════
+   三 / 四 / 六年级补充公式
+   依据：《高思学校竞赛数学导引》三年级 / 四年级 / 六年级真实 24 讲目录
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 三年级：四则运算与巧算 ── */
+
+/** 加减法凑整：a + b（利用交换律） */
+export function add2(a, b) { return a + b }
+
+/** 连减性质：a − b − c = a − (b + c) */
+export function subChain(a, b, c) { return a - b - c }
+
+/** 等差数列（找规律） */
+export function seqArith(list, n) {
+  const d = list[1] - list[0]
+  return list[0] + (n - 1) * d
+}
+
+/** 隔项规律：奇数项与偶数项各自成等差 */
+export function altSum(list) {
+  const odd = list.filter((_, i) => i % 2 === 0)
+  const even = list.filter((_, i) => i % 2 === 1)
+  return { odd, even }
+}
+
+/** 平方数：n² */
+export function sq(n) { return n * n }
+
+/** 立方：n³ */
+export function cube(n) { return n * n * n }
+
+/** 三角数：1+2+…+n */
+export function triNum(n) { return n * (n + 1) / 2 }
+
+/* ── 三年级：枚举法 ── */
+
+/** 枚举两数和为 s 的正整数对（无序）个数 */
+export function enumPairsSum(s) {
+  let c = 0
+  for (let a = 1; a < s; a++) if (s - a > a) c++
+  return c
+}
+
+/** 枚举：从 n 个中选 2 个的组合数 */
+export function enumChoose2(n) { return n * (n - 1) / 2 }
+
+/** 枚举三位数中数字和为 s 的个数（允许前导零按两位处理时用） */
+export function enumTriSum(s) {
+  let c = 0
+  for (let a = 0; a <= 9; a++) for (let b = 0; b <= 9; b++) for (let d = 0; d <= 9; d++) {
+    if (a + b + d === s && a > 0) c++
+  }
+  return c
+}
+
+/* ── 三年级：几何图形 ── */
+
+/** 长方形周长 */
+export function rectPeri2(a, b) { return 2 * (a + b) }
+/** 长方形面积 */
+export function rectArea2(a, b) { return a * b }
+/** 正方形周长 */
+export function sqPeri(a) { return 4 * a }
+/** 正方形面积 */
+export function sqArea2(a) { return a * a }
+
+/** 角度：平角 = 180°，周角 = 360°，直角 = 90° */
+export const ANGLE = { flat: 180, full: 360, right: 90 }
+
+/** 互补角之和 */
+export function complement(a) { return 90 - a }
+/** 互余角之和 */
+export function supplement(a) { return 180 - a }
+
+/* ── 三年级：盈亏 ── */
+
+/** 盈亏：人数 = (盈 + 亏) ÷ 每人差 */
+export function g3ProfitLoss(profit, loss, d) { return (profit + loss) / d }
+
+/* ── 四年级：整数计算综合 ── */
+
+/** 等差数列求和 */
+export function g4ArithSum(a1, d, n) { return (2 * a1 + (n - 1) * d) * n / 2 }
+
+/** 乘法分配律逆用：a×c ± b×c = (a±b)×c */
+export function g4Factor(a, b, c) { return [a + b, (a + b) * c] }
+
+/** 裂项：1/(n(n+1)) 累加 */
+export function g4Telescope(n) {
+  let s = 0
+  for (let i = 1; i <= n; i++) s += 1 / (i * (i + 1))
+  return s
+}
+
+/* ── 四年级：数阵图与幻方 ── */
+
+/** 3×3 幻方中心 = 总和 ÷ 9 */
+export function g4MagicCenter(total) { return total / 9 }
+
+/** 幻方每行和 = 总和 ÷ 3 */
+export function g4MagicLine(total) { return total / 3 }
+
+/** 数阵图：等差三角阵第 n 行第 m 个 */
+export function g4TriArray(n, m, d = 1) { return 1 + ((n - 1) * n / 2 + (m - 1)) * d }
+
+/** 数阵图：方形阵第 n 行第 m 个（首项 a，公差 d） */
+export function g4SquareArray(n, m, a, d) { return a + ((n - 1) + (m - 1)) * d }
+
+/* ── 四年级：行程 ── */
+
+/** 相遇时间 = 路程 ÷ 速度和 */
+export function g4Meet(s, v1, v2) { return s / (v1 + v2) }
+/** 追及时间 = 追及距离 ÷ 速度差 */
+export function g4Catch(d, v1, v2) { return d / Math.abs(v1 - v2) }
+
+/* ── 四年级：小数与平均数 ── */
+
+/** 小数加减 */
+export function decAdd(a, b) { return Number((a + b).toFixed(10)) }
+
+/** 平均数 */
+export function g4Avg(list) { return list.reduce((a, b) => a + b, 0) / list.length }
+
+/* ── 四年级：排列组合 ── */
+
+/** 组合数 */
+export function g4C(n, k) {
+  if (k < 0 || k > n) return 0
+  let r = 1
+  for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1)
+  return Math.round(r)
+}
+/** 排列数 */
+export function g4A(n, k) {
+  if (k < 0 || k > n) return 0
+  let r = 1
+  for (let i = 0; i < k; i++) r *= n - i
+  return r
+}
+
+/** 捆绑法：m 个同类 + n 个不同排成一排（同类视为一个整体） */
+export function g4Bundle(m, n) { return g4A(m + n - 1, m) }
+
+/** 插空法：n 个不同排成一排，插入 m 个相同元素 */
+export function g4Insert(n, m) { return g4C(n + 1, m) }
+
+/* ── 四年级：最值 ── */
+
+/** 和一定时乘积最大：n 个数和为 s（各数尽量接近） */
+export function g4MaxProd(n, s) {
+  const q = Math.floor(s / n)
+  const r = s % n
+  return Math.pow(q, n - r) * Math.pow(q + 1, r)
+}
+
+/* ── 六年级：分数数列计算 ── */
+
+/** 分数数列裂项求和 */
+export function g6FracTelescope(n) {
+  let s = 0
+  for (let i = 1; i <= n; i++) s += 1 / (i * (i + 1))
+  return s
+}
+
+/** 分数数列：1 + 1/2 + 1/4 + 1/8 + …（等比） */
+export function g6GeoFrac(n) {
+  let s = 0
+  for (let i = 0; i < n; i++) s += Math.pow(0.5, i)
+  return s
+}
+
+/* ── 六年级：比例与方程 ── */
+
+/** 比例：a/b = c/d 求 d */
+export function g6SolveD(a, b, c) { return c * b / a }
+
+/** 归一：总量 ÷ 份数 = 每份 */
+export function g6Unit(total, parts) { return total / parts }
+
+/** 行程：比例法 */
+export function g6RatioDist(total, v1, v2) {
+  const s = total * v1 / (v1 + v2)
+  return s
+}
+
+/* ── 六年级：浓度与经济 ── */
+
+/** 浓度混合 */
+export function g6Mix(c1, v1, c2, v2) { return (c1 * v1 + c2 * v2) / (v1 + v2) }
+/** 稀释：c1V1 = c2V2 */
+export function g6Dilute(c1, v1, c2) { return c1 * v1 / c2 }
+/** 利润 = 售价 − 进价；利润率 = 利润 ÷ 进价 */
+export function g6Profit(cost, sell) { return sell - cost }
+export function g6ProfitRate(cost, sell) { return (sell - cost) / cost }
+
+/* ── 六年级：不定方程 ── */
+
+/** ax + by = c 的正整数解个数 */
+export function g6PosSolutions(a, b, c) {
+  let cnt = 0
+  for (let x = 1; a * x < c; x++) {
+    const r = c - a * x
+    if (r % b === 0 && r / b > 0) cnt++
+  }
+  return cnt
+}
+
+/** 鸡兔同笼 */
+export function g6ChickenRabbit(heads, legs) {
+  const rabbit = (legs - 2 * heads) / 2
+  return { chicken: heads - rabbit, rabbit }
+}
+
+/* ── 六年级：立体几何 ── */
+
+/** 长方体体积 */
+export function g6CuboidV(a, b, c) { return a * b * c }
+/** 长方体表面积 */
+export function g6CuboidS(a, b, c) { return 2 * (a * b + a * c + b * c) }
+/** 正方体体积 / 表面积 */
+export function g6CubeV(a) { return a * a * a }
+export function g6CubeS(a) { return 6 * a * a }
+/** 圆柱体积（π=3.14） */
+export function g6CylV(r, h) { return 3.14 * r * r * h }
+/** 圆锥体积 = 圆柱 ÷ 3 */
+export function g6ConeV(r, h) { return 3.14 * r * r * h / 3 }
+
+/* ── 六年级：进位制与取整符号 ── */
+
+/** n 转 b 进制（返回数字字符串） */
+export function toBase(n, b) {
+  if (n === 0) return '0'
+  const digits = '0123456789ABCDEF'
+  let x = n, s = ''
+  while (x > 0) { s = digits[x % b] + s; x = Math.floor(x / b) }
+  return s
+}
+
+/** b 进制字符串转十进制 */
+export function fromBase(str, b) {
+  const digits = '0123456789ABCDEF'
+  let r = 0
+  for (const ch of str) r = r * b + digits.indexOf(ch)
+  return r
+}
+
+/** 向下取整符号 [x] */
+export function floorSym(x) { return Math.floor(x) }
+/** 向上取整符号 {x} */
+export function ceilSym(x) { return Math.ceil(x) }
+
+/* ── 六年级：概率初步 ── */
+
+/** 掷两枚骰子点数和的概率（计数） */
+export function diceSumWays(target) {
+  let c = 0
+  for (let i = 1; i <= 6; i++) for (let j = 1; j <= 6; j++) if (i + j === target) c++
+  return c
+}
+
+/** 摸球：m 个白 n 个黑，取 k 个全白的组合数 */
+export function g6BallC(m, n, k) { return g4C(m, k) }
