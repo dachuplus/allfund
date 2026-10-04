@@ -300,8 +300,8 @@ onMounted(() => {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -321,34 +321,36 @@ onMounted(() => {
 .g2048-dir:disabled .g2048-arrow--down  { border-top-color: #626a6e; }
 .g2048-dir:disabled .g2048-arrow--left   { border-right-color: #626a6e; }
 .g2048-dir:disabled .g2048-arrow--right  { border-left-color: #626a6e; }
-.g2048-dir--up    { transform: translate(-50%, calc(-50% - 26px)); }
-.g2048-dir--down  { transform: translate(-50%, calc(-50% + 26px)); }
-.g2048-dir--left  { transform: translate(calc(-50% - 26px), -50%); }
-.g2048-dir--right { transform: translate(calc(-50% + 26px), -50%); }
+/* 偏移 58px：斜向相邻按钮中心距 = 58*1.414 ≈ 82px > 48px 按钮宽，不再重叠。
+   2026-10-04 原为 26px（中心距 37px < 44px 按钮宽），四向按钮互相压在一起易点错。 */
+.g2048-dir--up    { transform: translate(-50%, calc(-50% - 58px)); }
+.g2048-dir--down  { transform: translate(-50%, calc(-50% + 58px)); }
+.g2048-dir--left  { transform: translate(calc(-50% - 58px), -50%); }
+.g2048-dir--right { transform: translate(calc(-50% + 58px), -50%); }
 .g2048-arrow {
   display: block;
   width: 0;
   height: 0;
 }
 .g2048-arrow--up {
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-bottom: 16px solid #1d70b8;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 18px solid #1d70b8;
 }
 .g2048-arrow--down {
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 16px solid #1d70b8;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 18px solid #1d70b8;
 }
 .g2048-arrow--left {
-  border-top: 10px solid transparent;
-  border-bottom: 10px solid transparent;
-  border-right: 16px solid #1d70b8;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-right: 18px solid #1d70b8;
 }
 .g2048-arrow--right {
-  border-top: 10px solid transparent;
-  border-bottom: 10px solid transparent;
-  border-left: 16px solid #1d70b8;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-left: 18px solid #1d70b8;
 }
 .g2048-tile {
   position: absolute;
