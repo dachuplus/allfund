@@ -14,9 +14,24 @@
       <router-link v-if="canManageContent && category === 'blog'" to="/content/editor" class="cp-new-btn">+ 写文章</router-link>
     </div>
 
-    <!-- 游戏二级 Tab：扫雷 / 2048（由信号页迁入） -->
+    <!-- 游戏二级 Tab：扫雷 / 2048 / 方块世界 / 平台冒险 / 推箱子 / 连线消除 / 六角消除 -->
     <div v-if="category === 'game'" class="cp-games">
       <GamesPanel />
+    </div>
+
+    <!-- 奥数二级 Tab：小学知识点库 + 初中联赛（分难度递进） -->
+    <div v-else-if="category === 'math'">
+      <div class="cp-subtabs">
+        <div
+          v-for="t in mathTabs"
+          :key="t.key"
+          class="cp-subtab"
+          :class="{ active: mathTab === t.key }"
+          @click="mathTab = t.key"
+        >{{ t.label }}</div>
+      </div>
+      <MathPanel v-if="mathTab === 'primary'" />
+      <JuniorPanel v-else />
     </div>
 
     <!-- 影视二级 Tab：影视观看榜（9+1电视剧评分框架） -->
@@ -140,6 +155,8 @@ import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
+import MathPanel from '../../components/math/MathPanel.vue'
+import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
@@ -176,12 +193,13 @@ const slowHint = ref(false)  // 加载超过 5s 时给出"网络较慢"提示
 let slowTimer = null
 const view = ref('published')
 
-// 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具（默认「博客」）
+// 二级分类导航：博客 / 影视 / 美食 / 奥数 / 游戏 / 工具（默认「博客」）
 const category = ref('blog')
 const categories = [
   { key: 'blog', label: '博客' },
   { key: 'film', label: '影视' },
   { key: 'food', label: '美食' },
+  { key: 'math', label: '奥数' },
   { key: 'game', label: '游戏' },
   { key: 'tool', label: '工具' },
 ]
@@ -190,6 +208,13 @@ function catLabel(c) {
   const m = categories.find((x) => x.key === c)
   return m ? m.label : '博客'
 }
+
+// 奥数下辖两个三级 Tab：小学奥数 / 初中联赛
+const mathTabs = [
+  { key: 'primary', label: '小学奥数' },
+  { key: 'junior', label: '初中联赛' },
+]
+const mathTab = ref('primary')
 /** 切换分类并重新加载列表 */
 function setCategory(c) {
   if (category.value === c) return
@@ -201,8 +226,8 @@ function setCategory(c) {
 const canManageContent = computed(() => isOwner.value)
 
 async function load() {
-  // 游戏 / 工具 Tab 不需要拉取文章列表
-  if (category.value === 'game' || category.value === 'tool') {
+  // 奥数 / 游戏 / 工具 Tab 不需要拉取文章列表
+  if (category.value === 'math' || category.value === 'game' || category.value === 'tool') {
     articles.value = []
     loadError.value = ''
     loading.value = false
