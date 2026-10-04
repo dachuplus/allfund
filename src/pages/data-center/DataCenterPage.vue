@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.28</strong></td>
+              <td><strong>v4.0.29</strong></td>
               <td>2026-10-04</td>
               <td><code>本次提交</code></td>
               <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.28</td>
+              <td>2026-10-04</td>
+              <td><code>bd5962c</code></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.27</td>

@@ -19,7 +19,7 @@
       <GamesPanel />
     </div>
 
-    <!-- 奥数二级 Tab：小学知识点库 + 初中联赛（分难度递进） -->
+    <!-- 奥数二级 Tab：小学奥数（按年级纵向铺开）+ 初中联赛 -->
     <div v-else-if="category === 'math'">
       <div class="cp-subtabs">
         <div
@@ -30,7 +30,19 @@
           @click="mathTab = t.key"
         >{{ t.label }}</div>
       </div>
-      <MathPanel v-if="mathTab === 'primary'" />
+      <div v-if="mathTab === 'primary'">
+        <div class="cp-subtabs cp-subtabs--inner">
+          <div
+            v-for="g in gradeTabs"
+            :key="g.key"
+            class="cp-subtab"
+            :class="{ active: gradeTab === g.key, disabled: g.disabled }"
+            @click="!g.disabled && (gradeTab = g.key)"
+          >{{ g.label }}</div>
+        </div>
+        <Grade5Panel v-if="gradeTab === 'g5'" />
+        <div v-else class="cp-placeholder">该年级内容整理中，敬请期待。</div>
+      </div>
       <JuniorPanel v-else />
     </div>
 
@@ -155,7 +167,7 @@ import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
-import MathPanel from '../../components/math/MathPanel.vue'
+import Grade5Panel from '../../components/math/Grade5Panel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
@@ -215,6 +227,16 @@ const mathTabs = [
   { key: 'junior', label: '初中联赛' },
 ]
 const mathTab = ref('primary')
+
+// 小学奥数按年级纵向铺开（对齐《高思学校竞赛数学导引》3/4/5/6 年级）
+// 当前只做了五年级（小朋友读五年级），其余置灰待补。
+const gradeTabs = [
+  { key: 'g3', label: '三年级', disabled: true },
+  { key: 'g4', label: '四年级', disabled: true },
+  { key: 'g5', label: '五年级', disabled: false },
+  { key: 'g6', label: '六年级', disabled: true },
+]
+const gradeTab = ref('g5')
 /** 切换分类并重新加载列表 */
 function setCategory(c) {
   if (category.value === c) return
@@ -388,6 +410,24 @@ watch(() => route.fullPath, () => {
   transition: color 0.15s, border-color 0.15s;
 }
 .cp-subtab:hover { color: var(--text-primary); }
+.cp-subtab.disabled {
+  color: #b1b4b6;
+  cursor: not-allowed;
+}
+.cp-subtab.disabled:hover { color: #b1b4b6; }
+.cp-subtabs--inner {
+  margin-top: 10px;
+  border-bottom: 1px solid #b1b4b6;
+}
+.cp-placeholder {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: #f3f2f1;
+  border: 1px solid #b1b4b6;
+  border-top: none;
+}
 .cp-subtab.active {
   color: #1d70b8;
   border-bottom-color: #1d70b8;

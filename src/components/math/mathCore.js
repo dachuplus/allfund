@@ -435,3 +435,241 @@ export function checkOp(a, b, result) {
   const cand = [a + b, a - b, a * b]
   return cand.some((v) => v === result)
 }
+
+/* ══════════════════════════════════════════════════════════
+   五年级竖向铺开所需公式（对应高斯导引五年级 24 讲）
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 第1讲 分数计算与比较大小 ── */
+
+/** 分数比较：交叉相乘。返回 -1/0/1 分别表示 a<b, a=b, a>b */
+export function cmpFrac(a1, a2, b1, b2) {
+  const l = a1 * b2
+  const r = b1 * a2
+  return l < r ? -1 : l > r ? 1 : 0
+}
+
+/** 分数加法：a/b + c/d */
+export function fracAdd(a, b, c, d) { return simplify(a * d + c * b, b * d) }
+
+/** 分数减法：a/b − c/d */
+export function fracSub(a, b, c, d) { return simplify(a * d - c * b, b * d) }
+
+/** 分数乘法：a/b × c/d */
+export function fracMul2(a, b, c, d) { return simplify(a * c, b * d) }
+
+/** 分数除法：a/b ÷ c/d */
+export function fracDiv(a, b, c, d) { return simplify(a * d, b * c) }
+
+/** 分数小数互化：n/d 转小数（保留 digits 位） */
+export function fracToDecimal(n, d, digits = 4) {
+  const v = n / d
+  return Number(v.toFixed(digits))
+}
+
+/** 带分数化假分数：a b/c → (a·c+b)/c */
+export function mixedToImproper(a, b, c) { return { n: a * c + b, d: c } }
+
+/** 假分数化带分数：23/5 → 4 3/5 */
+export function improperToMixed(n, d) {
+  const w = Math.floor(n / d)
+  return { w, r: n - w * d, d }
+}
+
+/* ── 第4讲 包含与排除（容斥） ── */
+
+/** 两集合容斥 */
+export function ie2(a, b, both) { return a + b - both }
+
+/** 三集合容斥 */
+export function ie3(a, b, c, ab, bc, ac, abc) { return a + b + c - ab - bc - ac + abc }
+
+/** 区间内倍数计数：1..n 中 d 的倍数个数 */
+export function countMultiples(n, d) { return Math.floor(n / d) }
+
+/** 1..n 中既能被 a 整除又能被 b 整除的个数（即 lcm 的倍数） */
+export function countBoth(n, a, b) { return countMultiples(n, lcm(a, b)) }
+
+/* ── 第5/20讲 行程问题 ── */
+
+/** 火车过桥：车尾完全离开桥的时间 */
+export function bridgeTime2(bridge, train, v) { return (bridge + train) / v }
+
+/** 火车完全在桥上的时间（不需考虑车尾离桥） */
+export function trainOnBridge(bridge, train, v) { return (bridge - train) / v }
+
+/** 环形跑道同向追及：n 次追上需时 n·C/(v1−v2) */
+export function circleCatch(c, n, v1, v2) { return n * c / (v1 - v2) }
+
+/* ── 第6讲 几何计数 ── */
+
+/** m×n 方格图中长方形总数 */
+export function countRectangles(m, n) { return m * (m + 1) * n * (n + 1) / 4 }
+
+/** 直线上 n 个点的线段数 */
+export function countSegments(n) { return n * (n - 1) / 2 }
+
+/* ── 第9讲 比较与估算 ── */
+
+/** 估算：四舍五入到指定位数（万/亿） */
+export function roundTo(n, unit) { return Math.round(n / unit) * unit }
+
+/** 放缩估算：判断 a/b 与 c/d 相差是否小于 10% */
+export function nearEqual(a, b, c, d, tol = 0.1) {
+  const x = a / b
+  const y = c / d
+  return Math.abs(x - y) / Math.max(x, y) < tol
+}
+
+/* ── 第11讲 和差倍分问题 ── */
+
+/** 和倍：小数 = 和 ÷ (倍数+1) */
+export function srSmall(total, times) { return total / (times + 1) }
+
+/** 差倍：大数 = 差 ÷ (倍数−1) */
+export function drBig(diff, times) { return diff / (times - 1) }
+
+/** 三量分配：总量按 a:b:c 分配 */
+export function allocate3(total, a, b, c) {
+  const s = a + b + c
+  return [total * a / s, total * b / s, total * c / s]
+}
+
+/* ── 第14/19讲 直线形计算 ── */
+
+/** 三角形面积（底×高÷2） */
+export function triArea2(base, height) { return base * height / 2 }
+
+/** 梯形中位线：(上底+下底)÷2 */
+export function trapezoidMidline(a, b) { return (a + b) / 2 }
+
+/** 等梯形（上底+下底=2×腰）周长 */
+export function trapezoidPerimeter(a, b, c) { return a + b + 2 * c }
+
+/* ── 第15讲 圆与扇形 ── */
+
+/** 圆面积 */
+export function circleArea2(r, pi = 3.14) { return pi * r * r }
+
+/** 圆周长 */
+export function circlePerimeter2(r, pi = 3.14) { return 2 * pi * r }
+
+/** 扇形面积 */
+export function sectorArea2(r, deg, pi = 3.14) { return (deg / 360) * pi * r * r }
+
+/** 扇形弧长 */
+export function arcLength(r, deg, pi = 3.14) { return (deg / 360) * 2 * pi * r }
+
+/** 环形面积（同心圆） */
+export function ringArea(R, r, pi = 3.14) { return pi * (R * R - r * r) }
+
+/* ── 第16讲 余数 ── */
+
+/** 被 d 整除的数中最大的不超过 n 的 */
+export function maxMultiple(n, d) { return Math.floor(n / d) * d }
+
+/**
+ * 求满足 n mod a = r1 且 n mod b = r2 的**最小非负整数** n。
+ * ⚠️ 返回的是最小解，不是任意解：例如 mod5余3 且 mod7余2 时，
+ *    23 与 58 都满足，但最小解是 23（23%5=3, 23%7=2）。
+ *    题目若问「最小是多少」直接用；若问「大于某值的最小解」需自行加 lcm(a,b) 的倍数。
+ * @returns 最小非负解；无解返回 -1
+ */
+export function solveCRT(a, r1, b, r2, limit = 100000) {
+  for (let n = 0; n <= limit; n++) {
+    if (n % a === r1 && n % b === r2) return n
+  }
+  return -1
+}
+
+/* ── 第17讲 工程问题 ── */
+
+/** 合作完成时间：1 ÷ (效率之和) */
+export function workTime2(rates) { return 1 / rates.reduce((a, b) => a + b, 0) }
+
+/** 交替工作：先算一个周期的工作量 */
+export function alternateWork(a, b, days) {
+  const per = a + b          // 两人各做 1 天
+  const cycles = Math.floor(days / 2)
+  const rest = days % 2
+  return { cycles, per, rest }
+}
+
+/* ── 第18讲 牛吃草与钟表 ── */
+
+/** 牛吃草：原有草量 */
+export function cowGrass2(n1, d1, n2, d2) {
+  const y = (n2 * d2 - n1 * d1) / (d2 - d1)
+  return n1 * d1 - y * d1
+}
+
+/** 牛吃草：日生长量 */
+export function cowGrowth(n1, d1, n2, d2) { return (n2 * d2 - n1 * d1) / (d2 - d1) }
+
+/** 钟表夹角（度） */
+export function clockAngle2(h, m) {
+  const a = Math.abs(30 * h - 5.5 * m)
+  return Math.min(a, 360 - a)
+}
+
+/* ── 第21讲 数字问题 ── */
+
+/** 回文数 */
+export function isPalindrome2(n) {
+  const s = String(n)
+  return s === s.split('').reverse().join('')
+}
+
+/** 数位逆序 */
+export function reverseDigits(n) { return Number(String(Math.abs(n)).split('').reverse().join('')) }
+
+/** 数字黑洞步数（数字→各位和→各位积，收敛到 0 或 495） */
+export function digitBlackhole(n, max = 20) {
+  let cur = Math.abs(n)
+  const seen = new Set()
+  for (let i = 0; i < max; i++) {
+    const s = String(cur)
+    const next = [...s].reduce((a, ch) => a * (+ch), 1)
+    if (next === cur) return { steps: i, value: cur }
+    if (seen.has(next)) return { steps: -1, value: next }
+    seen.add(next)
+    cur = next
+  }
+  return { steps: -1, value: cur }
+}
+
+/* ── 第22讲 计数综合 ── */
+
+/** 错位排列 */
+export function derangement2(n) {
+  if (n === 0) return 1
+  if (n === 1) return 0
+  let a = 1, b = 0
+  for (let i = 2; i <= n; i++) { [a, b] = [b, (i - 1) * (b + a)] }
+  return b
+}
+
+/** 组合数 */
+export function C2(n, k) {
+  if (k < 0 || k > n) return 0
+  return Math.round(factorial(n) / (factorial(k) * factorial(n - k)))
+}
+
+/* ── 第23讲 构造论证 ── */
+
+/** 构造：n 边形外角和恒为 360° */
+export function polygonExteriorSum() { return 360 }
+
+/** 构造：能否用 n 根同样长的小棒拼出若干个等边三角形（边数需 3 的倍数） */
+export function canMakeTriangles(n) { return n % 3 === 0 && n >= 3 }
+
+/* ── 第24讲 抽屉原理 ── */
+
+/** 至少 ⌈n/m⌉ */
+export function pigeonhole3(n, m) { return Math.ceil(n / m) }
+
+/** 加强版：n 个物体 m 个抽屉，保证至少 k 个同抽屉（返回是否保证） */
+export function pigeonholeGuarantee(n, m, k) { return n > m * (k - 1) }
+
+/** 至少有几组 k 个（把 n 个物体按 m 类分） */
+export function pigeonholeGroups(n, m, k) { return Math.floor(n / k) }
