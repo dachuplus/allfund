@@ -12,6 +12,10 @@
 
     <div class="games-area">
       <MinesweeperGame v-if="activeGame === 'minesweeper'" />
+      <SudokuGame v-else-if="activeGame === 'sudoku'" />
+      <HanoiGame v-else-if="activeGame === 'hanoi'" />
+      <EulerGame v-else-if="activeGame === 'euler'" />
+      <ColorGame v-else-if="activeGame === 'color'" />
       <MiniMinecraft v-else />
     </div>
   </div>
@@ -20,10 +24,18 @@
 <script setup>
 import { ref } from 'vue'
 import MinesweeperGame from './MinesweeperGame.vue'
+import SudokuGame from './SudokuGame.vue'
+import HanoiGame from './HanoiGame.vue'
+import EulerGame from './EulerGame.vue'
+import ColorGame from './ColorGame.vue'
 import MiniMinecraft from './MiniMinecraft.vue'
 
 const GAMES = [
   { key: 'minesweeper', label: '扫雷' },
+  { key: 'sudoku', label: '数独' },
+  { key: 'hanoi', label: '汉诺塔' },
+  { key: 'euler', label: '一笔画' },
+  { key: 'color', label: '染色' },
   { key: 'minecraft', label: '方块世界' },
 ]
 
