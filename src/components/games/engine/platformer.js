@@ -320,30 +320,31 @@ export function setupCanvas(canvas, cssW, cssH) {
 
 /**
  * 键盘输入：返回一个 { left, right, jump, jumpPressed } 引用对象。
- * jumpPressed 是「本帧刚按下」的脉冲信号，物理层消费后自动清除。
+ *
+ * ⚠️ keyMap 的值直接写动作名（'left' / 'right' / 'jump'），不要写 'jumpPressed'。
+ * 2026-10-04 修：原实现只在 slot==='jumpPressed' 时才置 jumpPressed 脉冲，而两个游戏
+ * 映射的是 'jump' ⇒ 走 else 分支只置 state.jump，脉冲永远为 false ⇒ stepPhysics 里的
+ * jumpBuf 永不填充 ⇒ **键盘跳完全失效**（触摸键走 bindVirtualButton 不受影响，
+ * 于是出现"手机能跳、PC 不能跳"）。现在 'jump' 即产生上升沿脉冲。
  */
 export function createInput(target, keyMap) {
   const state = { left: false, right: false, jump: false, jumpPressed: false }
   const kd = (e) => {
-    const k = e.key
-    if (keyMap[k]) {
-      if (k === 'ArrowUp' || k === ' ' || k === 'w' || k === 'W') e.preventDefault()
-      const slot = keyMap[k]
-      if (slot === 'jumpPressed') {
-        if (!state.jump) state.jumpPressed = true
-        state.jump = true
-      } else {
-        state[slot] = true
-      }
+    const slot = keyMap[e.key]
+    if (!slot) return
+    if (e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w' || e.key === 'W') e.preventDefault()
+    if (slot === 'jump') {
+      if (!state.jump) state.jumpPressed = true   // 上升沿脉冲，供跳跃缓冲用
+      state.jump = true
+    } else {
+      state[slot] = true
     }
   }
   const ku = (e) => {
-    const k = e.key
-    if (keyMap[k]) {
-      const slot = keyMap[k]
-      if (slot === 'jumpPressed') state.jump = false
-      else state[slot] = false
-    }
+    const slot = keyMap[e.key]
+    if (!slot) return
+    if (slot === 'jump') state.jump = false
+    else state[slot] = false
   }
   target.addEventListener('keydown', kd)
   target.addEventListener('keyup', ku)
