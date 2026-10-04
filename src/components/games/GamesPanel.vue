@@ -12,12 +12,7 @@
 
     <div class="games-area">
       <MinesweeperGame v-if="activeGame === 'minesweeper'" />
-      <Game2048 v-else-if="activeGame === '2048'" />
-      <MiniMinecraft v-else-if="activeGame === 'minecraft'" />
-      <PlatformMario v-else-if="activeGame === 'mario'" />
-      <SokobanGame v-else-if="activeGame === 'sokoban'" />
-      <LinkEliminate v-else-if="activeGame === 'link'" />
-      <HexEliminate v-else />
+      <MiniMinecraft v-else />
     </div>
   </div>
 </template>
@@ -25,21 +20,11 @@
 <script setup>
 import { ref } from 'vue'
 import MinesweeperGame from './MinesweeperGame.vue'
-import Game2048 from './Game2048.vue'
 import MiniMinecraft from './MiniMinecraft.vue'
-import PlatformMario from './PlatformMario.vue'
-import SokobanGame from './SokobanGame.vue'
-import LinkEliminate from './LinkEliminate.vue'
-import HexEliminate from './HexEliminate.vue'
 
 const GAMES = [
   { key: 'minesweeper', label: '扫雷' },
-  { key: '2048', label: '2048' },
   { key: 'minecraft', label: '方块世界' },
-  { key: 'mario', label: '平台冒险' },
-  { key: 'sokoban', label: '推箱子' },
-  { key: 'link', label: '连线消除' },
-  { key: 'hex', label: '六角消除' },
 ]
 
 const activeGame = ref('minesweeper')
