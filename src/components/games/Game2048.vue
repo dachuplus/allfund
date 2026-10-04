@@ -21,12 +21,26 @@
           :style="tileStyle(tile)"
         >{{ tile.value }}</div>
       </div>
+      <div class="g2048-controls" aria-label="方向控制">
+        <button class="g2048-dir g2048-dir--up" :disabled="gameOver" @click="move(1)" aria-label="向上移动">
+          <span class="g2048-arrow g2048-arrow--up"></span>
+        </button>
+        <button class="g2048-dir g2048-dir--down" :disabled="gameOver" @click="move(3)" aria-label="向下移动">
+          <span class="g2048-arrow g2048-arrow--down"></span>
+        </button>
+        <button class="g2048-dir g2048-dir--left" :disabled="gameOver" @click="move(0)" aria-label="向左移动">
+          <span class="g2048-arrow g2048-arrow--left"></span>
+        </button>
+        <button class="g2048-dir g2048-dir--right" :disabled="gameOver" @click="move(2)" aria-label="向右移动">
+          <span class="g2048-arrow g2048-arrow--right"></span>
+        </button>
+      </div>
     </div>
 
     <p v-if="won && !keepPlaying" class="g2048-status g2048-status--win">你合成 2048 了！</p>
     <p v-else-if="won && keepPlaying" class="g2048-status g2048-status--win">已达成 2048，继续挑战更高分！</p>
     <p v-else-if="gameOver" class="g2048-status g2048-status--lose">没有可移动的格子了。</p>
-    <p class="g2048-hint">使用方向键或滑动屏幕移动方块。相同数字碰撞会合并。</p>
+    <p class="g2048-hint">PC 点击棋盘中央的上下左右箭头，手机可滑动或点击箭头，也支持键盘方向键。相同数字碰撞会合并。</p>
   </div>
 </template>
 
@@ -246,10 +260,13 @@ onMounted(() => {
 .g2048-new-btn:hover { background: #003078; }
 .g2048-board {
   position: relative;
-  width: 280px;
-  height: 280px;
+  width: 296px;
+  height: 296px;
+  max-width: 100%;
   background: #b1b4b6;
   padding: 8px;
+  box-sizing: border-box;
+  touch-action: none;
 }
 .g2048-grid {
   position: absolute;
@@ -265,6 +282,66 @@ onMounted(() => {
   position: absolute;
   inset: 8px;
   pointer-events: none;
+}
+.g2048-controls {
+  position: absolute;
+  inset: 8px;
+  z-index: 2;
+  pointer-events: none;
+}
+.g2048-dir {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.12s ease;
+}
+.g2048-dir:hover { background: rgba(255, 255, 255, 0.75); }
+.g2048-dir:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+.g2048-dir:disabled .g2048-arrow--up    { border-bottom-color: #626a6e; }
+.g2048-dir:disabled .g2048-arrow--down  { border-top-color: #626a6e; }
+.g2048-dir:disabled .g2048-arrow--left   { border-right-color: #626a6e; }
+.g2048-dir:disabled .g2048-arrow--right  { border-left-color: #626a6e; }
+.g2048-dir--up    { transform: translate(-50%, calc(-50% - 26px)); }
+.g2048-dir--down  { transform: translate(-50%, calc(-50% + 26px)); }
+.g2048-dir--left  { transform: translate(calc(-50% - 26px), -50%); }
+.g2048-dir--right { transform: translate(calc(-50% + 26px), -50%); }
+.g2048-arrow {
+  display: block;
+  width: 0;
+  height: 0;
+}
+.g2048-arrow--up {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 16px solid #1d70b8;
+}
+.g2048-arrow--down {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 16px solid #1d70b8;
+}
+.g2048-arrow--left {
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 16px solid #1d70b8;
+}
+.g2048-arrow--right {
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 16px solid #1d70b8;
 }
 .g2048-tile {
   position: absolute;
