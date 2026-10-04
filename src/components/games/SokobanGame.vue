@@ -34,10 +34,10 @@
     <p v-else class="sk-status">用方向键把箱子推到圆点上。箱子只能推、不能拉。</p>
 
     <div class="sk-pad">
-      <button class="sk-key" @click="tryMove('up', 0, -1)">上</button>
-      <button class="sk-key" @click="tryMove('left', -1, 0)">左</button>
-      <button class="sk-key" @click="tryMove('down', 0, 1)">下</button>
-      <button class="sk-key" @click="tryMove('right', 1, 0)">右</button>
+      <button class="sk-key" @click="tryMove('up')">上</button>
+      <button class="sk-key" @click="tryMove('left')">左</button>
+      <button class="sk-key" @click="tryMove('down')">下</button>
+      <button class="sk-key" @click="tryMove('right')">右</button>
     </div>
   </div>
 </template>
@@ -108,6 +108,17 @@ const LEVELS = [
     ],
   },
 ]
+
+// 方向表：[名称, dr 行增量, dc 列增量]。
+// r 是行（向下增大）、c 是列（向右增大）。所有入口只读这张表，
+// 不要再在调用处手写 (dr, dc) —— 2026-10-04 就是把行列写反导致
+// 「点左往上走、点上往左走、点下往右走、点右往下走」，键盘方向键同样错。
+const DIRS = {
+  up:    { dr: -1, dc: 0 },
+  down:  { dr: 1,  dc: 0 },
+  left:  { dr: 0,  dc: -1 },
+  right: { dr: 0,  dc: 1 },
+}
 
 const level = ref(0)
 const moves = ref(0)
@@ -192,8 +203,11 @@ function load(i) {
 function isBox(r, c) { return boxes.value.some((b) => b.r === r && b.c === c) }
 function isTarget(r, c) { return targets.value.has(r * 100 + c) }
 
-function tryMove(dir, dr, dc) {
+function tryMove(dir) {
   if (won.value) return
+  const d = DIRS[dir]
+  if (!d) return
+  const { dr, dc } = d
   const nr = player.r + dr
   const nc = player.c + dc
   if (isWall(nr, nc)) return
@@ -255,9 +269,15 @@ function undo() {
 function restart() { load(level.value) }
 
 function onKey(e) {
-  const map = { ArrowUp: ['up', 0, -1], ArrowDown: ['down', 0, 1], ArrowLeft: ['left', -1, 0], ArrowRight: ['right', 1, 0], w: ['up', 0, -1], s: ['down', 0, 1], a: ['left', -1, 0], d: ['right', 1, 0] }
-  const m = map[e.key]
-  if (m) { e.preventDefault(); tryMove(m[0], m[1], m[2]) }
+  // 只映射方向名，行列偏移一律查 DIRS，避免两处各写一份导致不一致
+  const map = {
+    ArrowUp: 'up', w: 'up', W: 'up',
+    ArrowDown: 'down', s: 'down', S: 'down',
+    ArrowLeft: 'left', a: 'left', A: 'left',
+    ArrowRight: 'right', d: 'right', D: 'right',
+  }
+  const dir = map[e.key]
+  if (dir) { e.preventDefault(); tryMove(dir) }
 }
 
 onMounted(() => { load(0); window.addEventListener('keydown', onKey) })
@@ -314,12 +334,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 .sk-status { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .sk-status--win { color: #00703c; }
-.sk-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; max-width: 240px; margin-left: auto; margin-right: auto; }
+.sk-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 6px;
+  margin: 12px auto 0;
+  justify-content: center;
+}
 .sk-key {
-  padding: 14px 0; font-size: 15px; font-weight: 700;
+  padding: 0; font-size: 15px; font-weight: 700;
   background: #fff; border: 1px solid #1d70b8; color: #1d70b8; cursor: pointer;
 }
 .sk-key:active { background: #1d70b8; color: #fff; }
-.sk-pad .sk-key:nth-child(1) { grid-column: 2; }
-.sk-pad .sk-key:nth-child(2) { grid-column: 1; }
+/* 标准十字：上(1,2) 左(2,1) 下(3,2) 右(2,3)，中间(2,2) 留空。
+   原 nth-child 只定位了前两个，第三个按钮掉到第二行，布局不像方向键。 */
+.sk-key:nth-child(1) { grid-area: 1 / 2; }
+.sk-key:nth-child(2) { grid-area: 2 / 1; }
+.sk-key:nth-child(3) { grid-area: 3 / 2; }
+.sk-key:nth-child(4) { grid-area: 2 / 3; }
 </style>
