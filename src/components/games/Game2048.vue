@@ -156,16 +156,23 @@ function rotateCW(matrix) {
   return res
 }
 
+// 把「目标方向」旋转成「向左」，滑行合并后再反向旋转回去。
+// rotate 为把方向转成 left 所需的顺时针旋转次数：
+//   left=0 / up=3 / right=2 / down=1  ⇒  (4 - dir) % 4
+// ⚠️ 2026-10-04 修复：原先写成 `i < dir`（即 0/1/2/3），方向全部反了 ——
+//    点「上」箭头数字反而往下走。rotate 回去的次数是 rot 的逆运算 = dir 次。
+const ROTATE_FOR = [0, 3, 2, 1] // index = dir: 0=left 1=up 2=right 3=down
+
 function move(dir) {
-  // dir: 0=left, 1=up, 2=right, 3=down
+  const rot = ROTATE_FOR[dir]
   let rotated = board.value
-  for (let i = 0; i < dir; i++) rotated = rotateCW(rotated)
+  for (let i = 0; i < rot; i++) rotated = rotateCW(rotated)
   let moved = false
   const before = JSON.stringify(rotated.map((row) => row.map((x) => (x ? x.value : 0))))
   for (let r = 0; r < SIZE; r++) rotated[r] = slideRow(rotated[r])
   const after = JSON.stringify(rotated.map((row) => row.map((x) => (x ? x.value : 0))))
   if (before !== after) moved = true
-  for (let i = 0; i < (4 - dir) % 4; i++) rotated = rotateCW(rotated)
+  for (let i = 0; i < dir; i++) rotated = rotateCW(rotated)
   board.value = rotated
   if (moved) {
     addRandomTile()
