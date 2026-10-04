@@ -49,7 +49,7 @@
           <div class="g5-lv-head">
             <span class="g5-lv-name">{{ lv.lv }}</span>
             <span class="g5-lv-star">{{ '★'.repeat(lv.star) }}</span>
-            <button class="g5-toggle" @click="toggle(lv.lv)">
+            <button class="g5-toggle" @click="toggle(lec.n + '-' + lv.lv)">
               {{ opened[lec.n + '-' + lv.lv] ? '收起' : '看解答' }}
             </button>
           </div>
