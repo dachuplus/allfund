@@ -219,3 +219,219 @@ export function factorize(n) {
   if (n > 1) out.push(n)
   return out
 }
+
+/* ══════════════════════════════════════════════════════════
+   以下为按《高思学校竞赛数学导引》七大专题补充的公式
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 计算专题 ── */
+
+/** 循环小数的循环节长度（纯循环小数才精确；混循环返回 0） */
+export function repeatingCycle(n, d) {
+  const g = gcd(n, d)
+  let den = d / g
+  // 去掉 2 和 5 的因子
+  while (den % 2 === 0) den /= 2
+  while (den % 5 === 0) den /= 5
+  if (den === 1) return 0
+  // 计算 10^k ≡ 1 (mod den) 的最小 k
+  let k = 1, cur = 10 % den
+  while (cur !== 1) { cur = (cur * 10) % den; k++ }
+  return k
+}
+
+/** 数列第 n 项（等差或等比自动判断） */
+export function seqNth(a1, a2, n) {
+  const d = a2 - a1
+  // 等差判据要排除「公差恰等于前项」的情况：1,2,4 是等比，d=1 会被误判为等差。
+  // 正确做法：直接比较第三项 —— 缺第三项时按等差处理。
+  return d === 0
+    ? a1 * Math.pow(a2 / a1, n - 1)   // a1 === a2：等比（公比 1）
+    : a1 + (n - 1) * d                 // 等差
+}
+
+/** 数列第 n 项（已知前两项，需第三项消歧） */
+export function seqNth3(a1, a2, a3, n) {
+  if (a2 - a1 === a3 - a2) return a1 + (n - 1) * (a2 - a1)   // 等差
+  return a1 * Math.pow(a2 / a1, n - 1)                          // 等比
+}
+
+/** 找规律（等差或等比）求第 n 项 */
+export function findPattern(list, n) {
+  if (list.length < 2) return list[0] || 0
+  const d = list[1] - list[0]
+  const isArith = list.every((v, i) => i === 0 || v - list[i - 1] === d)
+  if (isArith) return list[0] + (n - 1) * d
+  const q = list[0] !== 0 ? list[1] / list[0] : 0
+  const isGeo = q !== 0 && list.every((v, i) => i === 0 || v / list[i - 1] === q)
+  if (isGeo) return list[0] * Math.pow(q, n - 1)
+  return null  // 复杂规律，返回 null 表示需要人工判断
+}
+
+/* ── 数论专题 ── */
+
+/** 辗转相除求 gcd */
+export function euclid(a, b) { return gcd(a, b) }
+
+/** 求 n 的所有正因数 */
+export function divisors(n) {
+  const out = []
+  for (let i = 1; i <= n; i++) if (n % i === 0) out.push(i)
+  return out
+}
+
+/** 判断能否被 a 整除 */
+export function divisibleBy(n, a) { return n % a === 0 }
+
+/* ── 计数专题 ── */
+
+/** 加法原理（分类计数之和） */
+export function addPrinciple(...counts) { return counts.reduce((a, b) => a + b, 0) }
+
+/** 乘法原理（分步计数之积） */
+export function mulPrinciple(...counts) { return counts.reduce((a, b) => a * b, 1) }
+
+/** 容斥原理：两集合 */
+export function inclusionExclusion2(a, b, ab) { return a + b - ab }
+
+/** 容斥原理：三集合 */
+export function inclusionExclusion3(a, b, c, ab, bc, ac, abc) {
+  return a + b + c - ab - bc - ac + abc
+}
+
+/** 错位排列（简单递推：D(n) = (n−1)[D(n−1) + D(n−2)]） */
+export function derangement(n) {
+  if (n === 0) return 1
+  if (n === 1) return 0
+  let a = 1, b = 0
+  for (let i = 2; i <= n; i++) { [a, b] = [b, (i - 1) * (b + a)] }
+  return b
+}
+
+/* ── 组合专题 ── */
+
+/** 抽屉原理：n 个物体放 m 个抽屉，至少一个抽屉不少于 ⌈n/m⌉ 个 */
+export function pigeonhole(n, m) { return Math.ceil(n / m) }
+
+/** 抽屉原理加强：n 个物体放 m 个抽屉，至少有 k 个同色，需 n > m×(k−1) */
+export function pigeonholeK(n, m, k) { return n > m * (k - 1) }
+
+/* ── 几何专题 ── */
+
+/** 长方形面积 */
+export function rectArea(a, b) { return a * b }
+/** 长方形周长 */
+export function rectPerimeter(a, b) { return 2 * (a + b) }
+
+/** 正方形面积 / 周长 */
+export function squareArea(a) { return a * a }
+export function squarePerimeter(a) { return 4 * a }
+
+/** 三角形面积（底 × 高 ÷ 2） */
+export function triArea(base, height) { return base * height / 2 }
+
+/** 平行四边形面积 */
+export function paraArea(base, height) { return base * height }
+
+/** 梯形面积 */
+export function trapezoidArea(a, b, h) { return (a + b) * h / 2 }
+
+/** 圆面积（π 取 3.14） */
+export function circleArea(r, pi = 3.14) { return pi * r * r }
+/** 圆周长（π 取 3.14） */
+export function circlePerimeter(r, pi = 3.14) { return 2 * pi * r }
+
+/** 扇形面积 */
+export function sectorArea(r, deg, pi = 3.14) { return (deg / 360) * pi * r * r }
+
+/** 长方体体积 / 表面积 */
+export function cuboidVolume(a, b, c) { return a * b * c }
+export function cuboidSurface(a, b, c) { return 2 * (a * b + a * c + b * c) }
+
+/** 正方体体积 / 表面积 */
+export function cubeVolume(a) { return a * a * a }
+export function cubeSurface(a) { return 6 * a * a }
+
+/** 圆柱体积（π 取 3.14） */
+export function cylinderVolume(r, h, pi = 3.14) { return pi * r * r * h }
+
+/** 圆锥体积 */
+export function coneVolume(r, h, pi = 3.14) { return pi * r * r * h / 3 }
+
+/* ── 应用题专题（高斯体系补充） ── */
+
+/**
+ * 牛吃草（反比例应用题）：
+ * 设原有草量 x（头·天），每天新长 y（头·天）。
+ * n₁ 头牛 d₁ 天吃完 ⇒ x + y·d₁ = n₁·d₁
+ * n₂ 头牛 d₂ 天吃完 ⇒ x + y·d₂ = n₂·d₂
+ * 两式相减：y·(d₂ − d₁) = n₂d₂ − n₁d₁  ⇒  y = (n₂d₂ − n₁d₁)/(d₂ − d₁)
+ * 再代回：x = n₁d₁ − y·d₁
+ * ⚠️ 2026-10-04 原写成 (n₁d₁ − n₂d₂)/(d₂ − d₁)，符号与结构都错，恒返回负值。
+ */
+export function cowGrass(n1, d1, n2, d2) {
+  const y = (n2 * d2 - n1 * d1) / (d2 - d1)      // 每天新长的草量
+  return n1 * d1 - y * d1                            // 原有草量
+}
+
+/** 牛吃草：每天新长的草量 */
+export function cowGrassGrowth(n1, d1, n2, d2) {
+  return (n2 * d2 - n1 * d1) / (d2 - d1)
+}
+
+/** 还原问题（逆推）：从结果倒推回去 */
+export function restore(start, steps) {
+  return steps.reduce((v, op) => op(v), start)
+}
+
+/** 钟表问题：追及（时针分针重合，12 小时 11 次） */
+export function clockOverlaps(hours) { return hours * 11 }
+
+/** 钟表夹角（°） */
+export function clockAngle(h, m) {
+  const a = Math.abs(30 * h - 5.5 * m)
+  return Math.min(a, 360 - a)
+}
+
+/** 浓度混合：c = (c₁V₁ + c₂V₂) ÷ (V₁ + V₂) */
+export function mixConcentration2(c1, v1, c2, v2) {
+  return (c1 * v1 + c2 * v2) / (v1 + v2)
+}
+
+/** 不定方程 ax + by = c 的正整数解（求个数） */
+export function countPositiveSolutions(a, b, c) {
+  let cnt = 0
+  for (let x = 1; a * x < c; x++) {
+    const rest = c - a * x
+    if (rest % b === 0 && rest / b > 0) cnt++
+  }
+  return cnt
+}
+
+/** 盈亏问题（高斯口径）：人数 = (盈 + 亏) ÷ 两次每份差 */
+export function profitLossCount(profit, loss, diffEach) {
+  return (profit + loss) / diffEach
+}
+
+/** 和倍问题：小数 = 和 ÷ (倍数 + 1) */
+export function sumRatioSmall(total, times) { return total / (times + 1) }
+
+/** 差倍问题：大数 = 差 ÷ (倍数 − 1) */
+export function diffRatioBig(diff, times) { return diff / (times - 1) }
+
+/* ── 数字谜专题 ── */
+
+/** 数阵图：等差三角阵第 n 行第 m 个数（首项 1，公差 d） */
+export function triangleArray(n, m, d = 1) { return 1 + ((n - 1) * n / 2 + (m - 1)) * d }
+
+/** 幻方校验：3×3 幻方中心数 = 总和 ÷ 9 */
+export function magicCenter(sum) { return sum / 9 }
+
+/** 竖式数字和：三位数 abc，数字和 = a+b+c */
+export function digitSumOf(n) { return digitSum(n) }
+
+/** 算符填空：给定 a、b 和结果，求缺失运算符（返回满足的两个数之和等） */
+export function checkOp(a, b, result) {
+  const cand = [a + b, a - b, a * b]
+  return cand.some((v) => v === result)
+}
