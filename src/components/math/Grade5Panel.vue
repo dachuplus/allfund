@@ -71,33 +71,38 @@
 
 <script setup>
 /**
- * 小学奥数通用年级面板 —— 三/四/五/六年级共用。
- * 每讲含「兴趣篇 / 拓展篇 / 超越篇」三档，难度与原书一致。
- * 数据见 grade3Data.js / grade4Data.js / grade5Data.js / grade6Data.js，
+ * 小学奥数通用年级面板 —— 支持机构维度（inst）× 年级（grade）。
+ * 每讲含「兴趣篇 / 拓展篇 / 超越篇」三档。
+ * 各机构使用各自独立的知识点体系（严禁复用高斯内容）：
+ *   - gaosi：高思导引体系（grade3Data.js ~ grade6Data.js）
+ *   - mogu / mc / ledu：各自独立课程体系的 data 模块（moguData.js / mcData.js / leduData.js）
  * 公式口径见 mathCore.js（有单元测试 + 暴力对拍）。
  */
 import { ref, computed, watch } from 'vue'
-import { GRADE3 } from './grade3Data.js'
-import { GRADE4 } from './grade4Data.js'
-import { GRADE5 } from './grade5Data.js'
-import { GRADE6 } from './grade6Data.js'
+import gaosiData from './gaosiData.js'
+import moguData from './moguData.js'
+import mcData from './mcData.js'
+import leduData from './leduData.js'
 
 const props = defineProps({
   grade: { type: String, default: 'g5' },
+  inst: { type: String, default: 'gaosi' },
 })
 
-const DATAS = { g3: GRADE3, g4: GRADE4, g5: GRADE5, g6: GRADE6 }
+// 各机构独立的年级数据（每个机构一份，互不共用）
+const REGISTRY = { gaosi: gaosiData, mogu: moguData, mc: mcData, ledu: leduData }
 
 const LVKEY = { 兴趣篇: 'a', 拓展篇: 'b', 超越篇: 'c' }
 
-const data = computed(() => DATAS[props.grade] || GRADE5)
+const gradeData = computed(() => REGISTRY[props.inst] || gaosiData)
+const data = computed(() => gradeData.value[props.grade] || gaosiData.g5)
 const cur = ref(1)
 const opened = ref({})
 // ⚠️ 用 computed 而非普通函数：模板里直接 lec.xxx 访问
 const lec = computed(() => data.value.find((l) => l.n === cur.value) || data.value[0])
 
-// 切换年级时重置到第 1 讲，避免停留在越界讲号上
-watch(() => props.grade, () => { cur.value = 1 })
+// 切换机构或年级时重置到第 1 讲，避免停留在越界讲号上
+watch(() => [props.inst, props.grade], () => { cur.value = 1; opened.value = {} })
 
 function toggle(key) {
   opened.value[key] = !opened.value[key]
