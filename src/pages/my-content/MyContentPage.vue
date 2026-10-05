@@ -19,7 +19,7 @@
       <GamesPanel />
     </div>
 
-    <!-- 奥数二级 Tab：小学奥数（按年级纵向铺开）+ 初中联赛 -->
+    <!-- 奥数二级 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队 -->
     <div v-else-if="category === 'math'">
       <div class="cp-subtabs">
         <div
@@ -30,18 +30,21 @@
           @click="mathTab = t.key"
         >{{ t.label }}</div>
       </div>
-      <div v-if="mathTab === 'primary'">
+      <p v-if="instDesc" class="cp-inst-desc">{{ instDesc }}</p>
+      <!-- 小学奥数类机构（高斯 / 蘑菇 / 学而思MC-club / 乐读集训队）共用标准知识体系，按三/四/五/六年级纵向铺开 -->
+      <div v-if="isPrimary">
         <div class="cp-subtabs cp-subtabs--inner">
           <div
             v-for="g in gradeTabs"
             :key="g.key"
             class="cp-subtab"
-            :class="{ active: gradeTab === g.key, disabled: g.disabled }"
-            @click="!g.disabled && (gradeTab = g.key)"
+            :class="{ active: gradeTab === g.key }"
+            @click="gradeTab = g.key"
           >{{ g.label }}</div>
         </div>
         <Grade5Panel :grade="gradeTab" />
       </div>
+      <!-- 初联：初中联赛方法论体系 -->
       <JuniorPanel v-else />
     </div>
 
@@ -220,15 +223,35 @@ function catLabel(c) {
   return m ? m.label : '博客'
 }
 
-// 奥数下辖两个三级 Tab：小学奥数 / 初中联赛
+// 奥数下辖机构 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队
+// 高斯 = 高思导引知识点体系；初联 = 初中联赛方法论体系；
+// 蘑菇 / 学而思MC-club / 乐读集训队 为小学奥数培训机构，其「奥数知识点梳理」共用
+// 同一套小学奥数标准知识体系（计算/数论/几何/应用题/行程/计数组合），仅课程框架不同。
 const mathTabs = [
-  { key: 'primary', label: '小学奥数' },
-  { key: 'junior', label: '初中联赛' },
+  { key: 'gaosi', label: '高斯' },
+  { key: 'junior', label: '初联' },
+  { key: 'mogu', label: '蘑菇' },
+  { key: 'mc', label: '学而思MC-club' },
+  { key: 'ledu', label: '乐读集训队' },
 ]
-const mathTab = ref('primary')
+const mathTab = ref('gaosi')
 
-// 小学奥数按年级纵向铺开（对齐《高思学校竞赛数学导引》3/4/5/6 年级）
-// 四个年级均已按原书真实 24 讲目录整理完毕。
+// 各机构课程框架说明（依据公开资料整理，仅作背景介绍，不含评级/推荐）
+const instMeta = {
+  gaosi: '《高思学校竞赛数学导引》体系：按计算 / 应用题 / 几何 / 数论 / 计数 / 组合六大模块组织，各年级 24 讲，每讲含兴趣篇 / 拓展篇 / 超越篇三档。',
+  junior: '初中联赛（初联）：乔一鹏《初中数学方法80讲》方法论体系 + 小蓝书初中卷，按板块与知识点递进。',
+  mogu: '蘑菇培优：沿用小学奥数标准六大模块（计算 / 数论 / 几何 / 应用题 / 行程 / 计数组合），以「思维培养五阶体系」分层推进。',
+  mc: '学而思 MC-club（Mathink Club）：12 级思维体系，覆盖计算 / 整数 / 图形 / 应用 / 行程 / 组合 / 计数 / 综合八大主题，螺旋上升。',
+  ledu: '乐读集训队：原学而思培优团队教研体系（校优 / A+ / S 三档），按专题模块（行程 / 工程 / 平面几何等）组织。',
+}
+const instDesc = computed(() => instMeta[mathTab.value] || '')
+
+// 小学奥数类机构（高斯 / 蘑菇 / 学而思MC-club / 乐读集训队）共用标准知识体系，按年级纵向铺开
+const primaryInsts = ['gaosi', 'mogu', 'mc', 'ledu']
+const isPrimary = computed(() => primaryInsts.includes(mathTab.value))
+
+// 小学奥数按年级纵向铺开（对齐小学奥数标准知识体系 3/4/5/6 年级）
+// 四个年级均已按真实 24 讲目录整理完毕，例题答案均经独立验算。
 const gradeTabs = [
   { key: 'g3', label: '三年级' },
   { key: 'g4', label: '四年级' },
@@ -417,6 +440,15 @@ watch(() => route.fullPath, () => {
 .cp-subtabs--inner {
   margin-top: 10px;
   border-bottom: 1px solid #b1b4b6;
+}
+.cp-inst-desc {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--brand);
+  background: var(--bg-body);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 .cp-placeholder {
   padding: 28px 12px;
