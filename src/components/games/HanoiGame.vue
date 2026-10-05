@@ -25,10 +25,8 @@
         v-for="(peg, pi) in state"
         :key="pi"
         class="hn-peg"
-        @click="pegFrom = pi"
-        @mouseover="hoverPeg = pi"
-        @mouseout="hoverPeg = -1"
-        :class="{ 'hn-peg-target': selFrom >= 0 && selFrom !== pi }"
+        @click="tapPeg(pi)"
+        :class="{ 'hn-peg-target': selFrom >= 0 && selFrom !== pi, 'hn-peg-from': selFrom === pi }"
       >
         <!-- 盘子在上、底座横线在下（底座要看起来在柱子脚下） -->
         <div class="hn-disks">
@@ -38,7 +36,6 @@
             :key="di"
             class="hn-disk"
             :style="diskStyle(disk)"
-            @click="tapDisk(pi, disk)"
           >{{ disk }}</div>
         </div>
         <div class="hn-peg-base"></div>
@@ -69,8 +66,6 @@ const moves = ref(0)
 const won = ref(false)
 const autoRunning = ref(false)
 const selFrom = ref(-1)
-const pegFrom = ref(-1)
-const hoverPeg = ref(-1)
 const pegNames = ['A 柱', 'B 柱', 'C 柱']
 
 let autoTimer = null
@@ -97,16 +92,13 @@ function reset() {
   selFrom.value = -1
 }
 
-/** 点盘子：第一次点选柱，第二次点目标柱 */
-function tapDisk(pegIndex, disk) {
+/** 点柱子：第一次点选源柱，第二次点目标柱（空柱也可作为目标） */
+function tapPeg(pi) {
   if (won.value || autoRunning.value) return
-  const peg = state.value[pegIndex]
-  if (peg[peg.length - 1] !== disk) return       // 只能点柱顶盘
+  if (selFrom.value === -1) { selFrom.value = pi; return }
+  if (selFrom.value === pi) { selFrom.value = -1; return }
 
-  if (selFrom.value === -1) { selFrom.value = pegIndex; return }
-  if (selFrom.value === pegIndex) { selFrom.value = -1; return }
-
-  tryMove(selFrom.value, pegIndex)
+  tryMove(selFrom.value, pi)
   selFrom.value = -1
 }
 
@@ -189,6 +181,9 @@ reset()
 .hn-disk:hover { filter: brightness(1.15); }
 .hn-peg-name { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .hn-peg-target .hn-peg-base { background: #1d70b8; }
+.hn-peg-from .hn-disks { border-color: #1d70b8; box-shadow: inset 0 0 0 1px #1d70b8; }
+.hn-peg-from .hn-peg-name { color: #1d70b8; font-weight: 700; }
+.hn-peg { cursor: pointer; }
 
 .hn-info {
   margin-top: 16px; font-size: 13px; color: var(--text-secondary);

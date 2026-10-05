@@ -37,21 +37,21 @@
       </svg>
 
       <div
-        v-for="i in nodes"
-        :key="'n' + i"
+        v-for="(c, idx) in coords"
+        :key="'n' + idx"
         class="eu-node"
         :class="{
-          'eu-node-odd': isOdd(i),
-          'eu-node-sel': sel === i,
-          'eu-node-last': lastNode === i,
+          'eu-node-odd': isOdd(idx),
+          'eu-node-sel': sel === idx,
+          'eu-node-last': lastNode === idx,
         }"
-        :style="{ left: pos(i).x - 13 + 'px', top: pos(i).y - 13 + 'px' }"
-        @click="clickNode(i)"
-      >{{ i }}</div>
+        :style="{ left: c.x - 13 + 'px', top: c.y - 13 + 'px' }"
+        @click="clickNode(idx)"
+      >{{ idx + 1 }}</div>
     </div>
 
     <div v-if="hintNode >= 0" class="eu-hint">
-      提示：从 <strong>{{ hintNode }}</strong> 起笔可一笔画成
+      提示：从 <strong>{{ hintNode + 1 }}</strong> 起笔可一笔画成
       <span v-if="oddCount === 2">（必须从一个奇点开始）</span>
     </div>
   </div>
@@ -78,7 +78,7 @@ const hintNode = ref(-1)
 const W = 320
 const H = 240
 
-let coords = []
+let coords = ref([])
 
 function newGame() {
   const seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0
@@ -94,27 +94,28 @@ function newGame() {
   layout()
 }
 
-/** 点位排布：简单分两圈，保证不重叠 */
+/** 点位排布：简单分两圈，保证不重叠（coords 为 0 基，标签显示 idx+1） */
 function layout() {
   const n = nodes.value
-  coords = []
+  const arr = []
   const cx = W / 2, cy = H / 2
   const r1 = 78, r2 = 45
   const outer = Math.min(6, n)
   for (let i = 0; i < n; i++) {
     if (i < outer) {
       const a = (i / outer) * Math.PI * 2 - Math.PI / 2
-      coords.push({ x: cx + r1 * Math.cos(a), y: cy + r1 * Math.sin(a) })
+      arr.push({ x: cx + r1 * Math.cos(a), y: cy + r1 * Math.sin(a) })
     } else {
       const a = ((i - outer) / Math.max(1, n - outer)) * Math.PI * 2 - Math.PI / 2
-      coords.push({ x: cx + r2 * Math.cos(a), y: cy + r2 * Math.sin(a) })
+      arr.push({ x: cx + r2 * Math.cos(a), y: cy + r2 * Math.sin(a) })
     }
   }
+  coords.value = arr
 }
 
 const boardStyle = computed(() => ({ width: W + 'px', height: H + 'px' }))
 
-function pos(i) { return coords[i] || { x: 0, y: 0 } }
+function pos(i) { return coords.value[i] || { x: 0, y: 0 } }
 
 const oddList = computed(() => oddNodes(edges.value, nodes.value))
 const oddCount = computed(() => oddList.value.length)

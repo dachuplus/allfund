@@ -131,9 +131,10 @@ export function genMap(level = 1, seed = Date.now()) {
     const adjArr = adj.map((s2) => [...s2])
     const { min, solution } = minColors(adjArr)
     if (solution && min >= 3) {
+      // cells 必须与 adj 使用同一套 0 基区域索引，否则前端 paint(cellIdx) 会越界
       return {
         W, H, regions: adjArr.length, adj: adjArr,
-        cells: owner, remap: [...remap.entries()],
+        cells: owner.map((v) => remap.get(v)), remap: [...remap.entries()],
         min, solution, level,
       }
     }
