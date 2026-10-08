@@ -128,6 +128,7 @@
               <td v-if="allCols" class="num">{{ fmtNum(row.roe) }}%</td>
               <td v-if="allCols" class="num">{{ fmtNum(row.gross_margin) }}%</td>
               <td v-if="allCols" class="num">{{ fmtNum(row.profit_cagr_3y) }}%</td>
+              <td class="num">{{ fmtCap(row.mktcap_total) }}</td>
               <td v-if="allCols" class="num">{{ fmtInt(row.mktcap_weighted) }}</td>
               <td v-if="allCols" class="num">{{ fmtPct1(row.top10_weight) }}</td>
             </tr>
@@ -196,6 +197,12 @@
         若混在一起排名，红利类指数会系统性垫底。切换上方分类即可查看对应池的排名。
       </p>
       <p class="ix-note-p">
+        <b>两种市值口径的区别</b>：表格里的<b>总市值</b>是成分股总市值的<b>简单加总</b>，反映指数覆盖的规模；
+        评分维里的「加权平均成分股市值」是<b>按权重加权</b>的每股平均市值，用于衡量「典型成分股的大小」，
+        两者相差很大（例：上证50 总市值 22.6 万亿，加权平均 0.6 万亿），不是同一件事。
+        总市值只统计成功匹配到行情的成分股，未匹配部分不计入。
+      </p>
+      <p class="ix-note-p">
         <b>分档标准</b>：A 85–100、B 70–84、C 55–69、D 40–54、E 0–39。
         分档仅表示该池内的相对位置，<b>不代表未来收益、不构成投资建议</b>。
       </p>
@@ -253,7 +260,8 @@ const COLUMNS = [
   { key: 'roe', label: 'ROE%', num: true, group: 'extra' },
   { key: 'gross_margin', label: '毛利率%', num: true, group: 'extra' },
   { key: 'profit_cagr_3y', label: '3年净利复合%', num: true, group: 'extra' },
-  { key: 'mktcap_weighted', label: '加权市值(亿)', num: true, group: 'extra' },
+  { key: 'mktcap_total', label: '总市值(亿)', num: true, group: 'base' },
+  { key: 'mktcap_weighted', label: '加权平均市值(亿)', num: true, group: 'extra' },
   { key: 'top10_weight', label: '前十大集中度%', num: true, group: 'extra' },
 ]
 const cols = computed(() => COLUMNS.filter((c) => allCols.value || c.group === 'base'))
@@ -310,6 +318,18 @@ function fmtPct2(v) {
   return isNaN(n) ? '—' : (n * 100).toFixed(2)
 }
 
+/**
+ * 指数总市值格式化。单位是「亿元」，跨度数大（几十亿 ~ 上百万亿），
+ * 故 ≥1 万亿时用「万亿」显示，否则用「亿」，避免一串零看不清。
+ */
+function fmtCap(v) {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  if (isNaN(n)) return '—'
+  if (Math.abs(n) >= 10000) return (n / 10000).toFixed(2) + ' 万亿'
+  return Math.round(n).toLocaleString('zh-CN') + ' 亿'
+}
+
 function cardDims(row) {
   return [
     { key: 'g', label: '成长性', w: 25, score: row.k_growth,
@@ -317,7 +337,7 @@ function cardDims(row) {
     { key: 'v', label: '估值', w: 25, score: row.k_value,
       note: `PE ${fmtNum(row.pe_index)}（近5年分位 ${fmtPct1(row.pe_pct_5y)}%）· PB ${fmtNum(row.pb)}` },
     { key: 'm', label: '市值流动性', w: 15, score: row.k_mktliq,
-      note: `加权市值 ${fmtInt(row.mktcap_weighted)} 亿 · 成分 ${fmtInt(row.cons_number)} 只 · 前十大 ${fmtPct1(row.top10_weight)}%` },
+      note: `总市值 ${fmtCap(row.mktcap_total)} · 成分 ${fmtInt(row.cons_number)} 只 · 前十大 ${fmtPct1(row.top10_weight)}%` },
     { key: 'q', label: '质量', w: 20, score: row.k_quality,
       note: `ROE ${fmtNum(row.roe)}% · 毛利率 ${fmtNum(row.gross_margin)}% · 负债率 ${fmtNum(row.debt_ratio)}%` },
     { key: 'd', label: '股东回报', w: 15, score: row.k_dividend,

@@ -663,7 +663,7 @@ const INDEX_SCORES_COLS =
   'code,name,index_class,pool,cons_number,close,trade_date,fin_period,' +
   'k_growth,k_value,k_mktliq,k_quality,k_dividend,k_all,grade,' +
   'profit_cagr_3y,rev_yoy,pe_index,pe_pct_5y,pb,roe,gross_margin,' +
-  'ocf_to_profit,debt_ratio,div_yield,payout_per10,mktcap_weighted,' +
+  'ocf_to_profit,debt_ratio,div_yield,payout_per10,mktcap_weighted,mktcap_total,' +
   'top10_weight,cons_match_rate,fin_period_cover,updated_at'
 
 /** 指数池：broad=规模/风格/策略/综合，sector=行业，fixed=固收 */

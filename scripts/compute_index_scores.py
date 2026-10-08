@@ -77,7 +77,9 @@ CREATE TABLE index_scores (
   pe_index numeric, pe_pct_5y numeric, pb numeric,
   roe numeric, gross_margin numeric, ocf_to_profit numeric, debt_ratio numeric,
   div_yield numeric, payout_per10 numeric,
-  mktcap_weighted numeric, top10_weight numeric,
+  mktcap_weighted numeric,   -- 加权平均成分股市值（亿），用于市值流动性维度
+  mktcap_total numeric,       -- 指数总市值（亿）= 成分股总市值简单加总
+  top10_weight numeric,
   cons_match_rate numeric, fin_period_cover numeric,
   updated_at timestamptz DEFAULT now()
 );
@@ -100,7 +102,7 @@ CREATE POLICY auth_read_index_scores ON index_scores
 COLS = ('code,name,index_class,pool,cons_number,close,trade_date,cons_date,fin_period,'
         'k_growth,k_value,k_mktliq,k_quality,k_dividend,k_all,grade,'
         'profit_cagr_3y,rev_yoy,pe_index,pe_pct_5y,pb,roe,gross_margin,'
-        'ocf_to_profit,debt_ratio,div_yield,payout_per10,mktcap_weighted,'
+        'ocf_to_profit,debt_ratio,div_yield,payout_per10,mktcap_weighted,mktcap_total,'
         'top10_weight,cons_match_rate,fin_period_cover')
 
 
@@ -294,6 +296,21 @@ def main():
                 ww = 1.0
             return (acc / ww if ww else None), (len(dct) / len(pairs))
 
+        def wsum_only(dct):
+            """**简单加总**（不乘权重）—— 用于「指数总市值」= 成分股总市值。
+
+            ⚠️ 与 wavg 的本质区别（实测踩过）：因为 Σ权重 = 1，
+            所以 Σ(mktcap × 权重)算出来是**加权平均**市值，不是总市值。
+            实测对照（2026-10-08）：
+              上证50 简单加总 = 226,191亿(22.62万亿)  ← 真实总市值
+                      加权平均 =   6,165亿            ← 差36倍
+            所以这一列必须用简单加总。
+            """
+            if not dct:
+                return None, 0.0
+            total = sum(dct.values())
+            return total, (len(dct) / len(pairs))
+
         def wins(dct):
             """缩尾加权：夹到 [5%,95%] 分位界内再平均（铁律2）。"""
             if not dct:
@@ -316,7 +333,8 @@ def main():
         ocf, cov5 = wavg(cols['ocf'])
         debt, cov6 = wavg(cols['debt'])
         pb, _ = wavg(cols['pb'])
-        mcap, _ = wavg(cols['mktcap'])
+        mcap, _ = wavg(cols['mktcap'])          # 加权平均市值（用于「市值流动性」维度打分）
+        mcap_total, mcap_total_cov = wsum_only(cols['mktcap'])   # 总市值（展示列）
         dy, _ = wavg(div_y)
         po, _ = wavg(payout)
 
@@ -331,7 +349,7 @@ def main():
             '_cagr': cagr, '_revyoy': revyoy, '_roe': roe, '_gm': gm, '_ocf': ocf,
             '_debt': debt, '_pb': pb, '_pe': num(r['pe_index']),
             '_pe_pct': num(r['pe_pct_5y']), '_dy': dy, '_payout': po,
-            '_mktcap': mcap, '_conc': top10,
+            '_mktcap': mcap, '_mcap_total': mcap_total, '_conc': top10,
             '_match': matched / len(pairs), '_basic_cov': basic_cov,
         })
     print(f'  聚合 {len(recs)} 条')
@@ -393,6 +411,7 @@ def main():
             row['ocf_to_profit'] = x['_ocf']; row['debt_ratio'] = x['_debt']
             row['pb'] = x['_pb']; row['div_yield'] = x['_dy']
             row['payout_per10'] = x['_payout']; row['mktcap_weighted'] = x['_mktcap']
+            row['mktcap_total'] = x['_mcap_total']
             row['top10_weight'] = x['_conc']; row['cons_match_rate'] = x['_match']
             row['fin_period_cover'] = x['_basic_cov']
             vals.append('(' + ','.join(lit(row[c]) for c in COLS.split(',')) + ')')
