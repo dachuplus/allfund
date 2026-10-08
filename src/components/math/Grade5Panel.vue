@@ -1,6 +1,6 @@
 <template>
   <div class="g5">
-    <!-- 24 讲列表 -->
+    <!-- 讲次列表（讲数随分册不同而不同，如奥精四/五年级 20 讲、六年级 22 讲） -->
     <div class="g5-nav">
       <div
         v-for="lec in data"
@@ -72,10 +72,13 @@
 <script setup>
 /**
  * 小学奥数通用年级面板 —— 支持机构维度（inst）× 年级（grade）。
- * 每讲含「兴趣篇 / 拓展篇 / 超越篇」三档。
+ * 每讲三档：高斯 / 蘑菇 / MC-club / 乐读为「兴趣篇 / 拓展篇 / 超越篇」，
+ * 奥精沿用原书「水平测试 A 卷 / B 卷 / C 卷」。
  * 各机构使用各自独立的知识点体系（严禁复用高斯内容）：
  *   - gaosi：高思导引体系（grade3Data.js ~ grade6Data.js）
  *   - mogu / mc / ledu：各自独立课程体系的 data 模块（moguData.js / mcData.js / leduData.js）
+ *   - aojing：《新编奥数精讲与测试》（熊斌、冯志刚主编，上海科技教育出版社），
+ *     按出版社公开目录整理，仅四 / 五 / 六年级（20 / 20 / 22 讲），无三年级分册。
  * 公式口径见 mathCore.js（有单元测试 + 暴力对拍）。
  */
 import { ref, computed, watch } from 'vue'
@@ -83,6 +86,7 @@ import gaosiData from './gaosiData.js'
 import moguData from './moguData.js'
 import mcData from './mcData.js'
 import leduData from './leduData.js'
+import aojingData from './aojingData.js'
 
 const props = defineProps({
   grade: { type: String, default: 'g5' },
@@ -90,12 +94,23 @@ const props = defineProps({
 })
 
 // 各机构独立的年级数据（每个机构一份，互不共用）
-const REGISTRY = { gaosi: gaosiData, mogu: moguData, mc: mcData, ledu: leduData }
+// 注意：aojing（奥数精讲与测试）只有四/五/六年级分册，没有 g3。
+const REGISTRY = { gaosi: gaosiData, mogu: moguData, mc: mcData, ledu: leduData, aojing: aojingData }
 
-const LVKEY = { 兴趣篇: 'a', 拓展篇: 'b', 超越篇: 'c' }
+// 档位配色键：高斯/蘑菇/MC/乐读用「兴趣·拓展·超越」，奥精沿用原书「水平测试 A/B/C 卷」
+const LVKEY = {
+  兴趣篇: 'a', 拓展篇: 'b', 超越篇: 'c',
+  A卷: 'a', B卷: 'b', C卷: 'c',
+}
 
 const gradeData = computed(() => REGISTRY[props.inst] || gaosiData)
-const data = computed(() => gradeData.value[props.grade] || gaosiData.g5)
+// 该机构没有当前年级分册时（如奥精无三年级），回退到该机构第一个可用年级，而不是别的机构
+const data = computed(() => {
+  const gd = gradeData.value
+  if (gd[props.grade]) return gd[props.grade]
+  const first = Object.keys(gd).find((k) => Array.isArray(gd[k]) && gd[k].length)
+  return first ? gd[first] : gaosiData.g5
+})
 const cur = ref(1)
 const opened = ref({})
 // ⚠️ 用 computed 而非普通函数：模板里直接 lec.xxx 访问

@@ -233,6 +233,7 @@ const mathTabs = [
   { key: 'mogu', label: '蘑菇' },
   { key: 'mc', label: '学而思MC-club' },
   { key: 'ledu', label: '乐读集训队' },
+  { key: 'aojing', label: '奥精' },
 ]
 const mathTab = ref('gaosi')
 
@@ -243,22 +244,38 @@ const instMeta = {
   mogu: '蘑菇培优：以卓越班五阶思维 + 小升初六大专题为框架，按自身真实课程体系独立组织各年级知识点与例题（不复用高思导引内容）。',
   mc: '学而思 MC-club（Mathink Club）：以 AMC/UKMT/SASMO 国际竞赛导向的四季螺旋体系，按自身真实大纲独立组织各年级知识点与例题。',
   ledu: '乐读集训队：原学而思培优线上化教研体系（校优 / A+ / S 三档），按自身模块化专题独立组织各年级知识点与例题。',
+  aojing: '《新编奥数精讲与测试》（熊斌、冯志刚 主编，上海科技教育出版社）：按出版社公开目录整理，四年级 20 讲、五年级 20 讲、六年级 22 讲（该套书无三年级分册），每讲沿用原书「知识要点 / 典例精讲 / 水平测试 A·B·C 卷」三栏目。',
 }
 const instDesc = computed(() => instMeta[mathTab.value] || '')
 
-// 小学奥数类机构（高斯 / 蘑菇 / 学而思MC-club / 乐读集训队）共用标准知识体系，按年级纵向铺开
-const primaryInsts = ['gaosi', 'mogu', 'mc', 'ledu']
+// 小学奥数类机构（高斯 / 蘑菇 / 学而思MC-club / 乐读集训队 / 奥精）各自独立知识点体系，按年级纵向铺开
+const primaryInsts = ['gaosi', 'mogu', 'mc', 'ledu', 'aojing']
 const isPrimary = computed(() => primaryInsts.includes(mathTab.value))
 
-// 小学奥数按年级纵向铺开（对齐小学奥数标准知识体系 3/4/5/6 年级）
-// 四个年级均已按真实 24 讲目录整理完毕，例题答案均经独立验算。
-const gradeTabs = [
+// 各机构实际出版的分册不同：奥精只有四 / 五 / 六年级，没有三年级
+const INST_GRADES = {
+  gaosi: ['g3', 'g4', 'g5', 'g6'],
+  mogu: ['g3', 'g4', 'g5', 'g6'],
+  mc: ['g3', 'g4', 'g5', 'g6'],
+  ledu: ['g3', 'g4', 'g5', 'g6'],
+  aojing: ['g4', 'g5', 'g6'],
+}
+const ALL_GRADES = [
   { key: 'g3', label: '三年级' },
   { key: 'g4', label: '四年级' },
   { key: 'g5', label: '五年级' },
   { key: 'g6', label: '六年级' },
 ]
+const gradeTabs = computed(() =>
+  ALL_GRADES.filter((g) => (INST_GRADES[mathTab.value] || ALL_GRADES.map((x) => x.key)).includes(g.key)),
+)
 const gradeTab = ref('g5')
+
+// 切换机构时，若当前年级在该机构没有分册（如从高斯切到奥精且停在三年级），自动落到它有分册的年级
+watch(mathTab, (inst) => {
+  const avail = INST_GRADES[inst] || []
+  if (avail.length && !avail.includes(gradeTab.value)) gradeTab.value = avail[0]
+})
 /** 切换分类并重新加载列表 */
 function setCategory(c) {
   if (category.value === c) return
