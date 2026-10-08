@@ -44,6 +44,8 @@
         </div>
         <Grade5Panel :grade="gradeTab" :inst="mathTab" />
       </div>
+      <!-- 质数：判定方法 + 试除过程计算器 + 质数表 + 年代指数表 + 陷阱数 -->
+      <PrimePanel v-else-if="mathTab === 'prime'" />
       <!-- 初联：初中联赛方法论体系 -->
       <JuniorPanel v-else />
     </div>
@@ -178,6 +180,7 @@ import GamesPanel from '../../components/games/GamesPanel.vue'
 import Grade5Panel from '../../components/math/Grade5Panel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import YuwenPanel from '../../components/math/YuwenPanel.vue'
+import PrimePanel from '../../components/math/PrimePanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
@@ -242,6 +245,7 @@ const mathTabs = [
   { key: 'mc', label: '学而思MC-club' },
   { key: 'ledu', label: '乐读集训队' },
   { key: 'aojing', label: '奥精' },
+  { key: 'prime', label: '质数' },
 ]
 const mathTab = ref('gaosi')
 
@@ -253,6 +257,7 @@ const instMeta = {
   mc: '学而思 MC-club（Mathink Club）：以 AMC/UKMT/SASMO 国际竞赛导向的四季螺旋体系，按自身真实大纲独立组织各年级知识点与例题。',
   ledu: '乐读集训队：原学而思培优线上化教研体系（校优 / A+ / S 三档），按自身模块化专题独立组织各年级知识点与例题。',
   aojing: '《新编奥数精讲与测试》（熊斌、冯志刚 主编，上海科技教育出版社）：按出版社公开目录整理，四年级 20 讲、五年级 20 讲、六年级 22 讲（该套书无三年级分册），每讲沿用原书「知识要点 / 典例精讲 / 水平测试 A·B·C 卷」三栏目。',
+  prime: '质数：奥数数论的第一道关口。含试除到 √n 的快速判定方法、可展示全过程���质数验证计算器、0–1000 质数表、1900–2999 年代指数质数表，以及考试常见陷阱数清单。',
 }
 const instDesc = computed(() => instMeta[mathTab.value] || '')
 
