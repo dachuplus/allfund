@@ -436,10 +436,10 @@ onMounted(async () => {
 .fi-wrap { padding: var(--space-md) 0; }
 .fi-head { display: flex; align-items: center; gap: var(--space-lg); flex-wrap: wrap; margin-bottom: var(--space-md); }
 .fi-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.fi-subtabs { display: inline-flex; gap: 4px; background: #f3f2f1; padding: 4px; border-radius: 2px; }
+.fi-subtabs { display: inline-flex; flex-wrap: wrap; gap: 4px; background: #f3f2f1; padding: 4px; border-radius: 2px; }
 .fi-subtab {
   border: none; background: transparent; padding: 6px 16px; font-size: 14px;
-  color: #505a66; cursor: pointer; border-radius: 2px; font-weight: 600;
+  color: #505a66; cursor: pointer; border-radius: 2px; font-weight: 600; white-space: nowrap;
 }
 .fi-subtab:hover { background: #eaeaea; }
 .fi-subtab.active { background: #1d70b8; color: #fff; }

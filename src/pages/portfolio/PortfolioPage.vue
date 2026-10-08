@@ -1198,9 +1198,9 @@ watch(customPortfolios, (newVal) => {
 <style scoped>
 .page-portfolio { padding-bottom: var(--space-2xl); }
 
-/* ===== 三Tab导航 ===== */
-.pf-tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: var(--space-xl); }
-.pf-tab { padding: var(--space-sm) var(--space-lg); font-size: 19px; font-weight: 700; color: var(--text-secondary); cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+/* ===== Tab 导航：窄屏自动折行，底线由每个 tab 自带 ===== */
+.pf-tabs { display: flex; flex-wrap: wrap; row-gap: 2px; margin-bottom: var(--space-xl); }
+.pf-tab { padding: var(--space-sm) var(--space-lg); font-size: 19px; font-weight: 700; color: var(--text-secondary); cursor: pointer; white-space: nowrap; border-bottom: 4px solid var(--border); transition: all 0.15s; }
 .pf-tab:hover { color: var(--text-primary); }
 .pf-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
 
@@ -1335,9 +1335,9 @@ watch(customPortfolios, (newVal) => {
 .ai-cat-chip:hover { border-color: #6c5ce7; background: #f0edff; }
 .ai-cat-chip:disabled { opacity: 0.5; }
 
-/* ===== AI 组合子标签（AI 策略 / 风险平价） ===== */
-.ai-subtabs { display: flex; gap: var(--space-sm); margin-bottom: var(--space-lg); border-bottom: 1px solid var(--border); }
-.ai-subtab { padding: var(--space-sm) var(--space-lg); font-size: 16px; font-weight: 700; color: var(--text-secondary); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+/* ===== AI 组合子标签（AI 策略 / 风险平价）===== */
+.ai-subtabs { display: flex; flex-wrap: wrap; gap: var(--space-sm); row-gap: 2px; margin-bottom: var(--space-lg); }
+.ai-subtab { padding: var(--space-sm) var(--space-lg); font-size: 16px; font-weight: 700; color: var(--text-secondary); cursor: pointer; white-space: nowrap; border-bottom: 3px solid var(--border); transition: all 0.15s; }
 .ai-subtab:hover { color: var(--text-primary); }
 .ai-subtab.active { color: #6c5ce7; border-bottom-color: #6c5ce7; }
 .rp-card { background: #f4f9ff; border-left: 5px solid #1d70b8; }
@@ -1357,5 +1357,7 @@ watch(customPortfolios, (newVal) => {
 /* ===== 移动端适配 ===== */
 @media (max-width: 768px) {
   .ai-bt-grid { grid-template-columns: repeat(2, 1fr); }
+  .pf-tab { padding: var(--space-sm) var(--space-md); font-size: 17px; }
+  .ai-subtab { padding: var(--space-sm) var(--space-md); font-size: 15px; }
 }
 </style>

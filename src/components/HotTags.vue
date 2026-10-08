@@ -1404,13 +1404,16 @@ defineExpose({ refresh: loadTags })
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
+  row-gap: 2px;
 }
 .tab-btn {
   padding: 4px 14px;
   font-size: 14px;
   color: var(--link);
   cursor: pointer;
+  white-space: nowrap;
   border: 1px solid var(--border);
   background: #fff;
   text-decoration: none;

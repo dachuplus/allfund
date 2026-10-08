@@ -253,16 +253,16 @@ onMounted(loadData)
 .header-refresh { cursor: pointer; }
 .refresh-text { font-size: 16px; color: var(--link); text-decoration: underline; }
 
-/* 类型筛选 */
+/* 类型筛选：窄屏自动折行，底线由每个 tab 自带 */
 .type-tabs {
-  display: flex; border-bottom: 2px solid var(--border);
+  display: flex; flex-wrap: wrap; row-gap: 2px;
   position: sticky; top: var(--header-height); z-index: 20;
   background: #ffffff;
 }
 .type-tab {
-  flex: 1; text-align: center; padding: var(--space-sm) 0;
-  font-size: 16px; color: var(--link); cursor: pointer;
-  border-bottom: 4px solid transparent;
+  flex: 1 1 auto; min-width: 88px; text-align: center; padding: var(--space-sm) var(--space-xs);
+  font-size: 16px; color: var(--link); cursor: pointer; white-space: nowrap;
+  border-bottom: 4px solid var(--border);
 }
 .type-tab.active {
   color: #1d70b8; font-weight: 700; border-bottom-color: #1d70b8;

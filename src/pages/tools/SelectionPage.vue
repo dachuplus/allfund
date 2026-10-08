@@ -38,10 +38,12 @@ const route = useRoute()
   width: 100%;
 }
 /* ========== 二级 tab（gov.uk 风格，蓝白配色、无圆角/阴影） ========== */
+/* 窄屏自动折行，底线由每个 tab 自带 */
 .selection-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
-  border-bottom: 2px solid var(--border);
+  row-gap: 2px;
   margin-bottom: var(--space-md);
 }
 .selection-tab {
@@ -51,8 +53,8 @@ const route = useRoute()
   font-weight: 700;
   color: var(--text-secondary);
   text-decoration: none;
-  border-bottom: 4px solid transparent;
-  margin-bottom: -2px;
+  white-space: nowrap;
+  border-bottom: 4px solid var(--border);
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .selection-tab:hover {

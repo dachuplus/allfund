@@ -408,14 +408,17 @@ watch(() => route.fullPath, () => {
   white-space: nowrap;
 }
 .cp-new-btn:hover { background: #003078; }
+/* Tab 栏：窗口窄时自动折成多行（不横向滑动，避免点不到后面的选项）。
+   底线由每个 tab 自带，折行后每行都有一条分隔线。 */
 .cp-tabs {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid var(--border);
+  row-gap: 2px;
   margin-bottom: var(--space-md);
 }
-.cp-tab-list { display: flex; }
+.cp-tab-list { display: flex; flex-wrap: wrap; row-gap: 2px; }
 .cp-games { margin-top: var(--space-sm); }
 .cp-tool { margin-top: var(--space-sm); }
 .cp-tool-title {
@@ -426,16 +429,13 @@ watch(() => route.fullPath, () => {
 }
 .cp-subblock { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
 .cp-subblock-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
-/* 三级 Tab：比二级 Tab 更轻（字号小一档、下划线更细），窄屏可横向滑动 */
+/* 三级 Tab：比二级 Tab 更轻（字号小一档、下划线更细），窄屏自动折行 */
 .cp-subtabs {
   display: flex;
-  border-bottom: 2px solid var(--border);
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin-bottom: var(--space-md);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-.cp-subtabs::-webkit-scrollbar { display: none; }
 .cp-subtab {
   flex: none;
   white-space: nowrap;
@@ -444,8 +444,7 @@ watch(() => route.fullPath, () => {
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  border-bottom: 3px solid var(--border);
   transition: color 0.15s, border-color 0.15s;
 }
 .cp-subtab:hover { color: var(--text-primary); }
@@ -456,7 +455,6 @@ watch(() => route.fullPath, () => {
 .cp-subtab.disabled:hover { color: #b1b4b6; }
 .cp-subtabs--inner {
   margin-top: 10px;
-  border-bottom: 1px solid #b1b4b6;
 }
 .cp-inst-desc {
   margin: 0 0 14px;
@@ -508,8 +506,8 @@ watch(() => route.fullPath, () => {
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  border-bottom: 4px solid transparent;
-  margin-bottom: -2px;
+  white-space: nowrap;
+  border-bottom: 4px solid var(--border);
   transition: all 0.15s;
 }
 .cp-tab:hover { color: var(--text-primary); }
@@ -527,8 +525,9 @@ watch(() => route.fullPath, () => {
 }
 .cp-viewswitch {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
-  border-bottom: 2px solid var(--border);
+  row-gap: 2px;
   margin-bottom: var(--space-md);
 }
 .cp-viewswitch button {
@@ -539,8 +538,8 @@ watch(() => route.fullPath, () => {
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  border-bottom: 4px solid transparent;
-  margin-bottom: -2px;
+  white-space: nowrap;
+  border-bottom: 4px solid var(--border);
 }
 .cp-viewswitch button.active {
   color: #1d70b8;
@@ -678,5 +677,11 @@ watch(() => route.fullPath, () => {
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
+}
+
+/* 窄屏：Tab 栏字号与内边距收窄，让折行更少、每行容纳更多选项 */
+@media (max-width: 768px) {
+  .cp-tab { padding: 8px 12px; font-size: 17px; }
+  .cp-subtab { padding: 8px 10px; font-size: 14px; }
 }
 </style>

@@ -502,15 +502,14 @@ async function sendReset() {
   margin-bottom: var(--space-lg);
 }
 
-/* Tabs */
+/* Tabs：窄屏自动折行，底线由每个 tab 自带 */
 .login-tabs {
-  display: flex; gap: var(--space-lg); margin-bottom: var(--space-lg);
-  border-bottom: 2px solid var(--border);
+  display: flex; gap: var(--space-lg); flex-wrap: wrap; row-gap: 2px; margin-bottom: var(--space-lg);
 }
 .login-tab {
   font-size: 16px; font-weight: 700; color: var(--text-secondary);
-  cursor: pointer; padding-bottom: var(--space-xs);
-  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  cursor: pointer; padding-bottom: var(--space-xs); white-space: nowrap;
+  border-bottom: 3px solid var(--border);
 }
 .login-tab.active {
   color: #1d70b8; border-bottom-color: #1d70b8;

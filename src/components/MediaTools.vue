@@ -496,11 +496,11 @@ onUnmounted(() => {
 
 <style scoped>
 .media-tools { padding: 4px 0; }
-.mt-subtabs { display: flex; gap: 0; border: 1px solid #b1b4b6; margin-bottom: 14px; }
+.mt-subtabs { display: flex; flex-wrap: wrap; gap: 0; row-gap: 2px; border: 1px solid #b1b4b6; margin-bottom: 14px; }
 .mt-subtab {
-  flex: 1; text-align: center; padding: 10px 8px; cursor: pointer;
+  flex: 1 1 auto; min-width: 76px; text-align: center; padding: 10px 8px; cursor: pointer;
   font-size: 15px; color: #1d70b8; background: #fff; border-right: 1px solid #b1b4b6;
-  user-select: none;
+  user-select: none; white-space: nowrap;
 }
 .mt-subtab:last-child { border-right: none; }
 .mt-subtab.active { background: #1d70b8; color: #fff; font-weight: 600; }

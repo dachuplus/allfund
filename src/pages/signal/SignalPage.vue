@@ -1410,15 +1410,15 @@ function handleResize() {
 }
 .refresh-btn { color: var(--link); cursor: pointer; text-decoration: underline; }
 
-/* Tab 导航 */
+/* Tab 导航：窄屏自动折行，底线由每个 tab 自带 */
 .signal-tabs {
-  display: flex; gap: 0; border-bottom: 2px solid var(--border);
-  margin: var(--space-md) 0 var(--space-lg); overflow-x: auto;
+  display: flex; gap: 0; flex-wrap: wrap; row-gap: 2px;
+  margin: var(--space-md) 0 var(--space-lg);
 }
 .signal-tab {
   padding: var(--space-sm) var(--space-md); font-size: 16px; font-weight: 700;
   color: var(--text-secondary); cursor: pointer; white-space: nowrap;
-  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  border-bottom: 3px solid var(--border);
   transition: color 0.15s, border-color 0.15s;
 }
 .signal-tab.active {
@@ -1427,8 +1427,8 @@ function handleResize() {
 .signal-tab:hover { color: var(--text-primary); }
 
 /* 子 Tab */
-.sub-tabs { display: flex; gap: var(--space-md); border-bottom: 2px solid var(--border); margin-bottom: var(--space-lg); }
-.sub-tab { padding: var(--space-xs) var(--space-sm); font-size: 14px; font-weight: 700; color: var(--text-secondary); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.sub-tabs { display: flex; gap: var(--space-md); flex-wrap: wrap; row-gap: 2px; margin-bottom: var(--space-lg); }
+.sub-tab { padding: var(--space-xs) var(--space-sm); font-size: 14px; font-weight: 700; color: var(--text-secondary); cursor: pointer; white-space: nowrap; border-bottom: 3px solid var(--border); }
 .sub-tab.active { color: #1d70b8; border-bottom-color: #1d70b8; }
 
 /* 卡片 */
