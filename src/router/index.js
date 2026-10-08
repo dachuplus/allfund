@@ -62,14 +62,14 @@ const routes = [
         }
       },
       {
-        path: 'futures',
-        name: 'tools-futures',
-        component: () => import('../pages/tools/FuturesPage.vue'),
+        path: 'index',
+        name: 'tools-index',
+        component: () => import('../pages/tools/IndexPage.vue'),
         meta: {
           tab: 'tools',
-          title: '选品 · 期货',
-          description: '期货选品：期货筛选、排序与对比工具（开发中）。',
-          keywords: '期货选品,期货筛选'
+          title: '选品 · 指数',
+          description: '指数选品：按成长、估值、市值流动性、质量、股东回报五个维度对指数做横截面评分与排序，支持规模风格、行业、固收分类查看。',
+          keywords: '指数选品,指数评分,指数筛选'
         }
       }
     ]

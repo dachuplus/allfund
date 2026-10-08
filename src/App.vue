@@ -279,14 +279,14 @@ const visibleQuickLinks = computed(() =>
 )
 
 /* 顶部导航高亮：默认按「精确匹配或前缀匹配」判定；
- * 选品（/tools）特殊：仅其三个二级 tab（基金/股票/期货）高亮，不含 /tools/tougu（投顾为独立入口） */
+ * 选品（/tools）特殊：仅其三个二级 tab（基金/股票/指数）高亮，不含 /tools/tougu（投顾为独立入口） */
 function isActiveNav(item) {
   if (item.path === '/tools') {
     return (
       route.path === '/tools' ||
       route.path.startsWith('/tools/fund') ||
       route.path.startsWith('/tools/stock') ||
-      route.path.startsWith('/tools/futures')
+      route.path.startsWith('/tools/index')
     )
   }
   return route.path === item.path || route.path.startsWith(item.path + '/')

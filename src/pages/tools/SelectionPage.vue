@@ -1,6 +1,6 @@
 <template>
   <div class="page-selection">
-    <!-- 二级 tab：基金 / 股票 / 期货 -->
+    <!-- 二级 tab：基金 / 股票 / 指数 -->
     <nav class="selection-tabs" aria-label="选品分类">
       <router-link
         to="/tools/fund"
@@ -13,10 +13,10 @@
         :class="{ 'selection-tab--active': route.name === 'tools-stock' }"
       >股票</router-link>
       <router-link
-        to="/tools/futures"
+        to="/tools/index"
         class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-futures' }"
-      >期货</router-link>
+        :class="{ 'selection-tab--active': route.name === 'tools-index' }"
+      >指数</router-link>
     </nav>
 
     <router-view v-slot="{ Component }">

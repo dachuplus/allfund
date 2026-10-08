@@ -1,6 +1,7 @@
 <template>
   <div class="content-page">
-    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏 / 工具，右侧放「博客-写文章」按钮 -->
+    <!-- 二级分类导航：博客 / 影视 / 美食 / 语文 / 游戏 / 工具。
+         「+ 写文章」按钮放在博客区「已发布 / 我的全部」那一排右侧（见下方 cp-viewswitch） -->
     <div class="cp-tabs">
       <div class="cp-tab-list">
         <div
@@ -11,7 +12,6 @@
           @click="setCategory(c.key)"
         >{{ c.label }}</div>
       </div>
-      <router-link v-if="canManageContent && category === 'blog'" to="/content/editor" class="cp-new-btn">+ 写文章</router-link>
     </div>
 
     <!-- 游戏二级 Tab：扫雷 / 2048 / 方块世界 / 平台冒险 / 推箱子 / 连线消除 / 六角消除 -->
@@ -122,6 +122,7 @@
     <div v-if="canManageContent" class="cp-viewswitch">
       <button :class="{ active: view === 'published' }" @click="setView('published')">已发布</button>
       <button :class="{ active: view === 'mine' }" @click="setView('mine')">我的全部（含草稿）</button>
+      <router-link to="/content/editor" class="cp-new-btn">+ 写文章</router-link>
     </div>
 
     <div v-if="loading && !articles.length" class="cp-loading">
@@ -133,7 +134,7 @@
       <button class="cp-retry-btn" @click="load">重新加载</button>
     </div>
     <div v-else-if="articles.length === 0" class="cp-empty">
-      {{ isOwner && view === 'mine' ? '还没有文章，点击右上角「写文章」开始吧。' : '暂无已发布内容。' }}
+      {{ isOwner && view === 'mine' ? '还没有文章，点上方「+ 写文章」开始吧。' : '暂无已发布内容。' }}
     </div>
 
     <ul v-else class="cp-list">
@@ -534,6 +535,7 @@ watch(() => route.fullPath, () => {
 .cp-viewswitch {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0;
   row-gap: 2px;
   margin-bottom: var(--space-md);
@@ -553,6 +555,17 @@ watch(() => route.fullPath, () => {
   color: #1d70b8;
   border-bottom-color: #1d70b8;
 }
+/* 「+ 写文章」按钮：贴在「已发布 / 我的全部」同一排的右侧 */
+.cp-viewswitch .cp-new-btn {
+  margin-left: auto;
+  border-bottom: none;
+  padding: 7px 14px;
+  background: #1d70b8;
+  color: #fff;
+  text-decoration: none;
+  font-family: inherit;
+}
+.cp-viewswitch .cp-new-btn:hover { background: #003078; }
 .cp-loading, .cp-empty {
   padding: 40px 0;
   text-align: center;

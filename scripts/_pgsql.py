@@ -48,7 +48,13 @@ if __name__ == "__main__":
         sql = " ".join(args)
     try:
         out = pg(sql)
-        print(json.dumps(out, ensure_ascii=False, indent=2)[:8000])
+        # ⚠️ 曾经这里写的是 json.dumps(...)[:8000] 做「防爆屏截断」，
+        # 结果被误当成「Management API 响应上限 8000 字符」，导致上层脚本
+        # 白白设计了「必须 SQL 端聚合、不能拉明细回本地」的复杂绕道。
+        # 实测（2026-10-08）：一次查 stock_scores 全部 9057 行返回 1.95 MB，
+        # HTTP 201，JSON 完整可解析 —— **API 侧没有任何 8000 字符限制**。
+        # 故去掉切片；真要防爆屏，请用 --raw 输出到文件而不是截断 stdout。
+        print(json.dumps(out, ensure_ascii=False, indent=2))
     except Exception as e:
         print("ERROR:", e)
         sys.exit(1)
