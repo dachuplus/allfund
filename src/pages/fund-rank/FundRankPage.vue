@@ -3,17 +3,23 @@
     <!-- 热门标签（行业/概念） -->
     <HotTags ref="hotTagsRef" />
 
-    <!-- 顶部：搜索 -->
+    <!-- 顶部：搜索（用「搜索」按钮提交，不用回车 —— 中文输入法选词的 Enter
+         会误触发 @keyup.enter，导致每选一次候选词就发一次全表查询把页面卡死） -->
     <div class="top-bar">
       <div class="search-box">
         <input
           class="search-input"
           placeholder="搜基金名/代码"
           v-model="searchText"
-          @keyup.enter="doSearch"
+          @keyup.enter="onSearchEnter"
+          @compositionstart="onCompositionStart"
+          @compositionend="onCompositionEnd"
         />
         <span class="search-clear" v-if="searchText" @click="clearSearch">✕</span>
       </div>
+      <button class="search-btn" type="button" :disabled="loading" @click="doSearch">
+        {{ loading ? '搜索中…' : '搜索' }}
+      </button>
     </div>
 
     <!-- 筛选区 -->
@@ -1284,6 +1290,23 @@ const sortedFunds = computed(() => funds.value)
 
 function doSearch() { loadData(true) }
 
+/**
+ * 回车提交守卫：中文输入法选词时按的 Enter 也会冒泡成 keyup.enter，
+ * 若直接搜索会在「选词确认」阶段连发多次全表查询（22k+ 行 × 30 列）把页面卡死。
+ * 判定规则：event.isComposing 为 true（正在选词）→ 忽略；
+ * 若输入框以 composition 结束（部分浏览器此时 isComposing 已是 false，
+ * 但紧接着会有一次 keydown 的 Enter 229），用「刚结束输入法」的时间窗兜底拦截。
+ */
+let lastCompositionEnd = 0
+function onCompositionStart() { /* 组合态开始，onSearchEnter 靠 e.isComposing 拦截 */ }
+function onCompositionEnd() { lastCompositionEnd = Date.now() }
+function onSearchEnter(e) {
+  if (e && e.isComposing) return
+  // 选词确认后的 250ms 内不视为「用户想搜索」，避免误触发
+  if (Date.now() - lastCompositionEnd < 250) return
+  doSearch()
+}
+
 function clearSearch() {
   searchText.value = ''
   loadData(true)
@@ -1390,6 +1413,20 @@ onUnmounted(() => {
   border: 2px solid #1d70b8; font-size: 16px;
   color: var(--text-primary); outline: none; box-sizing: border-box;
 }
+.search-btn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border: 2px solid #1d70b8;
+  background: #1d70b8;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.search-btn:hover:not(:disabled) { background: #003078; border-color: #003078; }
+.search-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .search-input:focus { outline: 3px solid #ffdd00; outline-offset: 0; }
 .search-input::placeholder { color: var(--text-secondary); }
 .search-clear {

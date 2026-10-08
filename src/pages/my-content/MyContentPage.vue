@@ -48,6 +48,11 @@
       <JuniorPanel v-else />
     </div>
 
+    <!-- 语文：小初高必背古诗文 333 篇（小学 / 初中 / 高中 三学段） -->
+    <div v-else-if="category === 'yuwen'">
+      <YuwenPanel />
+    </div>
+
     <!-- 影视二级 Tab：影视观看榜（9+1电视剧评分框架） -->
     <div v-else-if="category === 'film'">
       <RankBoard
@@ -171,6 +176,7 @@ import { useAuth } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
 import Grade5Panel from '../../components/math/Grade5Panel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
+import YuwenPanel from '../../components/math/YuwenPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
@@ -214,6 +220,7 @@ const categories = [
   { key: 'film', label: '影视' },
   { key: 'food', label: '美食' },
   { key: 'math', label: '奥数' },
+  { key: 'yuwen', label: '语文' },
   { key: 'game', label: '游戏' },
   { key: 'tool', label: '工具' },
 ]
@@ -287,8 +294,9 @@ function setCategory(c) {
 const canManageContent = computed(() => isOwner.value)
 
 async function load() {
-  // 奥数 / 游戏 / 工具 Tab 不需要拉取文章列表
-  if (category.value === 'math' || category.value === 'game' || category.value === 'tool') {
+  // 奥数 / 语文 / 游戏 / 工具 Tab 不需要拉取文章列表
+  if (category.value === 'math' || category.value === 'yuwen'
+      || category.value === 'game' || category.value === 'tool') {
     articles.value = []
     loadError.value = ''
     loading.value = false

@@ -654,3 +654,111 @@ export async function fetchStockIndustries() {
   }
   return []
 }
+
+// ========== 指数五维评分（index_scores）==========
+// 2026-10 新增。指数没有财报，五维为：成长 / 估值 / 市值流动性 / 质量 / 股东回报。
+// ⚠️ 三个池（broad 规模类 / sector 行业类 / fixed 固收类）**分数不可横向比较**，
+//    因为每个池各自做横截面标准化。前端按 pool 分别排名，切换分类才换榜。
+const INDEX_SCORES_COLS =
+  'code,name,index_class,pool,cons_number,close,trade_date,fin_period,' +
+  'k_growth,k_value,k_mktliq,k_quality,k_dividend,k_all,grade,' +
+  'profit_cagr_3y,rev_yoy,pe_index,pe_pct_5y,pb,roe,gross_margin,' +
+  'ocf_to_profit,debt_ratio,div_yield,payout_per10,mktcap_weighted,' +
+  'top10_weight,cons_match_rate,fin_period_cover,updated_at'
+
+/** 指数池：broad=规模/风格/策略/综合，sector=行业，fixed=固收 */
+export const INDEX_POOLS = [
+  { key: 'broad', label: '规模风格', desc: '规模 / 风格 / 策略 / 综合类宽基' },
+  { key: 'sector', label: '行业', desc: '中证二级行业指数' },
+  { key: 'fixed', label: '固收', desc: '利率债 / 信用债 / 可转债指数' },
+]
+
+function applyIndexFilters(query, params) {
+  const {
+    search = '', pool = null, onlyScored = false,
+    kAllMin = null, kAllMax = null, grade = 'all',
+  } = params
+  if (search) query = query.ilike('name', `%${search}%`)
+  if (pool) query = query.eq('pool', pool)
+  if (onlyScored) query = query.not('k_all', 'is', null)
+  if (kAllMin != null && kAllMin !== '') query = query.gte('k_all', Number(kAllMin))
+  if (kAllMax != null && kAllMax !== '') query = query.lte('k_all', Number(kAllMax))
+  if (grade && grade !== 'all') query = query.eq('grade', grade)
+  return query
+}
+
+async function fetchIndexCount(client, params) {
+  const {
+    search = '', pool = null, onlyScored = false,
+    kAllMin = null, kAllMax = null, grade = 'all',
+  } = params
+  try {
+    const { data, error } = await client.rpc('index_scores_stats', {
+      p_search: search || null,
+      p_pool: pool || null,
+      p_only_scored: !!onlyScored,
+      p_k_all_min: kAllMin != null && kAllMin !== '' ? Number(kAllMin) : null,
+      p_k_all_max: kAllMax != null && kAllMax !== '' ? Number(kAllMax) : null,
+      p_grade: grade || 'all',
+    })
+    if (!error && Array.isArray(data) && data.length) return Number(data[0].total) || 0
+  } catch (e) {
+    console.warn('[fetchIndexScores] 总数获取失败，降级为不显示总数:', e)
+  }
+  return null
+}
+
+/**
+ * 拉指数评分。⚠️ 精确计数必须走 SECURITY DEFINER RPC index_scores_stats：
+ * EdgeOne CDN 对 `Prefer: count=exact` 头一律返回 502（见 MEMORY.md）。
+ */
+export async function fetchIndexScores(params = {}) {
+  const client = supabase || supabaseDirect
+  if (!client) return { rows: [], total: 0, hasMore: false }
+  const {
+    search = '', pool = 'broad', sortKey = 'k_all', sortAsc = false,
+    page = 1, pageSize = 50, onlyScored = false,
+    kAllMin = null, kAllMax = null, grade = 'all',
+  } = params
+  const from = Math.max(0, (page - 1) * pageSize)
+  const to = from + pageSize
+  const maxRetries = 2
+  const fp = { search, pool, onlyScored, kAllMin, kAllMax, grade }
+
+  const total = await fetchIndexCount(client, fp)
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      let query = client.from('index_scores').select(INDEX_SCORES_COLS)
+      query = applyIndexFilters(query, fp)
+      query = query.order(sortKey, { ascending: sortAsc, nullsFirst: false })
+      const { data, error } = await query.range(from, to)
+      if (error) throw error
+      const all = data || []
+      const hasMore = all.length > pageSize
+      return { rows: hasMore ? all.slice(0, pageSize) : all, total, hasMore }
+    } catch (e) {
+      console.warn(`[fetchIndexScores] 第 ${attempt + 1} 次失败:`, e)
+      if (attempt === maxRetries) throw e
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)))
+    }
+  }
+  return { rows: [], total, hasMore: false }
+}
+
+/** 各池的指数总条数（顶部概览用，不随筛选变化） */
+export async function fetchIndexPoolTotal() {
+  const client = supabase || supabaseDirect
+  if (!client) return null
+  try {
+    const { data, error } = await client.rpc('index_scores_pool_total')
+    if (!error && Array.isArray(data)) {
+      const out = {}
+      for (const r of data) out[r.pool] = Number(r.n) || 0
+      return out
+    }
+  } catch (e) {
+    console.warn('[fetchIndexPoolTotal] 获取失败:', e)
+  }
+  return null
+}
