@@ -1,0 +1,161 @@
+name: 指数评分每日更新
+
+# 指数「靠谱指数」五维评分每日刷新（选品·指数 Tab）。
+#
+# 与既有流水线错峰，避开各自cron：
+#   21:30 基金评分 / 21:45 标签资金流 / 22:30 配置季度 / 23:20 股票评分 / 00:10 风格因子
+#   本workflow 北京时间 00:40（UTC 16:40）—— 放在最后，因为指数数据是日频、越晚越新鲜。
+#
+# ⚠️ 中证官网硬限流（实测 2026-10-08）：连续约 26–40 只请求后开始返回空/403，
+#   冷却需 20 分钟以上。所以本 workflow **分多轮抓取、轮间强制等待**，
+#   而不是一把梭 169 只 —— 那样会 137 只失败。
+#   fetch_index_raw.py 会自动跳过 index_scores_raw 里已抓到的，天然增量、幂等。
+#
+# 安全性（三级流水线，与 fund/stock 一致）：
+#   步骤1 fetch_index_raw.py   → 只写 index_scores_raw（原始落地，不算分）
+#   步骤2 compute_index_scores.py → 只写 index_scores_staging（算五维+分池）
+#   步骤3 promote_index_scores.py  → 护栏校验不过就**拒绝切换**，生产表保持不变
+#   护栏：条数≥60 / k_all非空≥80% / PE分位非空≥90% / broad与sector 各≥3 有分 /
+#        成分匹配率≥0.85 / 行情日≤7天；固收池天然稀少，改为非阻断+ 页面提示。
+#   所以抓取失败**不会污染线上**，最坏情况是数据停在昨天的版本。
+
+on:
+  schedule:
+    - cron: '40 16 * * *'   # 北京时间每日 00:40
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: '抓取轮数（中证限流，每轮间隔需等待冷却；3 轮约能抓 60–100 只）'
+        required: false
+        type: string
+        default: '3'
+      per_round:
+        description: '每轮最多抓多少只'
+        required: false
+        type: string
+        default: '40'
+      interval:
+        description: '每次请求间隔秒（中证限流敏感，建议 ≥1.5）'
+        required: false
+        type: string
+        default: '2.5'
+      sleep_mins:
+        description: '轮间冷却等待分钟数（中证被限流后需 20 分钟以上恢复）'
+        required: false
+        type: string
+        default: '21'
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  update-index-scores:
+    runs-on: ubuntu-latest
+    # 限流下要多轮 + 冷却等待，给足时间
+    timeout-minutes: 180
+    # ⚠️ secret 映射说明：仓库里**确定存在**的是 SUPABASE_MGMT_TOKEN
+    # （update-scores.yml 就是 `SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}` 这样映射的），
+    # 而 `secrets.SUPABASE_PAT` 这个名字未见于任何已验证可用的 workflow。
+    # 这里两个都注入（同一个值），脚本的 `SUPABASE_PAT or SUPABASE_MGMT_TOKEN`
+    # 无论命中哪个都能工作，避免因secret 名字对不上而整条流水线失败。
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 验证环境变量
+        run: |
+          if [ -z "$SUPABASE_PAT" ] && [ -z "$SUPABASE_MGMT_TOKEN" ]; then
+            echo "ERROR: SUPABASE_PAT / SUPABASE_MGMT_TOKEN 均未设置！请在 GitHub Secrets 中配置 SUPABASE_MGMT_TOKEN。"
+            exit 1
+          fi
+          echo "凭据已配置: SUPABASE_PAT=${#SUPABASE_PAT} 字符, SUPABASE_MGMT_TOKEN=${#SUPABASE_MGMT_TOKEN} 字符"
+
+      - name: 安装依赖
+        run: pip install akshare requests
+
+      - name: 抓取原始数据（分轮，规避中证限流）
+        run: |
+          ROUNDS="${{ github.event.inputs.rounds || '3' }}"
+          PER_ROUND="${{ github.event.inputs.per_round || '40' }}"
+          INTERVAL="${{ github.event.inputs.interval || '2.5' }}"
+          SLEEP_MINS="${{ github.event.inputs.sleep_mins || '21' }}"
+          echo "轮数=$ROUNDS 每轮=$PER_ROUND 间隔=${INTERVAL}s 轮间冷却=${SLEEP_MINS}min"
+
+          for i in $(seq 1 "$ROUNDS"); do
+            echo ""
+            echo "============================================"
+            echo "  第 $i/$ROUNDS 轮抓取  开始 $(date '+%H:%M:%S')"
+            echo "============================================"
+            # --limit / --interval 控制单轮规模与速率；
+            # 已抓到的会自动跳过（index_scores_raw 里有记录），所以重跑是幂等的。
+            python scripts/fetch_index_raw.py --limit "$PER_ROUND" --interval "$INTERVAL" || \
+              echo "[WARN] 第 $i 轮有失败，继续下一轮"
+
+            if [ "$i" -lt "$ROUNDS" ]; then
+              echo ">>> 中证限流冷却等待 ${SLEEP_MINS} 分钟…"
+              sleep $((SLEEP_MINS * 60))
+            fi
+          done
+          echo "全部轮次结束 $(date '+%H:%M:%S')"
+
+      - name: 步骤2 — 由原始数据算五维评分（写 staging）
+        run: |
+          echo "============================================"
+          echo "  compute_index_scores（五维 + 分池标准化）"
+          echo "  开始 $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/compute_index_scores.py
+          echo "计算完成 $(date '+%H:%M:%S')"
+
+      - name: 步骤3 — 校验并原子切换到生产 index_scores
+        run: |
+          echo "============================================"
+          echo "  promote_index_scores（护栏不过则拒绝切换）"
+          echo "  开始 $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/promote_index_scores.py
+          echo "切换完成 $(date '+%H:%M:%S')"
+
+      - name: 步骤4 — 确保 RPC 存在（精确计数用，CDN 对 Prefer 头会502）
+        run: |
+          # 幂等：DROP FUNCTION IF EXISTS 后重建，重复跑无副作用。
+          # 防的是「函数缺失或签名过期」导致前端总数显示异常。
+          python scripts/setup_index_rpc.py
+
+      - name: 步骤5 — 输出本轮结果摘要
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, sys, json, subprocess
+          sql = """
+          SELECT count(*) AS total, count(k_all) AS k_all_n,
+                 count(pe_pct_5y) AS pe_n, count(DISTINCT pool) AS pools,
+                 max(trade_date) AS trade_date,
+                 count(*) FILTER (WHERE pool='broad')  AS broad_n,
+                 count(*) FILTER (WHERE pool='sector') AS sector_n,
+                 count(*) FILTER (WHERE pool='fixed')  AS fixed_n
+          FROM index_scores
+          """
+          open('/tmp/_ci_sum.sql','w').write(sql)
+          r = subprocess.run(['python3','scripts/_pgsql.py','--file','/tmp/_ci_sum.sql'],
+                             capture_output=True, text=True)
+          print("=== index_scores 生产表现状 ===")
+          print(r.stdout.strip() or r.stderr.strip())
+          PY
+
+      - name: 抓取失败不阻断（限流属常态）
+        if: failure()
+        run: |
+          echo "::warning::指数评分流水线本次未全部成功（多半是中证官网限流）。"
+          echo "生产表保持上一次成功版本，不受影响；下次调度会自动增量补齐。"
+          exit 0
