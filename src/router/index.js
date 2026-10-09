@@ -20,8 +20,8 @@ const routes = [
       tab: 'signal',
       feature: 'signal',
       title: '策略',
-      description: '宏观指标信号：股债利差、FED模型、大类资产性价比、风格因子与行业估值，叠加上证指数走势，辅助判断市场位置。',
-      keywords: '宏观指标,股债利差,FED模型,大类资产,风格因子,行业估值'
+      description: '宏观指标信号：股债利差、FED模型、大类资产性价比、风格因子，叠加上证指数走势，辅助判断市场位置。',
+      keywords: '宏观指标,股债利差,FED模型,大类资产,风格因子'
     }
   },
   {
@@ -70,6 +70,17 @@ const routes = [
           title: '选品 · 指数',
           description: '指数选品：按成长、估值、市值流动性、质量、股东回报五个维度对指数做横截面评分与排序，支持规模风格、行业、固收分类查看。',
           keywords: '指数选品,指数评分,指数筛选'
+        }
+      },
+      {
+        path: 'valuation',
+        name: 'tools-valuation',
+        component: () => import('../pages/tools/ValuationPage.vue'),
+        meta: {
+          tab: 'tools',
+          title: '选品 · 估值',
+          description: '估值工具：基于公开指数估值数据，按 PE / PB / 股息率 / ROE 及历史百分位对宽基、策略、行业主题指数做排行与筛选。',
+          keywords: '估值,指数估值,行业估值,PE百分位,估值排行'
         }
       }
     ]
@@ -221,7 +232,7 @@ const routes = [
   },
   {
     path: '/tools/industry-rank',
-    redirect: '/signal?tab=industry'
+    redirect: '/tools/valuation'
   },
   // SPA 兜底：未匹配的前端路由重定向到首页（配合 EdgeOne SPA fallback）
   {

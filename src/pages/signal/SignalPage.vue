@@ -236,48 +236,7 @@
       </div>
     </div>
 
-    <!-- ==================== 6. 行业估值 ==================== -->
-    <div v-if="activeTab === 'industry'">
-      <div class="card">
-        <div class="card-title">指数估值排行</div>
-        <div class="filter-row">
-          <span
-            v-for="f in industryFilters" :key="f.key"
-            class="filter-chip" :class="{ active: industryFilter === f.key }"
-            @click="industryFilter = f.key"
-          >{{ f.label }}</span>
-        </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th class="sortable" @click="sortIndustry('name')">名称 {{ sortIcon('name') }}</th>
-                <th class="sortable num" @click="sortIndustry('pe')">PE {{ sortIcon('pe') }}</th>
-                <th class="sortable num" @click="sortIndustry('pe_pct')">PE百分位 {{ sortIcon('pe_pct') }}</th>
-                <th class="sortable num" @click="sortIndustry('pb')">PB {{ sortIcon('pb') }}</th>
-                <th class="sortable num" @click="sortIndustry('pb_pct')">PB百分位 {{ sortIcon('pb_pct') }}</th>
-                <th class="sortable num" @click="sortIndustry('div_yield')">股息率 {{ sortIcon('div_yield') }}</th>
-                <th class="sortable num" @click="sortIndustry('roe')">ROE {{ sortIcon('roe') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in industryList" :key="row.code" @click="toggleIndustryExpand(row)">
-                <td>{{ row.name }}</td>
-                <td class="num">{{ fmtNum(row.pe, 4) }}</td>
-                <td class="num" :class="row.pe_pct_color">{{ fmtNum(row.pe_pct, 2) }}%</td>
-                <td class="num">{{ fmtNum(row.pb, 4) }}</td>
-                <td class="num" :class="row.pb_pct_color">{{ fmtNum(row.pb_pct, 2) }}%</td>
-                <td class="num">{{ fmtNum(row.div_yield, 2) }}%</td>
-                <td class="num">{{ fmtNum(row.roe, 2) }}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="data-source">数据来源：公开网络</p>
-      </div>
-    </div>
-
-    <!-- ==================== 7. 特色指标 ==================== -->
+    <!-- ==================== 6. 特色指标 ==================== -->
     <div v-if="activeTab === 'jqr'">
       <div class="card">
         <div class="card-title">特色指标<span class="card-subtitle">自建复合算法 · 每日更新</span></div>
@@ -304,7 +263,7 @@ import { useRoute } from 'vue-router'
 import echarts from '../../utils/echarts-setup'
 import { getIndexQuotes, buildMarketData, parseMacroData } from '../../utils/market-data'
 import { calcAllExpectedReturns, calcEnhancedRiskParityWeights, calcMarketSharpe, calcRiskPremium } from '../../utils/calc'
-import { fetchMacroData, fetchConfig, fetchIndexEva, fetchFactorScores, fetchStyleFactors } from '../../utils/api'
+import { fetchMacroData, fetchConfig, fetchFactorScores, fetchStyleFactors } from '../../utils/api'
 import { COLORS } from '../../utils/echarts-theme'
 import { supabase } from '../../api/supabase'
 import HelpTip from '../../components/HelpTip.vue'
@@ -317,7 +276,6 @@ const tabs = [
   { key: 'asset',    label: '资产配置' },
   { key: 'fed',      label: '股债对比' },
   { key: 'factor',   label: '风格因子' },
-  { key: 'industry', label: '行业估值' },
   { key: 'jqr',      label: '特色指标' },
 ]
 // ===== 标签页持久化（Req6）：刷新后保留浏览位置 =====
@@ -456,42 +414,6 @@ let fedChart = null
 let compareIdxChart = null
 let fedHistChart = null
 
-// ===== 行业估值 =====
-const industryFilters = [
-  { key: 'all', label: '全部' },
-  { key: 'broad', label: '宽基' },
-  { key: 'strategy', label: '策略' },
-  { key: 'sector', label: '行业主题' }
-]
-const industryFilter = ref('all')
-const industryRaw = ref([])
-const industrySort = reactive({ field: 'pe_pct', asc: true })
-
-const filteredIndustry = computed(() => {
-  let list = [...industryRaw.value]
-  if (industryFilter.value === 'broad') {
-    list = list.filter(r => r.cat === 'broad')
-  } else if (industryFilter.value === 'strategy') {
-    list = list.filter(r => r.cat === 'strategy')
-  } else if (industryFilter.value === 'sector') {
-    list = list.filter(r => r.cat === 'sector')
-  }
-  const f = industrySort.field
-  list.sort((a, b) => {
-    const va = a[f]; const vb = b[f]
-    if (va == null && vb == null) return 0
-    if (va == null) return 1; if (vb == null) return -1
-    return industrySort.asc ? va - vb : vb - va
-  })
-  return list.map(r => ({
-    ...r,
-    pe_pct_color: r.pe_pct > 70 ? 'text-up' : r.pe_pct < 30 ? 'text-down' : '',
-    pb_pct_color: r.pb_pct > 70 ? 'text-up' : r.pb_pct < 30 ? 'text-down' : '',
-  }))
-})
-
-const industryList = computed(() => filteredIndustry.value.slice(0, 100))
-
 // ===== 工具函数 =====
 function metricClass(label) {
   if (!label || label === '--') return ''
@@ -501,24 +423,6 @@ function metricClass(label) {
 function rpClass(val) {
   if (!val || val === '--') return ''
   return val[0] === '+' ? 'text-up' : 'text-down'
-}
-
-function sortIndustry(field) {
-  if (industrySort.field === field) {
-    industrySort.asc = !industrySort.asc
-  } else {
-    industrySort.field = field
-    industrySort.asc = field === 'pe_pct' || field === 'pb_pct'
-  }
-}
-
-function sortIcon(field) {
-  if (industrySort.field !== field) return ''
-  return industrySort.asc ? '▲' : '▼'
-}
-
-function toggleIndustryExpand(row) {
-  // placeholder for expand
 }
 
 function switchFactorSub(key) {
@@ -622,11 +526,10 @@ async function loadAll() {
     await nextTick()
     drawGauge()
 
-    // 风格因子(股票/债券/大宗) + 行业估值 + 特色指标（读生产表，异步不阻塞主流程）
+    // 风格因子(股票/债券/大宗) + 特色指标（读生产表，异步不阻塞主流程）
     loadFactorScores()
     loadBondFactors()
     loadCommodityFactors()
-    loadIndustry()
     loadJqr()
 
   } catch (err) {
@@ -1106,31 +1009,6 @@ function buildSignalOverview() {
   signalOverview.value = cards
 }
 
-// ===== 加载行业估值（实时，经 danjuan-eva Edge Function 抓蛋卷估值中心，不落库） =====
-async function loadIndustry() {
-  try {
-    const rows = await fetchIndexEva()
-    if (!rows || rows.length === 0) {
-      console.warn('行业估值实时拉取为空，可能是网络/蛋卷接口暂不可用')
-      return
-    }
-    industryRaw.value = rows.map(r => ({
-      code: r.index_code,
-      name: r.name,
-      cat: r.cat || 'other',
-      ttype: r.ttype,
-      pe: r.pe != null ? r.pe : null,
-      pe_pct: r.pe_percentile != null ? parseFloat(r.pe_percentile) : null,
-      pb: r.pb != null ? r.pb : null,
-      pb_pct: r.pb_percentile != null ? parseFloat(r.pb_percentile) : null,
-      div_yield: r.dividend_yield != null ? parseFloat(r.dividend_yield) : null,
-      roe: r.roe != null ? parseFloat(r.roe) : null,
-    }))
-  } catch (e) {
-    console.error('行业估值加载失败', e)
-  }
-}
-
 // ===== 加载风格因子评分（读 style_factors 生产表，股票风格·全中证指数） =====
 async function loadFactorScores() {
   try {
@@ -1367,9 +1245,6 @@ function redrawCurrentCharts() {
       if (commodityItems.value.length === 0) loadCommodityFactors()
       if (factorSub.value === 'stock') drawRadar()
       else if (factorSub.value === 'bond') drawBondCurve()
-    }
-    else if (tab === 'industry') {
-      if (industryRaw.value.length === 0) loadIndustry()
     }
     else if (tab === 'jqr') {
       if (jqrCards.value.length === 0) loadJqr()
