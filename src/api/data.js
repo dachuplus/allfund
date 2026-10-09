@@ -369,8 +369,9 @@ async function fetchFundScoresImpl(params = {}) {
     // 指增（指数增强）：名称含「增强」且二级分类 t1 含「指数」
     // 覆盖「指数增强 / 增强指数 / 量化增强 / 增强策略ETF」及「增强指数型债券」；
     // 排除名称含「增强」但非指数型的债基（如增强回报债，t1 为债券型-*）。
+    // 注：postgrest-js 无 .and() 方法，用链式 .ilike() 表达 AND（与 etf 过滤同构）。
     if (zz) {
-      if (zz === '1') query = query.and('n.ilike.%增强%,t1.ilike.%指数%')
+      if (zz === '1') query = query.ilike('n', '%增强%').ilike('t1', '%指数%')
       else if (zz === '0') query = query.or('n.not.ilike.%增强%,t1.not.ilike.%指数%')
     }
     if (dailyLimit) {
