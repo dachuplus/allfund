@@ -31,10 +31,11 @@ MGMT_PAT     = os.environ.get("SUPABASE_MGMT_TOKEN") or os.environ.get("SUPABASE
 MGMT_HEADERS = {"Authorization": f"Bearer {MGMT_PAT}", "Content-Type": "application/json"}
 ANON_HEADERS = {"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}"}
 
-WORKERS     = 10
-RATE_DELAY  = 0.1
-FETCH_RETRY = 2
+WORKERS     = 6
+RATE_DELAY  = 0.2
+FETCH_RETRY = 3
 PROGRESS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".backfill_fund_scale.progress")
+FAIL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".backfill_fund_scale.failures")
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -173,12 +174,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=None, help='仅处理前 N 只（自测用）')
     ap.add_argument('--resume', action='store_true', help='跳过进度文件中已成功写入的代码')
+    ap.add_argument('--from-file', type=str, default=None, help='从指定文件读取代码列表（每行列一个 c，用于失败补刷）')
     args = ap.parse_args()
 
     if not MGMT_PAT:
         sys.exit("缺少 SUPABASE_MGMT_TOKEN / SUPABASE_PAT（环境变量或 .env.local）")
 
-    codes = get_codes()
+    if args.from_file:
+        with open(args.from_file, 'r', encoding='utf-8') as f:
+            codes = [line.strip() for line in f if line.strip()]
+        print(f"[*] 从文件读取 {len(codes)} 只（失败补刷模式）")
+    else:
+        codes = get_codes()
     if not codes:
         sys.exit("未获取到基金代码，终止")
     print(f"[*] fund_scores 共 {len(codes)} 只")
@@ -195,6 +202,7 @@ def main():
     BATCH = 200
     results = []
     processed = [0]
+    failures = []
     lock = threading.Lock()
 
     def worker(code):
@@ -202,9 +210,11 @@ def main():
         with lock:
             if v is not None:
                 results.append({'c': code, 'v': v})
+            else:
+                failures.append(code)  # 抓取失败（None）→ 记录，便于诊断/补刷
             processed[0] += 1
             if processed[0] % 200 == 0:
-                print(f"  [进度] {processed[0]}/{len(codes)}，已取到规模 {len(results)} 只")
+                print(f"  [进度] {processed[0]}/{len(codes)}，已取到规模 {len(results)} 只，失败 {len(failures)} 只")
             # 每 200 只写入一次
             if processed[0] % BATCH == 0:
                 n = batch_update(results)
@@ -232,6 +242,16 @@ def main():
             print(f"  [完成] 末批写入 {n} 只")
         else:
             print(f"  [WARN] 末批写入失败，进度文件未更新；可 --resume 重试")
+
+    # 记录抓取失败的代码，便于后续针对性补刷
+    if failures:
+        try:
+            with open(FAIL_FILE, 'w', encoding='utf-8') as f:
+                for c in sorted(failures):
+                    f.write(c + '\n')
+            print(f"[*] 抓取失败（未更新）代码已记录至 {FAIL_FILE}：共 {len(failures)} 只")
+        except Exception:
+            pass
 
     print(f"[*] 回刷完成。成功写入 {len(done)} 只（含历史进度）。")
     if os.path.exists(PROGRESS_FILE):

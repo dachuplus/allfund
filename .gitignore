@@ -41,3 +41,4 @@ functions/api/_deepseek_key.js
 
 # 回刷脚本断点进度文件（运行时生成，不入 git）
 scripts/.backfill_fund_scale.progress
+scripts/.backfill_fund_scale.failures
