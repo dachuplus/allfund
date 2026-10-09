@@ -38,3 +38,6 @@ supabase/.temp/
 
 # 服务端密钥文件（仅 EdgeOne Function 运行时使用，绝不进 git）
 functions/api/_deepseek_key.js
+
+# 回刷脚本断点进度文件（运行时生成，不入 git）
+scripts/.backfill_fund_scale.progress

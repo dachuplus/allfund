@@ -1,0 +1,78 @@
+name: 季度刷新基金规模（fund_scale）
+
+# =====================================================================
+# 季度刷新 fund_scores.fund_scale（基金最新季度净资产规模）
+#
+# 背景：日常流水线 update-scores.yml 与 update-allocation-quarterly.yml 均不刷新
+# fund_scale（fetch_fund_basic_info.py 补缺模式不含 fund_scale 触发字段，
+# supplement_fund_details.py 只写 fund_raw_sample）。规模自首次回填后永久陈旧
+# （如 016644 曾停在 Q1 145.906，而上游 Q2=83.8512）。
+#
+# 本流水线按季度执行全量回刷，时间锚定各季度财报披露完毕后：
+#   - 2/1  → Q4（上年 10-12 月）报告已于 1 月下旬披露完毕
+#   - 5/1  → Q1（1-3 月）报告已于 4 月下旬披露完毕
+#   - 8/1  → Q2（4-6 月）报告已于 7 月下旬披露完毕
+#   - 11/1 → Q3（7-9 月）报告已于 10 月下旬披露完毕
+# 北京时间 22:00 = UTC 14:00。
+#
+# 复用 scripts/backfill_fund_scale.py（读 fund_scores 全部代码 → 抓天天基金
+# pingzhongdata 净资产末点 → 批量 UPDATE fund_scores.fund_scale）。
+# 该脚本幂等：重跑即用最新季度值覆盖；失败可 --resume 续跑。
+# =====================================================================
+
+on:
+  # 季度定时：北京时间 22:00 的 2/1、5/1、8/1、11/1
+  schedule:
+    - cron: '0 14 1 2,5,8,11 *'
+  # 手动触发（紧急补刷用）
+  workflow_dispatch:
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-fund-scale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖（requests）
+        run: pip install requests
+
+      - name: 季度回刷 fund_scale（全量，支持断点续跑）
+        id: backfill
+        run: |
+          echo "============================================"
+          echo "  季度回刷 fund_scores.fund_scale"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "  数据源: 天天基金 pingzhongdata 净资产末点（最新季度）"
+          echo "  说明: 全量 22k+ 基金，并发抓取 + 批量 UPDATE，幂等可重跑"
+          echo "============================================"
+          python scripts/backfill_fund_scale.py --resume 2>&1 | tee "$GITHUB_WORKSPACE/fund-scale-backfill.log"
+          echo "fund_scale 季度回刷完成: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: 记录更新简报
+        if: always()
+        env:
+          STEP_OUTCOME: ${{ steps.backfill.outcome }}
+        run: |
+          if [ "$STEP_OUTCOME" = "success" ]; then ST=success; else ST=error; fi
+          if [ "$ST" != "success" ]; then
+            MSG="fund_scale 季度回刷失败：详见 GitHub Actions 日志；最近输出：$(tail -c 600 "$GITHUB_WORKSPACE/fund-scale-backfill.log" 2>/dev/null | tr '\n' ' ')"
+          else
+            MSG="fund_scores.fund_scale 已回刷至最新季度（天天基金净资产末点）"
+          fi
+          python3 scripts/log_etl_step.py --step "季度 · 基金规模回刷" --status "$ST" --message "$MSG" --run-date "$(TZ=Asia/Shanghai date +%Y-%m-%d)" || true
