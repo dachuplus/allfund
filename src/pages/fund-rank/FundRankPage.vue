@@ -121,6 +121,16 @@
                 </div>
               </div>
 
+              <!-- 是否指增（指数增强）：名称含「增强」且二级分类 t1 含「指数」 -->
+              <div class="filter-row">
+                <span class="filter-label">指增</span>
+                <div class="filter-chips">
+                  <div class="filter-chip" :class="{ active: filterZZ === '' }" @click="mToggleFlag('ZZ', '')">全部</div>
+                  <div class="filter-chip" :class="{ active: filterZZ === '1' }" @click="mToggleFlag('ZZ', '1')">是</div>
+                  <div class="filter-chip" :class="{ active: filterZZ === '0' }" @click="mToggleFlag('ZZ', '0')">否</div>
+                </div>
+              </div>
+
               <!-- 是否定开 -->
               <div class="filter-row">
                 <span class="filter-label">定开</span>
@@ -748,6 +758,7 @@ const filterHolding = ref([])  // 持有期（多选）：可含 '无限制' 与
 const filterETF = ref('')
 const filterLOF = ref('')
 const filterFOF = ref('')
+const filterZZ = ref('')       // 指增（指数增强）：''全部 '1'是 '0'否
 const filterCN = ref('')       // 场内：''全部 '1'是(ETF/LOF/REITs不计联接) '0'否(场外+ETF联接)
 const filterDK = ref('')
 const filterDailyLimit = ref('')
@@ -1052,6 +1063,7 @@ async function loadData(reset = true, _retryCount = 0) {
       etf: filterETF.value || undefined,
       lof: filterLOF.value || undefined,
       dk: filterDK.value || undefined,
+      zz: filterZZ.value || undefined,
       sg: filterSG.value || undefined,
       dailyLimit: filterDailyLimit.value || undefined,
       // 规模区间（多选并集）：服务端下推；单区间走 gte/lte，多区间走 or(and(...))
@@ -1135,6 +1147,7 @@ function clearMoreFilters() {
   filterETF.value = ''
   filterLOF.value = ''
   filterFOF.value = ''
+  filterZZ.value = ''
   filterDK.value = ''
   filterDailyLimit.value = ''
   filterSG.value = ''
@@ -1149,7 +1162,7 @@ let moreFilterSnapshot = null
 
 function openMoreFilter() {
   moreFilterSnapshot = {
-    sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value,
+    sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
     sp: [...scalePicks.value], scu: scaleCustom.value,
@@ -1164,6 +1177,7 @@ function cancelMoreFilter() {
     filterETF.value = moreFilterSnapshot.etf
     filterLOF.value = moreFilterSnapshot.lof
     filterFOF.value = moreFilterSnapshot.fof
+    filterZZ.value = moreFilterSnapshot.zz
     filterCN.value = moreFilterSnapshot.cn
     filterDK.value = moreFilterSnapshot.dk
     filterDailyLimit.value = moreFilterSnapshot.dl
@@ -1202,7 +1216,7 @@ function mToggleCN(val) { filterCN.value = filterCN.value === val ? '' : val }
 function mToggleSG(val) { filterSG.value = filterSG.value === val ? '' : val }
 function mToggleDailyLimit(val) { filterDailyLimit.value = filterDailyLimit.value === val ? '' : val }
 function mToggleFlag(type, val) {
-  const map = { ETF: filterETF, LOF: filterLOF, FOF: filterFOF, DK: filterDK }
+  const map = { ETF: filterETF, LOF: filterLOF, FOF: filterFOF, DK: filterDK, ZZ: filterZZ }
   const r = map[type]
   if (!r) return
   const next = r.value === val ? '' : val
@@ -1241,6 +1255,7 @@ const activeMoreFilterCount = computed(() => {
   if (filterETF.value) n++
   if (filterLOF.value) n++
   if (filterFOF.value) n++
+  if (filterZZ.value) n++
   if (filterCN.value) n++
   if (filterDK.value) n++
   if (filterDailyLimit.value) n++

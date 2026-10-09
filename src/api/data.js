@@ -328,7 +328,7 @@ export function scaleFilterExpr(ranges) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
   if (supabase) {
     // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
     //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
@@ -365,6 +365,13 @@ async function fetchFundScoresImpl(params = {}) {
     if (sg) {
       if (sg === '1') query = query.eq('sg', 1)
       else if (sg === '0') query = query.neq('sg', 1)
+    }
+    // 指增（指数增强）：名称含「增强」且二级分类 t1 含「指数」
+    // 覆盖「指数增强 / 增强指数 / 量化增强 / 增强策略ETF」及「增强指数型债券」；
+    // 排除名称含「增强」但非指数型的债基（如增强回报债，t1 为债券型-*）。
+    if (zz) {
+      if (zz === '1') query = query.and('n.ilike.%增强%,t1.ilike.%指数%')
+      else if (zz === '0') query = query.or('n.not.ilike.%增强%,t1.not.ilike.%指数%')
     }
     if (dailyLimit) {
       if (dailyLimit === '1') query = query.gte('daily_change', 20)
