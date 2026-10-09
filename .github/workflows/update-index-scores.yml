@@ -6,10 +6,15 @@ name: 指数评分每日更新
 #   21:30 基金评分 / 21:45 标签资金流 / 22:30 配置季度 / 23:20 股票评分 / 00:10 风格因子
 #   本workflow 北京时间 00:40（UTC 16:40）—— 放在最后，因为指数数据是日频、越晚越新鲜。
 #
-# ⚠️ 中证官网硬限流（实测 2026-10-08）：连续约 26–40 只请求后开始返回空/403，
-#   冷却需 20 分钟以上。所以本 workflow **分多轮抓取、轮间强制等待**，
-#   而不是一把梭 169 只 —— 那样会 137 只失败。
-#   fetch_index_raw.py 会自动跳过 index_scores_raw 里已抓到的，天然增量、幂等。
+# ⚠️ 中证官网拦截（2026-10-08~09 复测后的准确结论，纠正旧注释）：
+#   - 旧版 timeout=15 太短才是上次 137 只失败的**主因**（响应偶发 7–15s 被误判限流）；
+#     已改为默认 30s，并**显式识别 403 WAF**。
+#   - 真限流 = HTTP 403 + 反爬 HTML，属 **IP 级 WAF 拦截**；**云环境（GitHub Actions）首次请求即 403**，
+#     本地非云 IP 才通。故 CI 跑本 workflow 时 PE 大概率被拦，生产表靠护栏保持旧版本（符合"限流兜底"预期）。
+#   - 速率敏感非计数敏感：间隔 <1s 必触发、≥2s 安全（默认 2.5s）。
+#   - fetch_index_raw.py 命中 WAF 会写 /tmp/WAF_BLOCKED.flag 并整批短路；本 workflow 检测到即跳过后续轮次与冷却，
+#     直接走 compute/promote（护栏不过则拒绝切换，生产表不变）。
+#   - 脚本自动跳过 index_scores_raw 里已抓到的，天然增量、幂等。
 #
 # 安全性（三级流水线，与 fund/stock 一致）：
 #   步骤1 fetch_index_raw.py   → 只写 index_scores_raw（原始落地，不算分）
@@ -35,10 +40,15 @@ on:
         type: string
         default: '40'
       interval:
-        description: '每次请求间隔秒（中证限流敏感，建议 ≥1.5）'
+        description: '每次请求间隔秒（中证速率敏感，<1s必触发WAF，建议 ≥2）'
         required: false
         type: string
         default: '2.5'
+      timeout:
+        description: 'index-perf 请求超时秒（默认30；旧版15太短易误判限流）'
+        required: false
+        type: string
+        default: '30'
       sleep_mins:
         description: '轮间冷却等待分钟数（中证被限流后需 20 分钟以上恢复）'
         required: false
@@ -83,26 +93,34 @@ jobs:
       - name: 安装依赖
         run: pip install akshare requests
 
-      - name: 抓取原始数据（分轮，规避中证限流）
+      - name: 抓取原始数据（分轮，规避中证 WAF/限流）
         run: |
           ROUNDS="${{ github.event.inputs.rounds || '3' }}"
-          PER_ROUND="${{ github.event.inputs.per_round || '40' }}"
+          PER_ROUND="${{ github.event.inputs.per_round || '60' }}"
           INTERVAL="${{ github.event.inputs.interval || '2.5' }}"
+          TIMEOUT="${{ github.event.inputs.timeout || '30' }}"
           SLEEP_MINS="${{ github.event.inputs.sleep_mins || '21' }}"
-          echo "轮数=$ROUNDS 每轮=$PER_ROUND 间隔=${INTERVAL}s 轮间冷却=${SLEEP_MINS}min"
+          rm -f /tmp/WAF_BLOCKED.flag
+          echo "轮数=$ROUNDS 每轮=$PER_ROUND 间隔=${INTERVAL}s 超时=${TIMEOUT}s 轮间冷却=${SLEEP_MINS}min"
 
           for i in $(seq 1 "$ROUNDS"); do
             echo ""
             echo "============================================"
             echo "  第 $i/$ROUNDS 轮抓取  开始 $(date '+%H:%M:%S')"
             echo "============================================"
-            # --limit / --interval 控制单轮规模与速率；
+            # --limit / --interval / --timeout 控制单轮规模、速率与超时；
             # 已抓到的会自动跳过（index_scores_raw 里有记录），所以重跑是幂等的。
-            python scripts/fetch_index_raw.py --limit "$PER_ROUND" --interval "$INTERVAL" || \
+            python scripts/fetch_index_raw.py --limit "$PER_ROUND" --interval "$INTERVAL" --timeout "$TIMEOUT" || \
               echo "[WARN] 第 $i 轮有失败，继续下一轮"
 
+            # 命中中证 WAF（云环境常见）：本轮已整体短路，后续轮次与冷却均无意义，直接收尾
+            if [ -f /tmp/WAF_BLOCKED.flag ]; then
+              echo ">>> 检测到中证 WAF 拦截（$(cat /tmp/WAF_BLOCKED.flag)），跳过后续轮次与冷却等待"
+              break
+            fi
+
             if [ "$i" -lt "$ROUNDS" ]; then
-              echo ">>> 中证限流冷却等待 ${SLEEP_MINS} 分钟…"
+              echo ">>> 中证冷却等待 ${SLEEP_MINS} 分钟…"
               sleep $((SLEEP_MINS * 60))
             fi
           done

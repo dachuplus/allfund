@@ -13,13 +13,18 @@ fetch_index_raw.py — 【第1级】指数原始数据抓取 → index_scores_ra
         有 2100+ 天历史，可算 5 年分位。
   2) 成分股权重：akshare index_stock_cons_weight_csindex（中证官网）
 
-⚠️ 限流（实测）：中证这两个端点都有硬限流，约 40 次请求后开始返回 403/空，
-   冷却 20 分钟未恢复。所以本脚本：
-   - **严格串行**，绝不并发；
-   - 每次请求之间 sleep（默认 1.2s，可用 --interval 调大）；
-   - 失败不阻塞整体，记账后继续下一只；
-   - **写库按已完成的一只就 commit**，中途挂掉下次重跑会自动跳过已抓到的
-     （按 trade_date 与 cons_date 判断新鲜度），天然支持「分批跑完 169 只」。
+⚠️ 限流 / 拦截（2026-10-08~09 全面复测后的准确结论）：
+   1) 旧版 fetch_pe 的 timeout=15 太短是上次 137 只失败的主因 —— `index-perf` 响应
+      偶尔要 7–15 秒，15 秒超时被误判成"限流"。已改为默认 30 秒（实测同 IP 连续 41 次 0 失败）。
+   2) 真限流形态 = HTTP 403 + 反爬 HTML（含 attack.jinxibei.com 标记），**IP 级 WAF 拦截**，
+      且云环境（GitHub Actions / Azure 等数据中心 IP）首次请求即 403，本地非云 IP 才通。
+      命中 WAF 时本批应整体短路，而非逐只重试空耗配额（抛 WAFBlocked → 调用方 break）。
+   3) 速率敏感（非计数敏感）：请求间隔 < 1s 必触发 403，≥ 2s 安全（实测 2.5s 留余量）。
+      故默认 --interval 2.5，且严格串行、绝不并发。
+   4) 写库按已完成的一只就 commit，中途挂掉下次重跑会自动跳过已抓到的
+      （按 trade_date 与 cons_date 判断新鲜度），天然支持「分批跑完 169 只」。
+   5) 云 IP 被 WAF 拦时，本脚本写 /tmp/WAF_BLOCKED.flag；workflow 检测到即跳过后续轮次
+      与冷却，直接走 compute/promote（护栏校验不通过则生产表保持上一次成功版本）。
 
 用法：
   export SUPABASE_PAT=...
@@ -37,6 +42,7 @@ import subprocess
 import warnings
 from datetime import date, timedelta
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 warnings.filterwarnings('ignore')
 
@@ -166,15 +172,20 @@ def fetch_index_list():
     return out
 
 
-def fetch_pe(code, years=2, timeout=15):
+class WAFBlocked(Exception):
+    """中证 WAF 拦截（IP 级，云环境常见）。命中即本批 PE 抓取应整体短路。"""
+    pass
+
+
+def fetch_pe(code, years=2, timeout=30):
     """中证官网日线（含官方滚动PE + 历史分位）。严格串行。
 
-    ⚠️ 实测坑（2026-10-08）：**响应耗时随请求跨度暴涨**
-       2 年跨度 → 0.6–2.4 秒，稳定；
-       5 年跨度 → 4.6 秒起，频繁 20–40 秒**读超时**。
-       169 只指数跑5 年跨度会耗时 1 小时以上且大量失败。
-    故默认只用 2 年跨度算分位（约 1.6 秒/只 ⇒ 全量约 5 分钟）。
-    需要 5 年分位时用 --pe-years 5 显式开启（慢，且建议配合 --limit 分批）。
+    ⚠️ 实测坑（2026-10-08~09 全面复测）：
+       1) 响应耗时随请求跨度暴涨：2 年跨度 0.6–2.4 秒稳定；5 年跨度 4.6 秒起、常 20–40 秒超时。
+          故默认仅 2 年跨度算分位。旧版 timeout=15 太短，偶发 7–15 秒响应会被误判成限流 → 已改 30。
+       2) 真限流形态 = HTTP 403 + 反爬 HTML（attack.jinxibei.com 标记），**IP 级 WAF 拦截**，
+          云环境（GitHub Actions / Azure）首次请求即 403，本地非云 IP 才通。命中抛 WAFBlocked，
+          由调用方整体短路，避免 169×403 空耗配额。
     """
     end = date.today().strftime('%Y%m%d')
     start = (date.today() - timedelta(days=int(365.25 * years))).strftime('%Y%m%d')
@@ -183,6 +194,10 @@ def fetch_pe(code, years=2, timeout=15):
     try:
         with urlopen(Request(url, headers=HDRS), timeout=timeout) as r:
             d = json.loads(r.read().decode())
+    except HTTPError as e:
+        if e.code == 403:
+            raise WAFBlocked(f'index-perf 403 WAF: {code}')
+        return None
     except Exception:
         return None
     data = d.get('data') or []
@@ -228,7 +243,8 @@ def main():
     _load_env_local()
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=0, help='本次最多抓多少只（0=不限）')
-    ap.add_argument('--interval', type=float, default=1.2, help='每次请求间隔秒（默认1.2）')
+    ap.add_argument('--interval', type=float, default=2.5, help='每次请求间隔秒（默认2.5；<1s必触发WAF）')
+    ap.add_argument('--timeout', type=int, default=30, help='index-perf 请求超时秒（默认30；旧版15太短易误判限流）')
     ap.add_argument('--force', action='store_true', help='忽略库里已有数据，全部重抓')
     ap.add_argument('--pe-years', type=int, default=2, choices=[2, 5],
                     help='PE 分位回看年数（默认2；5 年实测慢 3-10 倍且易超时）')
@@ -263,13 +279,24 @@ def main():
     print(f'  本次待抓 {len(todo)} 只\n')
 
     print('=== [4/4] 串行抓取（每只写完立即 commit，可断点续跑）===')
-    okc, fail = [], []
+    okc, fail, skipped = [], [], []
+    waf_blocked = False
     t0 = time.time()
     for i, code in enumerate(todo, 1):
         name = pool[code]['name']
-        pe = fetch_pe(code, years=args.pe_years)
+        if waf_blocked:                       # 本机 IP 已被 WAF 拦，整批跳过 PE
+            skipped.append(code)
+            continue
+        try:
+            pe = fetch_pe(code, years=args.pe_years, timeout=args.timeout)
+        except WAFBlocked:
+            waf_blocked = True
+            open('/tmp/WAF_BLOCKED.flag', 'w').write(code)
+            print(f'  ⚠️ 检测到中证 WAF 拦截（云环境常见，IP 级）：自 {code} 起后续 PE 抓取全部跳过')
+            skipped.append(code)
+            continue
         if not pe:
-            print(f'  [{i}/{len(todo)}] {code} {name[:10]:12s} PE 取不到（限流？）')
+            print(f'  [{i}/{len(todo)}] {code} {name[:10]:12s} PE 取不到（代码无效/无数据）')
             fail.append((code, 'PE'))
             time.sleep(args.interval * 2)
             continue
@@ -317,7 +344,11 @@ def main():
             print(f'    —— 进度 {len(okc)}/{len(todo)}（{time.time()-t0:.0f}s）')
         time.sleep(args.interval)
 
-    print(f'\n成功 {len(okc)} / 失败 {len(fail)}，耗时 {time.time()-t0:.0f}s'
+    if waf_blocked:
+        print('\n⚠️ 本机 IP 被中证 WAF 拦截，本次 PE 未更新（成分权重接口通常不受影响，但本表需 PE 才能落库）。')
+        print('   生产表 index_scores 经护栏校验后保持上一次成功版本，不受影响。')
+        print('   如需刷新 PE，请在非云 IP（如本地 Mac）运行：python3 scripts/fetch_index_raw.py')
+    print(f'\n成功 {len(okc)} / 失败 {len(fail)} / 跳过(WAF) {len(skipped)}，耗时 {time.time()-t0:.0f}s'
           f'（平均 {round((time.time()-t0)/max(1,len(todo)),1)}s/只）')
     if fail:
         print(f'失败清单（下次重跑会自动补）: {fail[:20]}')
