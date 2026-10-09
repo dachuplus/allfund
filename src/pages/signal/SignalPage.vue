@@ -41,34 +41,6 @@
       <p>{{ dataError }}</p>
     </div>
 
-    <!-- ==================== 0. 信号总览（专业机构风格） ==================== -->
-    <div v-if="activeTab === 'overview'">
-      <div class="card overview-banner">
-        <div class="ov-banner-title">信号总览</div>
-        <p class="ov-banner-text">{{ overviewConclusion }}</p>
-      </div>
-      <div class="ov-grid">
-        <div class="ov-card" v-for="c in signalOverview" :key="c.key">
-          <div class="ov-card-head">
-            <div class="ov-card-name">{{ c.name }}</div>
-            <HelpTip :text="c.help" />
-          </div>
-          <div class="ov-card-value">{{ c.valueLabel }}</div>
-          <div class="ov-bar-wrap" v-if="c.pct != null">
-            <div class="ov-bar"><div class="ov-fill" :style="{ width: c.pct + '%', background: c.color }"></div></div>
-            <span class="ov-pct">{{ c.pct }}%</span>
-          </div>
-          <div class="ov-signal" :class="c.signal">{{ c.signalLabel }}</div>
-          <div class="ov-notes">
-            <div class="ov-signal-label" :class="adviceClass(c.advice)">信号：{{ c.adviceLabel }}</div>
-            <div class="ov-benchmark" v-if="c.benchmark">统计基准：{{ c.benchmark }}</div>
-            <div class="ov-card-hint" v-if="c.hint">{{ c.hint }}</div>
-          </div>
-        </div>
-      </div>
-      <p class="ov-hint">信号基于公开宏观与市场数据计算，仅供参考研究，不构成投资建议。</p>
-    </div>
-
     <!-- ==================== 1. 宏观策略 ==================== -->
     <div v-if="activeTab === 'macro'">
       <!-- 隐含夏普仪表盘 -->
@@ -271,7 +243,6 @@ import JqrIndicator from '../../components/JqrIndicator.vue'
 
 // ===== Tab 结构 =====
 const tabs = [
-  { key: 'overview', label: '信号总览' },
   { key: 'macro',    label: '宏观策略' },
   { key: 'asset',    label: '资产配置' },
   { key: 'fed',      label: '股债对比' },
@@ -280,7 +251,10 @@ const tabs = [
 ]
 // ===== 标签页持久化（Req6）：刷新后保留浏览位置 =====
 const ACTIVE_TAB_KEY = 'af_signal_active_tab'
-const activeTab = ref(localStorage.getItem(ACTIVE_TAB_KEY) || 'overview')
+const activeTab = ref((() => {
+  const t = localStorage.getItem(ACTIVE_TAB_KEY)
+  return t && tabs.some(x => x.key === t) ? t : 'macro'
+})())
 watch(activeTab, (t) => {
   try { localStorage.setItem(ACTIVE_TAB_KEY, t) } catch (e) {}
 })
@@ -312,25 +286,6 @@ function onMarketChange() { redrawCurrentCharts() }
 const dataDate = ref('--')
 const dataError = ref('')
 const refreshing = ref(false)
-
-// ===== 信号总览（仅呈现指标信号，不提供配置建议） =====
-const signalOverview = ref([])
-const pe300PctGlobal = ref(null)
-const pmiValGlobal = ref(null)
-const us10yVal = ref(null)
-const overviewConclusion = computed(() => {
-  const list = signalOverview.value
-  if (!list.length) return ''
-  const ow = list.filter(c => c.advice === 'overweight').length
-  const uw = list.filter(c => c.advice === 'underweight').length
-  const nt = list.length - ow - uw
-  let head
-  if (ow >= 3) head = '多数信号指向风险资产性价比提升'
-  else if (uw >= 3) head = '多重信号偏紧'
-  else head = '信号分化'
-  // 仅陈述信号分布，不提供任何配置建议
-  return `${head}（偏多 ${ow} · 偏空 ${uw} · 中性 ${nt}）`
-})
 
 // ===== 宏觀數據 =====
 const bondY10y = ref(null)
@@ -516,11 +471,6 @@ async function loadAll() {
 
     // FED
     calcFED(quotes, rf)
-
-    // 信号总览全局值 + 计算
-    pe300PctGlobal.value = v300Pct
-    pmiValGlobal.value = pmiData.pmi != null ? pmiData.pmi : null
-    buildSignalOverview()
 
     // Charts
     await nextTick()
@@ -925,89 +875,6 @@ function calcFED(quotes, rf) {
   fedIndices.value = results
 }
 
-// ===== 信号总览计算 =====
-function adviceClass(advice) {
-  return advice === 'overweight' ? 'text-up' : advice === 'underweight' ? 'text-down' : ''
-}
-
-function makeCard(key, name, valueLabel, pct, signal, signalLabel, advice, adviceLabel, desc = '', benchmark = '', hint = '') {
-  const colorMap = { hot: 'var(--color-up)', cold: 'var(--color-down)', neutral: '#505a5f' }
-  const help = [
-    desc,
-    benchmark ? '统计基准：' + benchmark : '',
-    hint,
-    '更新时间：每日 21:30 自动更新（与页面顶部"数据截止"一致）。'
-  ].filter(Boolean).join('\n\n')
-  return { key, name, valueLabel, pct, signal, signalLabel, advice, adviceLabel, desc, benchmark, hint, help, color: colorMap[signal] || '#505a5f' }
-}
-
-// 专业机构框架：6 大信号模块 → 指标值 + 历史分位 + 配置建议
-function buildSignalOverview() {
-  const cards = []
-  // 1. 市场温度：全市场加权平均隐含夏普
-  const sharpe = dashData.value ? dashData.value.value : null
-  cards.push(makeCard('temp', '市场温度',
-    sharpe != null ? sharpe.toFixed(2) : '--', null,
-    sharpe != null ? (sharpe > 0.1 ? 'hot' : sharpe < -0.1 ? 'cold' : 'neutral') : 'neutral',
-    sharpe != null ? (sharpe > 0.1 ? '偏热' : sharpe < -0.1 ? '偏冷' : '中性') : '中性',
-    sharpe != null ? (sharpe > 0.1 ? 'underweight' : sharpe < -0.1 ? 'overweight' : 'neutral') : 'neutral',
-    sharpe != null ? (sharpe > 0.1 ? '低配' : sharpe < -0.1 ? '超配' : '标配') : '标配',
-    '全市场风险平价加权隐含夏普比率，衡量权益资产整体性价比：数值越正，性价比越高。取值区间 −1 ~ 1。',
-    '风险平价权重加权平均 · 区间 −1 ~ 1'))
-  // 2. 估值水位：沪深300 PE 百分位
-  const pePct = pe300PctGlobal.value
-  cards.push(makeCard('val', '估值水位',
-    pePct != null ? pePct + '%' : '--', pePct,
-    pePct != null ? (pePct > 70 ? 'hot' : pePct < 30 ? 'cold' : 'neutral') : 'neutral',
-    pePct != null ? (pePct > 70 ? '偏贵' : pePct < 30 ? '偏低' : '中性') : '中性',
-    pePct != null ? (pePct > 70 ? 'underweight' : pePct < 30 ? 'overweight' : 'neutral') : 'neutral',
-    pePct != null ? (pePct > 70 ? '低配' : pePct < 30 ? '超配' : '标配') : '标配',
-    '沪深300指数 PE 所处历史分位：0% = 历史最便宜，100% = 历史最贵，越高越贵。',
-    '近10年历史分位（沪深300 PE）'))
-  // 3. 流动性：10Y 国债收益率（越低越宽松）
-  const y10 = bondY10y.value
-  cards.push(makeCard('liq', '流动性',
-    y10 != null ? (y10 * 100).toFixed(2) + '%' : '--', null,
-    y10 != null ? (y10 < 0.025 ? 'cold' : y10 > 0.03 ? 'hot' : 'neutral') : 'neutral',
-    y10 != null ? (y10 < 0.025 ? '宽松' : y10 > 0.03 ? '收紧' : '中性') : '中性',
-    y10 != null ? (y10 < 0.025 ? 'overweight' : 'neutral') : 'neutral',
-    y10 != null ? (y10 < 0.025 ? '超配' : '标配') : '标配',
-    '10年期国债收益率反映货币政策松紧：收益率越低，市场流动性越宽松。',
-    '中国10年期国债收益率（实时）'))
-  // 4. 信用景气：PMI（>50 扩张）
-  const pmi = pmiValGlobal.value
-  cards.push(makeCard('credit', '信用景气',
-    pmi != null ? pmi.toFixed(1) : '--', null,
-    pmi != null ? (pmi > 50 ? 'hot' : 'cold') : 'neutral',
-    pmi != null ? (pmi > 50 ? '扩张' : '收缩') : '中性',
-    pmi != null ? (pmi > 50 ? 'overweight' : 'underweight') : 'neutral',
-    pmi != null ? (pmi > 50 ? '超配' : '低配') : '标配',
-    '官方制造业 PMI 衡量经济扩张/收缩：高于 50 为扩张，低于 50 为收缩。',
-    '官方制造业 PMI（月度）',
-    pmi == null ? '信用数据待披露：官方 PMI 于每月初发布，最新一期尚未更新。' : ''))
-  // 5. 海外联动：美债收益率（>4.5% 偏紧）
-  const uy = us10yVal.value
-  cards.push(makeCard('oversea', '海外联动',
-    uy != null ? uy.toFixed(2) + '%' : '待更新', null,
-    uy != null ? (uy > 4.5 ? 'hot' : 'cold') : 'neutral',
-    uy != null ? (uy > 4.5 ? '收紧' : '宽松') : '中性',
-    uy != null ? (uy > 4.5 ? 'underweight' : 'overweight') : 'neutral',
-    uy != null ? (uy > 4.5 ? '低配' : '超配') : '标配',
-    '美国10年期国债收益率影响全球流动性与风险偏好：越高越偏紧，对权益资产估值压制越大。',
-    '美国10年期国债收益率（每日）',
-    uy == null ? '海外数据待同步：美债收盘较晚，每日 22:00 后同步更新。' : ''))
-  // 6. 风格：价值因子百分位（<30% 低配价值/超配成长，>70% 反之）
-  const valFactor = factorFactors.value.find(f => f.key === 'value')
-  cards.push(makeCard('style', '风格(价值)',
-    valFactor ? valFactor.percentile + '%' : '待更新', valFactor ? valFactor.percentile : null,
-    valFactor ? (valFactor.percentile > 70 ? 'hot' : valFactor.percentile < 30 ? 'cold' : 'neutral') : 'neutral',
-    valFactor ? (valFactor.percentile > 70 ? '偏高' : valFactor.percentile < 30 ? '偏低' : '中性') : '中性',
-    valFactor ? (valFactor.percentile > 70 ? 'underweight' : 'overweight') : 'neutral',
-    valFactor ? (valFactor.percentile > 70 ? '低配' : '超配') : '标配',
-    '价值因子估值分（0~100，越高越贵）。结合性价比分判断成长/价值风格的相对吸引力。',
-    'Barra 价值因子估值分（0~100）'))
-  signalOverview.value = cards
-}
 
 // ===== 加载风格因子评分（读 style_factors 生产表，股票风格·全中证指数） =====
 async function loadFactorScores() {
@@ -1029,8 +896,6 @@ async function loadFactorScores() {
       signalLabel: r.signal_label || '',
       color: r.color || '#1d70b8',
     }))
-    // 刷新信号总览中的"风格(价值)"卡片
-    if (signalOverview.value.length) buildSignalOverview()
     if (factorSub.value === 'stock') nextTick(drawRadar)
   } catch (e) {
     console.error('风格因子加载失败', e)
@@ -1454,44 +1319,8 @@ function handleResize() {
 .jqr-chart { width: 100%; height: 240px; }
 
 /* ===== 移动端适配 ===== */
-/* 信号总览 */
-.overview-banner { background: #1d70b8; color: #fff; border-color: #1d70b8; }
-.ov-banner-title { font-size: 14px; font-weight: 700; opacity: 0.9; margin-bottom: 6px; }
-.ov-banner-text { font-size: 18px; font-weight: 700; margin: 0; line-height: 1.5; }
-.ov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); margin-bottom: var(--space-xl); }
-/* 卡片：上部分（标题/大数值/信号标签）居中靠上，下部分说明文字统一靠底靠左 */
-.ov-card {
-  border: 1px solid var(--border);
-  padding: var(--space-md);
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-  min-height: 168px;
-}
-.ov-card-name { font-size: 13px; color: var(--text-secondary); font-weight: 700; }
-.ov-card-value { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 4px 0 8px; }
-.ov-bar-wrap { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
-.ov-bar { flex: 1; height: 8px; background: #f3f2f1; }
-.ov-fill { height: 100%; }
-.ov-pct { font-size: 12px; color: var(--text-secondary); width: 38px; text-align: right; }
-.ov-signal { display: inline-block; font-size: 13px; font-weight: 700; padding: 1px 8px; margin-bottom: 6px; }
-.ov-signal.hot { color: var(--color-up); }
-.ov-signal.cold { color: var(--color-down); }
-.ov-signal.neutral { color: var(--text-secondary); }
-/* 说明文字组：推到卡片底部、靠左显示，保证 6 张卡片底部对齐 */
-.ov-notes {
-  margin-top: auto;
-  text-align: left;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-sm);
-}
-.ov-signal-label { font-size: 14px; font-weight: 700; text-align: left; }
-.ov-hint { font-size: 12px; color: var(--text-secondary); }
-
 @media (max-width: 768px) {
   .jqr-grid { grid-template-columns: 1fr; }
-  .ov-grid { grid-template-columns: repeat(2, 1fr); }
   .fed-grid { grid-template-columns: repeat(1, 1fr); }
   .comm-grid { grid-template-columns: repeat(1, 1fr); }
   .bond-signal-grid { grid-template-columns: repeat(1, 1fr); }
@@ -1512,15 +1341,8 @@ function handleResize() {
 .market-notice { display: flex; align-items: center; gap: 8px; margin: var(--space-sm) 0 var(--space-md); padding: var(--space-sm) var(--space-md); background: #f3f2f1; border-left: 4px solid var(--brand); font-size: 13px; color: var(--text-secondary); }
 .market-notice__icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; font-weight: 700; flex: 0 0 auto; }
 
-/* 信号总览卡片注释（问号悬浮 + 统计基准） */
-.ov-card-head { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.ov-help { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-secondary); color: var(--text-secondary); font-size: 11px; font-weight: 700; cursor: help; flex: 0 0 auto; }
-.ov-benchmark { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
-.ov-card-hint { font-size: 11px; color: #b95900; margin-top: 4px; line-height: 1.4; }
-
 /* 中屏（平板 / 小屏笔记本）提前堆叠，避免横向滚动 */
 @media (max-width: 1100px) {
-  .ov-grid { grid-template-columns: repeat(2, 1fr); }
   .jqr-grid { grid-template-columns: repeat(2, 1fr); }
   .fed-grid { grid-template-columns: repeat(2, 1fr); }
   .comm-grid { grid-template-columns: repeat(2, 1fr); }
