@@ -344,15 +344,19 @@ def call_zhipu(model_id, prompt_messages, key):
     return r.json()["choices"][0]["message"]["content"]
 
 
-def call_kimi(model_id, prompt_messages, key):
-    url = "https://api.moonshot.cn/v1/chat/completions"
-    # Kimi（kimi-k2/k2.5）仅允许 temperature=1，传 0.7 会报 400 invalid temperature
-    body = {"model": model_id, "messages": prompt_messages, "temperature": 1, "max_tokens": 4096,
+def call_kimi(prompt_messages, key=None):
+    # Kimi 由阿里云百炼(DashScope)提供，走百炼兼容端点 + 百炼 key（与千问同一把 QWEN_API_KEY）。
+    # 注：原实现错写成打 Moonshot 官方(api.moonshot.cn) + KIMI_API_KEY，而本项目 Kimi 实际托管在百炼，
+    # 故必须改用 dashscope 端点 + QWEN_API_KEY（实测 kimi-k2.5/k2.6/k3 均可 200）。
+    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    bailian_key = os.environ.get("QWEN_API_KEY") or key
+    # Kimi（kimi-k2.5）仅允许 temperature=1，传 0.7 会报 400 invalid temperature
+    body = {"model": "kimi-k2.5", "messages": prompt_messages, "temperature": 1, "max_tokens": 4096,
             "response_format": {"type": "json_object"}}
-    r = requests.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    r = requests.post(url, headers={"Authorization": f"Bearer {bailian_key}", "Content-Type": "application/json"},
                       json=body, timeout=150)
     if r.status_code != 200:
-        raise RuntimeError(f"Kimi API 返回 {r.status_code}: {r.text[:400]}")
+        raise RuntimeError(f"Kimi(百炼) API 返回 {r.status_code}: {r.text[:400]}")
     return r.json()["choices"][0]["message"]["content"]
 
 
@@ -371,7 +375,7 @@ def call_model(model, prompt_messages):
     if provider == "zhipu":
         return call_zhipu(model.get("api_model") or "glm-4-plus", prompt_messages, key)
     if provider == "kimi":
-        return call_kimi(model.get("api_model") or "kimi-k2", prompt_messages, key)
+        return call_kimi(prompt_messages, key)
     if provider == "volc-ark":
         apimodel = model.get("api_model") or ""
         if not apimodel.startswith("ep-"):

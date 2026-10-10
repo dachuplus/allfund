@@ -89,7 +89,7 @@ _API_CONFIG = {
     "qwen": {"api_provider": "qwen", "api_model": "qwen-plus", "api_key_env": "QWEN_API_KEY"},
     "wenxin": {"api_provider": "wenxin", "api_model": "ernie-5.1", "api_key_env": "WENXIN_API_KEY"},
     "zhipu": {"api_provider": "zhipu", "api_model": "glm-5.2", "api_key_env": "ZHIPU_API_KEY"},
-    "kimi": {"api_provider": "kimi", "api_model": "kimi-k2.5", "api_key_env": "KIMI_API_KEY"},
+    "kimi": {"api_provider": "kimi", "api_model": "kimi-k2.5", "api_key_env": "QWEN_API_KEY"},
     "minimax": {"api_provider": "minimax", "api_model": "MiniMax-M3", "api_key_env": "MINIMAX_API_KEY"},
 }
 for m in MODELS:
