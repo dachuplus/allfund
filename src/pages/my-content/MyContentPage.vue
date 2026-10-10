@@ -115,6 +115,10 @@
       <h2 class="cp-tool-title">进位制转换</h2>
       <BaseConverterTool />
       <div class="cp-subblock">
+        <h3 class="cp-subblock-title">进位制计算器（算式求值）</h3>
+        <BaseCalculatorTool />
+      </div>
+      <div class="cp-subblock">
         <h3 class="cp-subblock-title">个人工具</h3>
         <MediaTools />
       </div>
@@ -185,6 +189,7 @@ import PrimePanel from '../../components/math/PrimePanel.vue'
 import MultiplicationPanel from '../../components/math/MultiplicationPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
+import BaseCalculatorTool from '../../components/tools/BaseCalculatorTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
 import MustEatBoard from '../../components/rank/MustEatBoard.vue'
 import { FILM_RANK, FILM_DIMS } from '../../data/filmRank.js'
