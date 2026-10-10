@@ -31,6 +31,7 @@ export const TOGGLEABLE_FEATURES = [
   { key: 'fund-rank', label: '选品', desc: '靠谱指数评分、基金详情、基金对比' },
   { key: 'portfolio', label: '组合', desc: '个人组合、智能选基、组合回测' },
   { key: 'admin', label: '管理', desc: '数据中心(管理)权限，可管理其他用户' },
+  { key: 'login-wall', label: '首页权限墙', desc: '开启后未登录访客访问站点需先登录（首页权限墙）；关闭则全站公开可读（默认关闭）。' },
 ]
 
 // 模块级单例：所有组件共享同一份 flags
