@@ -53,8 +53,10 @@
           <template v-else>
             <div class="aipk-fund" v-for="(f, i) in (picksMap[m.id]?.picks || [])" :key="f.code">
               <span class="aipk-fund-idx">{{ i + 1 }}</span>
-              <span class="aipk-fund-name">{{ f.name }}</span>
-              <span class="aipk-fund-code">{{ f.code }}</span>
+              <a class="aipk-fund-link" :href="fundUrl(f.code)" target="_blank" rel="noopener">
+                <span class="aipk-fund-name">{{ f.name }}</span>
+                <span class="aipk-fund-code">{{ f.code }}</span>
+              </a>
               <span class="aipk-fund-w">20%</span>
             </div>
             <div class="aipk-funds-empty" v-if="!(picksMap[m.id]?.picks || []).length">暂无选基数据</div>
@@ -166,7 +168,9 @@
             <div class="aipk-tl-funds">
               <div class="aipk-tl-fund" v-for="(f, i) in (picksMap[m.id]?.picks || [])" :key="f.code">
                 <span class="aipk-tl-fund-idx">{{ i + 1 }}</span>
-                <span class="aipk-tl-fund-name">{{ f.name }}</span>
+                <a class="aipk-fund-link" :href="fundUrl(f.code)" target="_blank" rel="noopener">
+                  <span class="aipk-tl-fund-name">{{ f.name }}</span>
+                </a>
                 <span class="aipk-tl-fund-w">20%</span>
                 <p class="aipk-tl-fund-reason">{{ f.reason || '—' }}</p>
               </div>
@@ -428,15 +432,19 @@ const RETURN_COLS = [
   { key: 'r5y', label: '近5年' },
   { key: 'r10y', label: '近10年' },
 ]
-const STRICT_COLS = { r3y: true, r5y: true, r10y: true }
+// 长期区间(r3y/r5y/r10y)在 fund_scores 中非全量：放宽严格约束，按「有数据的持仓」加权展示，缺失成分跳过
+// （不再因任一成分缺值就整列显示 --）。注：r10y 全表 0 条非空，恒为 --，属真实数据缺失而非逻辑问题
+const STRICT_COLS = {}
 
 const CHART_PERIODS = [
   { key: 'r1m', label: '近1月' },
   { key: 'r3m', label: '近3月' },
   { key: 'r6m', label: '近6月' },
   { key: 'r1y', label: '近1年' },
+  { key: 'r2y', label: '近2年' },
   { key: 'r3y', label: '近3年' },
   { key: 'r5y', label: '近5年' },
+  { key: 'r10y', label: '近10年' },
 ]
 const chartPeriod = ref('r1y')
 const chartEl = ref(null)
@@ -550,6 +558,13 @@ function fmtRet(v) {
 function retClass(v) {
   if (v == null) return 'ret-na'
   return v > 0 ? 'ret-pos' : (v < 0 ? 'ret-neg' : 'ret-flat')
+}
+
+// 基金跳转：天天基金详情页（code 形如 161133.OF → 取 6 位主代码）
+function fundUrl(code) {
+  if (!code) return '#'
+  const c = String(code).split('.')[0]
+  return `https://fund.eastmoney.com/${c}.html`
 }
 
 async function loadAll() {
@@ -1194,6 +1209,9 @@ async function toggleModelActive(m) {
 .aipk-fund-idx { width: 18px; height: 18px; line-height: 18px; text-align: center; background: #f3f2f1; color: var(--text-secondary); font-size: 11px; flex: none; }
 .aipk-fund-name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aipk-fund-code { color: var(--text-secondary); font-size: 12px; }
+.aipk-fund-link { flex: 1; min-width: 0; display: inline-flex; align-items: baseline; gap: var(--space-sm); color: inherit; text-decoration: none; }
+.aipk-fund-link:hover { text-decoration: underline; color: #1d70b8; }
+.aipk-fund-link .aipk-fund-name { flex: 1; }
 .aipk-fund-w { color: #1d70b8; font-weight: 700; font-size: 12px; }
 .aipk-funds-empty { font-size: 13px; color: var(--text-secondary); }
 .aipk-pending { font-size: 14px; font-weight: 700; color: #943c0c; background: #fff4e0; border: 1px solid #f0c89a; padding: var(--space-sm); text-align: center; }

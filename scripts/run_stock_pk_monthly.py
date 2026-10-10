@@ -10,7 +10,7 @@ run_stock_pk_monthly.py — 股票组合 PK 月度自动重选编排器
      否则 → seed_stock_pk.py（规则版兜底，保证每月都有可展示的选股结果）
   4. 写 etl_run_log 汇总。
 
-用法（由 .github/workflows/stock-pk-monthly.yml 每月1日调用）：
+用法（由 .github/workflows/stock-pk-weekly.yml 每周一调用，现改为每周调仓）：
   python3 scripts/run_stock_pk_monthly.py
 """
 import os

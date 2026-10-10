@@ -2149,7 +2149,7 @@ const ETL_STEP_INFO = {
   export_fund_details: { title: '导出数据文件', desc: '将最新数据导出为 Excel 并发布到数据下载中心' },
   fetch_stock_scores: { title: '股票评分抓取', desc: '抓取沪深京 A 股 + 港股全市场行情与财务数据，按五维模型（成长/质量/健康/估值/动量）评分，写入 stock_scores 暂存表' },
   promote_stock_scores: { title: '股票评分切换', desc: '校验并原子切换到 stock_scores 生产表，刷新 stock_pk_models / stock_pk_picks' },
-  run_stock_pk_monthly: { title: '股票PK月度重选', desc: '每月自动重选股票 PK 组合（真实 LLM 选股或规则兜底）' },
+  run_stock_pk_monthly: { title: '股票PK每周重选', desc: '每周自动重选股票 PK 组合（真实 LLM 选股或规则兜底）' },
   stock_pk: { title: '股票PK选股', desc: '生成当期股票 PK 推荐组合' },
   // —— 两条基金自动更新流水线（方案B）写入的简报步骤 ——
   '评分流水线 · 抓取基金数据': { title: '基金评分 · 抓取与评分', desc: '抓取全市场基金收益/风险指标，重算 V7 靠谱分写入 staging 临时表' },

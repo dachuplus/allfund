@@ -1,9 +1,9 @@
-name: 股票PK月度重选
+name: 股票PK每周重选
 
 on:
-  # 定时触发：北京时间每月 1 日 22:00（UTC 14:00）
+  # 定时触发：北京时间每周一 22:00（UTC 14:00），每周调仓一次
   schedule:
-    - cron: '0 14 1 * *'
+    - cron: '0 14 * * 1'
   # 手动触发
   workflow_dispatch:
 
@@ -11,7 +11,7 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
-  stock-pk-monthly:
+  stock-pk-weekly:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -67,20 +67,20 @@ jobs:
           python scripts/promote_stock_scores.py
           echo "切换完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
-      - name: 步骤3 — 月度重选（真实LLM选股或规则兜底 + 写 etl_run_log）
+      - name: 步骤3 — 每周重选（真实LLM选股或规则兜底 + 写 etl_run_log）
         run: |
           echo "============================================"
-          echo "  步骤3: run_stock_pk_monthly（编排月度重选）"
+          echo "  步骤3: run_stock_pk_monthly（编排每周重选）"
           echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
           echo "============================================"
           pip install requests
           # 内部已处理「有 LLM key 则真实选股，否则 seed 规则兜底」+ 写 etl_run_log。
           # 缺失 LLM Key 时安全回退规则版，不应报错退出。
           python scripts/run_stock_pk_monthly.py
-          echo "月度重选完成: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "每周重选完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: 失败通知
         if: ${{ failure() || cancelled() }}
         run: |
-          echo "股票 PK 月度重选失败！请检查 GitHub Actions 日志。"
+          echo "股票 PK 每周重选失败！请检查 GitHub Actions 日志。"
           echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"

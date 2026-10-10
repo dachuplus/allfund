@@ -11,7 +11,7 @@
       </div>
       <p class="card-desc">
         让 7 个真实大模型基于ALLFUND股票靠谱指数（stock_scores）真实行情数据，先选二级行业、再在该行业内选个股，
-        各 5 只 × 20% 等权，每月 1 日调仓，比一比谁的收益更好。
+        各 5 只 × 20% 等权，每周调仓一次，比一比谁的收益更好。
         由 <b>7 个真实大模型</b>基于股票靠谱指数（stock_scores）真实行情，先选二级行业、再在该行业内选个股（含豆包·火山方舟真实模型），
         并给出两层逻辑（第一层行业选择 · 第二层个股选择）；各模型按自身推理逻辑自主决策，目标只有一个——跑赢对手。
         通过「千问百炼」聚合平台调用的模型已在卡片上标注<span class="aipk-ds-badge">百炼</span>徽标。
@@ -58,8 +58,10 @@
           <template v-else>
             <div class="aipk-fund" v-for="(f, i) in (picksMap[m.id]?.picks || [])" :key="f.code">
               <span class="aipk-fund-idx">{{ i + 1 }}</span>
-              <span class="aipk-fund-name">{{ f.name }}</span>
-              <span class="aipk-fund-code">{{ f.code }}</span>
+              <a class="aipk-fund-link" :href="stockUrl(f.code)" target="_blank" rel="noopener">
+                <span class="aipk-fund-name">{{ f.name }}</span>
+                <span class="aipk-fund-code">{{ f.code }}</span>
+              </a>
               <span class="aipk-fund-w">20%</span>
             </div>
             <div class="aipk-funds-empty" v-if="!(picksMap[m.id]?.picks || []).length">暂无选股数据</div>
@@ -148,7 +150,7 @@
         </button>
       </div>
       <div class="aipk-tl-period" v-if="latestPeriod">
-        {{ latestPeriod }} 月度调仓 · 各模型选股逻辑（两层）
+        {{ latestPeriod }} 每周调仓 · 各模型选股逻辑（两层）
         <span class="aipk-tl-mode-note" v-if="orderedModels.length">
           （{{ realModels.length ? realModels.length + ' 个真实模型' : '' }}{{ realModels.length && ruleModels.length ? ' + ' : '' }}{{ ruleModels.length ? ruleModels.length + ' 个规则版' : '' }}）
         </span>
@@ -171,7 +173,9 @@
             <div class="aipk-tl-funds">
               <div class="aipk-tl-fund" v-for="(f, i) in (picksMap[m.id]?.picks || [])" :key="f.code">
                 <span class="aipk-tl-fund-idx">{{ i + 1 }}</span>
-                <span class="aipk-tl-fund-name">{{ f.name }} <span class="aipk-tl-fund-ind">{{ f.industry }}</span></span>
+                <a class="aipk-fund-link" :href="stockUrl(f.code)" target="_blank" rel="noopener">
+                  <span class="aipk-tl-fund-name">{{ f.name }} <span class="aipk-tl-fund-ind">{{ f.industry }}</span></span>
+                </a>
                 <span class="aipk-tl-fund-w">20%</span>
                 <p class="aipk-tl-fund-reason">{{ f.reason || '—' }}</p>
               </div>
@@ -552,6 +556,15 @@ function retClass(v) {
   return v > 0 ? 'ret-pos' : (v < 0 ? 'ret-neg' : 'ret-flat')
 }
 
+// 股票跳转：东方财富行情页（code 形如 688195.SH → sh688195；.SZ→sz / .BJ→bj；股票不在天天基金，用东财行情页）
+function stockUrl(code) {
+  if (!code) return '#'
+  const m = String(code).match(/^(\d{6})\.(\w+)$/)
+  if (!m) return '#'
+  const ex = { SH: 'sh', SZ: 'sz', BJ: 'bj' }[m[2].toUpperCase()] || 'sh'
+  return `https://quote.eastmoney.com/${ex}${m[1]}.html`
+}
+
 async function loadAll() {
   loading.value = true
   try {
@@ -742,7 +755,7 @@ function drawShareHeader(ctx, W, pad, headerH, title) {
 /** 收益 PK 海报：曲线图 + 冠亚季军 + 完整对比表 */
 async function drawPkPoster(ctx, W, pad, headerH) {
   let y = headerH + 24
-  const subtitle = latestPeriod.value ? `${latestPeriod.value} 月度调仓 · 各模型加权区间收益` : '各模型加权区间收益'
+  const subtitle = latestPeriod.value ? `${latestPeriod.value} 每周调仓 · 各模型加权区间收益` : '各模型加权区间收益'
   ctx.fillStyle = '#1a1a1a'
   ctx.font = 'bold 22px sans-serif'
   ctx.textAlign = 'left'
@@ -877,7 +890,7 @@ function drawLineupPoster(ctx, W, pad, headerH) {
 function drawTimelinePoster(ctx, W, pad, headerH) {
   let y = headerH + 24
   const periodLabel = latestPeriod.value
-    ? `${latestPeriod.value} 月度调仓 · 各模型两层选股逻辑`
+    ? `${latestPeriod.value} 每周调仓 · 各模型两层选股逻辑`
     : '各模型两层选股逻辑'
   ctx.fillStyle = '#1a1a1a'
   ctx.font = 'bold 22px sans-serif'
@@ -1221,6 +1234,9 @@ async function toggleModelActive(m) {
 .aipk-fund-idx { width: 18px; height: 18px; line-height: 18px; text-align: center; background: #f3f2f1; color: var(--text-secondary); font-size: 11px; flex: none; }
 .aipk-fund-name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aipk-fund-code { color: var(--text-secondary); font-size: 12px; }
+.aipk-fund-link { flex: 1; min-width: 0; display: inline-flex; align-items: baseline; gap: var(--space-sm); color: inherit; text-decoration: none; }
+.aipk-fund-link:hover { text-decoration: underline; color: #1d70b8; }
+.aipk-fund-link .aipk-fund-name { flex: 1; }
 .aipk-fund-w { color: #1d70b8; font-weight: 700; font-size: 12px; }
 .aipk-funds-empty { font-size: 13px; color: var(--text-secondary); }
 .aipk-pending { font-size: 14px; font-weight: 700; color: #943c0c; background: #fff4e0; border: 1px solid #f0c89a; padding: var(--space-sm); text-align: center; }
