@@ -310,6 +310,9 @@ function isActiveNav(item) {
 
 /* ---- 当前路由的功能权限拦截（未授权功能显示「无访问权限」） ---- */
 const routeAllowed = computed(() => {
+  // 初始化（恢复会话 + 加载权限）未完成前，乐观放行：避免已登录用户刷新页面时，
+  // 因 permissionsReady 尚未就绪、hasFeature 暂返回 false 而闪现「无访问权限」弹窗。
+  if (!permissionsReady.value) return true
   // ownerOnly 路由：仅管理员可进；管理员始终可进，不受功能开关影响（避免把自己锁在门外）
   if (route.meta?.ownerOnly) return isOwner.value
   const feat = route.meta?.feature

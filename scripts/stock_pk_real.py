@@ -346,7 +346,8 @@ def call_zhipu(model_id, prompt_messages, key):
 
 def call_kimi(model_id, prompt_messages, key):
     url = "https://api.moonshot.cn/v1/chat/completions"
-    body = {"model": model_id, "messages": prompt_messages, "temperature": 0.7, "max_tokens": 4096,
+    # Kimi（kimi-k2/k2.5）仅允许 temperature=1，传 0.7 会报 400 invalid temperature
+    body = {"model": model_id, "messages": prompt_messages, "temperature": 1, "max_tokens": 4096,
             "response_format": {"type": "json_object"}}
     r = requests.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
                       json=body, timeout=150)
@@ -472,14 +473,24 @@ def run_model(model, ind_summary, period_month, dry_run):
     return True
 
 
+def period_week():
+    """本周调仓期次：YYYY-MM-Wn（n=当月第几周，周一为周首）。
+
+    股票组合为每周调仓，期次按「年-月-第几周」标记，便于前端展示
+    「2026-10 第2周」这样的真实周维度，而非笼统的月份。"""
+    d = datetime.date.today()
+    w = (d.day - 1) // 7 + 1
+    return f"{d.year}-{d.month:02d}-W{w}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", help="限定模型 id，逗号分隔，如 ds,doubao")
     ap.add_argument("--dry-run", action="store_true", help="只打印不写入")
-    ap.add_argument("--period", help="期次 YYYY-MM，默认当月")
+    ap.add_argument("--period", help="期次 YYYY-MM-Wn（默认本周），如 2026-10-W2")
     args = ap.parse_args()
 
-    period_month = args.period or datetime.date.today().strftime("%Y-%m")
+    period_month = args.period or period_week()
     print(f"=== 股票组合 PK 真实模型自选（基于 stock_scores 两层选股：先选行业，再选单品）(期次 {period_month}) ===")
 
     rows = mgmt_query(

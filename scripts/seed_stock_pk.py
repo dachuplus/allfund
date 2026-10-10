@@ -387,7 +387,9 @@ def upsert_picks(picks_by_model, period_month, mode="rule"):
 
 
 def main():
-    period_month = datetime.date.today().strftime("%Y-%m")
+    d = datetime.date.today()
+    w = (d.day - 1) // 7 + 1
+    period_month = f"{d.year}-{d.month:02d}-W{w}"  # 与真实跑批一致的周维度期次
     print(f"=== 股票组合 PK 规则版种子 (期次 {period_month}) ===", flush=True)
     create_tables()
     upsert_models()

@@ -643,7 +643,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
-import { fetchFundScores, fetchFundMeta, fetchFundCategories, HOLDING_PERIOD_OPTIONS } from '../../api/data.js'
+import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, HOLDING_PERIOD_OPTIONS } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
@@ -1031,6 +1031,8 @@ async function loadData(reset = true, _retryCount = 0) {
   loading.value = true
   loadError.value = false
   if (reset) page.value = 1
+  // 切换筛选条件时先清空旧总数，加载期间回退到已加载条数，避免残留上一筛选的真实总数
+  if (reset) totalCount.value = null
 
   try {
     // 确定 t0 过滤（FOF 类型筛选用 'FOF'）
@@ -1047,14 +1049,12 @@ async function loadData(reset = true, _retryCount = 0) {
       t0Filter = undefined
     }
 
-    // t0（一级分类）/ t1（二级分类 t1_tt）直接来自 fund_scores，服务端按总表过滤
-    const result = await withTimeout(fetchFundScores({
+    // 当前筛选条件（同时用于「列表」与「真实总数」两次请求，保证口径一致）
+    const queryParams = {
       t0: t0Filter,
       t1: filterT1.value || undefined,
       search: buildSearchText(),
-      // 份额（多选，含「主代码」）：服务端按名称正则过滤（并集）
       shareClasses: filterSC.value.length ? filterSC.value : undefined,
-      // 持有期（多选，含「无限制」）：服务端按名称正则过滤（并集）
       holdingPeriods: filterHolding.value.length ? filterHolding.value : undefined,
       kKey: currentPeriod.value,
       sortAsc: sortAsc.value,
@@ -1066,12 +1066,20 @@ async function loadData(reset = true, _retryCount = 0) {
       zz: filterZZ.value || undefined,
       sg: filterSG.value || undefined,
       dailyLimit: filterDailyLimit.value || undefined,
-      // 规模区间（多选并集）：服务端下推；单区间走 gte/lte，多区间走 or(and(...))
       scaleRanges: scaleRanges.value.length ? scaleRanges.value : undefined,
-      // 列排序（代码/简称/经理/规模/管理费/各阶段收益）：服务端在整个 fund_scores 表排序后分页返回
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
-    }), LOAD_TIMEOUT_MS)
+    }
+
+    // 并行拉取「真实总数」：走 fund-scores-count Edge Function（service-role + count=exact），
+    // 完整复刻上述过滤链 + 前端场内(filterCN)过滤，返回不受 pageSize(2000) 限制的真实总数。
+    // 不阻塞列表加载；结果回来后响应式更新 totalCount（失败则保持 null，回退 funds.length）。
+    fetchFundScoresCount({ ...queryParams, filterCN: filterCN.value || undefined })
+      .then(cnt => { if (cnt != null) totalCount.value = cnt })
+      .catch(() => {})
+
+    // t0（一级分类）/ t1（二级分类 t1_tt）直接来自 fund_scores，服务端按总表过滤
+    const result = await withTimeout(fetchFundScores(queryParams), LOAD_TIMEOUT_MS)
 
     if (result.data) {
       // 服务端过滤后的真实总数（已含 t0/t1/search 及下推的 ETF/LOF/定开/申购状态/±20%）

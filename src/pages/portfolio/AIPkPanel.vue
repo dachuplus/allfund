@@ -4,7 +4,7 @@
     <!-- 说明卡 -->
     <div class="card aipk-intro">
       <div class="card-title-row">
-        <span class="card-title">AI 大 PK</span>
+        <span class="card-title">基金组合</span>
         <span class="aipk-badge" :class="{ 'aipk-badge-real': realModels.length }">
           {{ realModels.length ? `真实大模型已接入（${realModels.length}）` : '规则版' }}
         </span>

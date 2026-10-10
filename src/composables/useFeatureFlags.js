@@ -24,13 +24,13 @@ const DEFAULT_FLAGS = {
                         // 平时仍按 DB 里的开关值生效（设为 on 则照常开墙）。
 }
 
-// 可在面板中切换的功能清单（核心管理类 admin / data-center 不放入开关，避免把自己锁门外）
+// 可在面板中切换的功能清单（与一级 tab 完全一致：娱乐/策略/选品/组合/管理）
 export const TOGGLEABLE_FEATURES = [
-  { key: 'content', label: '内容（博客）', desc: '独立性研究文章，公开可读（无需登录）' },
-  { key: 'signal', label: '策略', desc: '宏观信号、股债性价比、风格因子' },
+  { key: 'content', label: '娱乐', desc: '娱乐内容，公开可读（无需登录）' },
+  { key: 'signal', label: '策略', desc: '宏观信号、股债性价比、风格因子、行业估值' },
   { key: 'fund-rank', label: '选品', desc: '靠谱指数评分、基金详情、基金对比' },
-  { key: 'portfolio', label: '组合', desc: '自建组合、AI 组合、组合回测' },
-  { key: 'login-wall', label: '首页权限墙', desc: '开启后未登录用户必须登录才能访问网站；关闭后所有人可直接浏览（无需登录）' },
+  { key: 'portfolio', label: '组合', desc: '个人组合、智能选基、组合回测' },
+  { key: 'admin', label: '管理', desc: '数据中心(管理)权限，可管理其他用户' },
 ]
 
 // 模块级单例：所有组件共享同一份 flags

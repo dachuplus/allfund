@@ -3,7 +3,7 @@
  * - 仅从 Supabase 云数据库读取真实数据
  * - 未配置 Supabase 时：返回空结果（前端显示「暂无数据 / --」），绝不展示伪造示例数据
  */
-import { supabase, supabaseDirect } from './supabase.js'
+import { supabase, supabaseDirect, rewriteSupabaseUrl } from './supabase.js'
 import { withCache } from '../utils/cache.js'
 
 // ========== 工具函数 ==========
@@ -421,6 +421,38 @@ async function fetchFundScoresImpl(params = {}) {
   }
   // 未配置 Supabase：按最高风控规则返回空，绝不展示伪造的示例数据
   return { data: [], count: 0 }
+}
+
+/**
+ * 取当前筛选条件下的真实总数（服务端精确计数）。
+ * 走 fund-scores-count Edge Function（service-role 直连，count='exact'，绕过代理 502 与 57014），
+ * 完整复刻 fetchFundScoresImpl 的过滤链 + 前端「场内」(filterCN) 客户端过滤。
+ * 失败返回 null（前端回退 funds.length 作为总数 fallback）。
+ */
+export async function fetchFundScoresCount(params = {}) {
+  if (!supabase) return null
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return null
+    const url = rewriteSupabaseUrl(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-scores-count`)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(params),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.warn('[fetchFundScoresCount] 计数失败：', data.error || res.status)
+      return null
+    }
+    return typeof data.count === 'number' ? data.count : null
+  } catch (e) {
+    console.warn('[fetchFundScoresCount] 计数异常，降级为不显示总数：', e)
+    return null
+  }
 }
 
 // ========== 基金分类（动态，来自 fund_scores 的 t0/t1_tt）==========

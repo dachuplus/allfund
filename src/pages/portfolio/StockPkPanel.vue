@@ -6,7 +6,7 @@
       <div class="card-title-row">
         <span class="card-title">股票组合</span>
         <span class="aipk-badge" :class="{ 'aipk-badge-real': realModels.length }">
-          {{ realModels.length ? `真实大模型已接入（${realModels.length}）` : '规则版' }}
+          {{ realModels.length ? `真实大模型已接入（${realModels.length}）` : '待接入' }}
         </span>
       </div>
       <p class="card-desc">
@@ -18,10 +18,6 @@
         所有选股与推理均基于 stock_scores 真实指标（收益/回撤/夏普），模型不引用任何表外或网络信息，无编造、无模拟。
       </p>
       <div class="aipk-src">数据来源：公开网络（股票靠谱指数库，真实行情，非模拟）</div>
-      <div class="aipk-disclaimer">
-        <span class="aipk-disclaimer-icon" aria-hidden="true">!</span>
-        <span>AI 模拟，不构成投资建议</span>
-      </div>
     </div>
 
     <!-- 模型阵容 -->
@@ -150,9 +146,9 @@
         </button>
       </div>
       <div class="aipk-tl-period" v-if="latestPeriod">
-        {{ latestPeriod }} 每周调仓 · 各模型选股逻辑（两层）
-        <span class="aipk-tl-mode-note" v-if="orderedModels.length">
-          （{{ realModels.length ? realModels.length + ' 个真实模型' : '' }}{{ realModels.length && ruleModels.length ? ' + ' : '' }}{{ ruleModels.length ? ruleModels.length + ' 个规则版' : '' }}）
+        {{ formatPeriod(latestPeriod) }} 每周调仓 · 各模型选股逻辑（两层）
+        <span class="aipk-tl-mode-note" v-if="realModels.length">
+          （{{ realModels.length }} 个真实模型）
         </span>
       </div>
       <div class="aipk-tl-empty" v-if="!orderedModels.length">暂无选股数据</div>
@@ -527,6 +523,13 @@ const timelinePeriods = computed(() => {
 })
 const latestPeriod = computed(() => timelinePeriods.value[0] || null)
 
+function formatPeriod(p) {
+  if (!p) return ''
+  const m = String(p).match(/^(\d{4})-(\d{2})-W(\d+)$/)
+  if (m) return `${m[1]}-${m[2]} 第${m[3]}周`
+  return p
+}
+
 function modelName(id) {
   return models.value.find(m => m.id === id)?.name || id
 }
@@ -755,7 +758,7 @@ function drawShareHeader(ctx, W, pad, headerH, title) {
 /** 收益 PK 海报：曲线图 + 冠亚季军 + 完整对比表 */
 async function drawPkPoster(ctx, W, pad, headerH) {
   let y = headerH + 24
-  const subtitle = latestPeriod.value ? `${latestPeriod.value} 每周调仓 · 各模型加权区间收益` : '各模型加权区间收益'
+  const subtitle = latestPeriod.value ? `${formatPeriod(latestPeriod.value)} 每周调仓 · 各模型加权区间收益` : '各模型加权区间收益'
   ctx.fillStyle = '#1a1a1a'
   ctx.font = 'bold 22px sans-serif'
   ctx.textAlign = 'left'
@@ -890,7 +893,7 @@ function drawLineupPoster(ctx, W, pad, headerH) {
 function drawTimelinePoster(ctx, W, pad, headerH) {
   let y = headerH + 24
   const periodLabel = latestPeriod.value
-    ? `${latestPeriod.value} 每周调仓 · 各模型两层选股逻辑`
+    ? `${formatPeriod(latestPeriod.value)} 每周调仓 · 各模型两层选股逻辑`
     : '各模型两层选股逻辑'
   ctx.fillStyle = '#1a1a1a'
   ctx.font = 'bold 22px sans-serif'

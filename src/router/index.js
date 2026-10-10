@@ -118,8 +118,8 @@ const routes = [
       tab: 'tools',
       feature: 'portfolio',
       title: '组合',
-      description: '智能组合构建：自建组合、DeepSeek AI 推荐组合（16 策略）与基于 Kan&Zhou 增强型风险平价的风险平价组合，辅助资产配置。',
-      keywords: '智能组合,资产配置,风险平价,AI组合'
+      description: '智能组合构建：个人组合、DeepSeek 智能选基（16 策略）与基于 Kan&Zhou 增强型风险平价的风险平价组合，辅助资产配置。',
+      keywords: '智能组合,资产配置,风险平价,智能选基'
     }
   },
   {
@@ -181,7 +181,7 @@ const routes = [
     meta: {
       tab: 'profile',
       title: '我的',
-      description: '我的：管理自选智能组合、查看历史 AI 组合推荐与账户信息。',
+      description: '我的：管理自选智能组合、查看历史 智能选基 推荐与账户信息。',
       keywords: '我的,自选关注,账户信息'
     }
   },

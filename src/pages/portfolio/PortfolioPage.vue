@@ -15,7 +15,7 @@
     <div v-if="activeTab === 'custom'">
       <!-- 未登录提示 -->
       <div class="card" v-if="!isLoggedIn">
-        <div class="card-title">自建组合</div>
+        <div class="card-title">个人组合</div>
         <p class="card-desc">登录后可创建和管理自己的智能组合</p>
         <button class="btn-primary" @click="showLogin">登录 / 注册</button>
       </div>
@@ -161,7 +161,7 @@
         <div class="ai-action">
           <button class="ai-generate-btn" :disabled="aiGenerating" @click="generateAiPortfolio">
             <span v-if="aiGenerating">AI 分析中...</span>
-            <span v-else>生成 AI 组合</span>
+            <span v-else>生成 智能选基</span>
           </button>
           <span class="ai-status" v-if="aiStatusText">{{ aiStatusText }}</span>
         </div>
@@ -169,7 +169,7 @@
         <!-- 自定义弹窗 -->
         <div class="modal-overlay" v-if="showCustomDialog" @click.self="showCustomDialog = false">
           <div class="modal-box">
-            <div class="modal-title">自定义 AI 组合要求</div>
+            <div class="modal-title">自定义 智能选基 要求</div>
             <textarea v-model="customRequirement" class="modal-textarea" placeholder="例如：我想配置一个防守型的养老组合，重点配置债券和红利基金，不要科技类..." rows="4"></textarea>
             <div class="modal-btns">
               <button class="btn-secondary" @click="showCustomDialog = false">取消</button>
@@ -233,7 +233,7 @@
             </div>
           </div>
           <div class="ai-add-row">
-            <button class="btn-primary" @click="addAiToCustom">+ 添加到自建组合</button>
+            <button class="btn-primary" @click="addAiToCustom">+ 添加到个人组合</button>
           </div>
 
           <!-- AI 策略组合区间收益 -->
@@ -249,7 +249,7 @@
         </div>
 
         <div class="ai-history" v-if="aiHistory.length > 0">
-          <div class="card-title" style="font-size:19px; margin-top:20px">历史 AI 组合</div>
+          <div class="card-title" style="font-size:19px; margin-top:20px">历史 智能选基</div>
           <div class="ai-hist-item" v-for="h in aiHistory" :key="h.id" @click="loadAiFromHistory(h)">
             <span class="ai-hist-name">{{ h.strategyName }}</span>
             <span class="ai-hist-date">{{ h.createdAt }}</span>
@@ -333,7 +333,7 @@
             </div>
           </div>
           <div class="ai-add-row">
-            <button class="btn-primary" @click="addRpToCustom">+ 添加到自建组合</button>
+            <button class="btn-primary" @click="addRpToCustom">+ 添加到个人组合</button>
           </div>
 
           <!-- 风险平价组合区间收益 -->
@@ -385,9 +385,9 @@ const {
 
 // ===== Tab =====
 const tabs = [
-  { key: 'custom', label: '自建组合' },
-  { key: 'ai', label: 'AI 组合' },
-  { key: 'aipk', label: 'AI 大 PK' },
+  { key: 'custom', label: '个人组合' },
+  { key: 'ai', label: '智能选基' },
+  { key: 'aipk', label: '基金组合' },
   { key: 'stockpk', label: '股票组合' }
 ]
 const activeTab = ref('custom')
@@ -911,11 +911,11 @@ async function addPortfolioToCustom(pf) {
     return
   }
   if (!isLoggedIn.value) {
-    toast('请先登录后再添加到自建组合', 'warning')
+    toast('请先登录后再添加到个人组合', 'warning')
     return
   }
 
-  const pfName = pf.strategyName || 'AI组合'
+  const pfName = pf.strategyName || '智能选基'
   const portfolioData = pf.funds.map(f => ({
     code: f.code,
     name: f.name,
@@ -938,7 +938,7 @@ async function addPortfolioToCustom(pf) {
       updated_at: new Date().toISOString()
     })
 
-    toast('已添加到自建组合', 'success')
+    toast('已添加到个人组合', 'success')
     activeTab.value = 'custom'
     await nextTick()
     await enrichRanks()

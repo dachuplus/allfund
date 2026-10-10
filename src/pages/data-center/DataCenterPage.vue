@@ -671,6 +671,39 @@
       <p class="section-desc" v-else>暂无用户权限记录。</p>
     </div>
 
+    <!-- 新建用户（仅管理员可见） -->
+    <div class="card" v-if="isOwner" v-show="activeTab==='users'">
+      <div class="card-title">新建用户</div>
+      <p class="section-desc">在后台直接创建账号：填写用户名（登录邮箱）与密码，对方即可用「用户名 + 密码」登录。可同时勾选开通功能，使其登录后立即可用（不勾则登录后为「陌生人」需另行开通）。</p>
+      <div class="perm-add">
+        <input
+          v-model.trim="newUserEmail"
+          class="perm-email-input"
+          type="text"
+          placeholder="用户名 / 登录邮箱，如 user@example.com"
+          @keyup.enter="createUser"
+        />
+        <input
+          v-model="newUserPassword"
+          class="perm-email-input"
+          type="password"
+          placeholder="登录密码（至少 6 位）"
+          @keyup.enter="createUser"
+        />
+        <div class="perm-features">
+          <label v-for="f in permFeatures" :key="f.key" class="perm-feature">
+            <input type="checkbox" :value="f.key" v-model="newUserFeatures" /> {{ f.label }}
+          </label>
+        </div>
+        <div class="perm-quick">
+          <button type="button" class="btn-all" @click="newUserFeatures = FEATURES.map(f => f.key)">全部</button>
+          <button type="button" class="btn-none" @click="newUserFeatures = []">全否</button>
+        </div>
+        <button class="btn-login" :disabled="createUserSaving" @click="createUser">新建并保存</button>
+      </div>
+      <div v-if="createUserMsg" class="perm-msg" :class="createUserMsgType">{{ createUserMsg }}</div>
+    </div>
+
     <!-- 权限申请（陌生人 → 管理员审批） -->
     <div class="card" v-show="activeTab==='users'">
       <div class="card-title">权限申请</div>
@@ -1852,6 +1885,14 @@ const permMsg = ref('')
 const permMsgType = ref('')
 function clearPermMsg() { permMsg.value = '' }
 
+// 新建用户（后台创建账号：用户名/登录邮箱 + 密码，可选开通功能）
+const newUserEmail = ref('')
+const newUserPassword = ref('')
+const newUserFeatures = ref([])
+const createUserSaving = ref(false)
+const createUserMsg = ref('')
+const createUserMsgType = ref('')
+
 // 密码状态（来自 get_user_password_info RPC：是否弱密码123456 / 最后改密时间），按邮箱索引
 const passwordInfo = ref({})
 async function loadPasswordInfo() {
@@ -2672,6 +2713,56 @@ async function removeRow(row) {
     permMsgType.value = 'perm-msg--error'
   } finally {
     row._saving = false
+  }
+}
+
+// 新建用户：调用 admin-create-user Edge Function 创建账号，并默认授予所选功能
+async function createUser() {
+  const email = (newUserEmail.value || '').trim().toLowerCase()
+  const password = newUserPassword.value || ''
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    createUserMsg.value = '请输入有效的登录邮箱（用户名）'
+    createUserMsgType.value = 'perm-msg--error'
+    return
+  }
+  if (!password || password.length < 6) {
+    createUserMsg.value = '密码至少 6 位'
+    createUserMsgType.value = 'perm-msg--error'
+    return
+  }
+  createUserSaving.value = true
+  createUserMsg.value = ''
+  try {
+    const { supabase, rewriteSupabaseUrl } = await import('../../api/supabase.js')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('未登录或会话已过期')
+    const url = rewriteSupabaseUrl(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    // 新建成功后按所选功能写入 user_permissions（让对方登录即可用）
+    await savePermissions(email, {
+      is_admin: newUserFeatures.value.includes('admin'),
+      enabled_features: [...newUserFeatures.value],
+    })
+    newUserEmail.value = ''
+    newUserPassword.value = ''
+    newUserFeatures.value = []
+    await loadPermissionsList()
+    createUserMsg.value = `已新建用户 ${email} 并开通权限`
+    createUserMsgType.value = 'perm-msg--ok'
+  } catch (e) {
+    createUserMsg.value = '新建失败：' + (e?.message || e)
+    createUserMsgType.value = 'perm-msg--error'
+  } finally {
+    createUserSaving.value = false
   }
 }
 
