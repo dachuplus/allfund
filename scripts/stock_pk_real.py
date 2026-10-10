@@ -282,18 +282,33 @@ def extract_json(text):
 
 
 def call_deepseek(model_id, prompt_messages, key=None):
-    # DeepSeek 由阿里云百炼(DashScope)提供，走百炼兼容端点 + 百炼 key（与千问同一把 QWEN_API_KEY）。
-    # 注：原实现错写成打 api.deepseek.com + DEEPSEEK_API_KEY，而本项目 DeepSeek 实际托管在百炼，
-    # 故改用 dashscope 端点 + QWEN_API_KEY。模型 deepseek-v3-0324 在百炼可识别；
-    # 若返回 400 Access denied，说明该百炼账号尚未开通 DeepSeek 服务（需在百炼控制台开通）。
-    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    bailian_key = os.environ.get("QWEN_API_KEY") or key
-    body = {"model": model_id or "deepseek-v3-0324", "messages": prompt_messages, "temperature": 0.7,
+    """DeepSeek 路由（双通道）：
+    1) 优先走官方 api.deepseek.com + DEEPSEEK_API_KEY（本 key 实测 deepseek-chat 返回 200）。
+    2) 未配置 DEEPSEEK_API_KEY 时，回退阿里云百炼(DashScope) deepseek-v3-0324 + QWEN_API_KEY
+       （注：百炼侧需账号开通 DeepSeek 服务，否则 400 Access denied）。
+
+    两个端点模型名不同（官方 deepseek-chat / 百炼 deepseek-v3-0324），故按端点各自校正模型名，
+    避免 DB 里残留的百炼模型名被误发给官方端点（会 400）。
+    """
+    ds_key = os.environ.get("DEEPSEEK_API_KEY") or key
+    if ds_key:
+        url = "https://api.deepseek.com/v1/chat/completions"
+        # 官方端点仅认官方模型名；若 DB 里是百炼名(deepseek-v3-0324 等)则纠正为 deepseek-chat
+        _OFFICIAL_MODELS = ("deepseek-chat", "deepseek-reasoner", "deepseek-coder")
+        model = model_id if (model_id in _OFFICIAL_MODELS) else "deepseek-chat"
+        bearer, label = ds_key, "DeepSeek(官方)"
+    else:
+        url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        model = "deepseek-v3-0324"  # 百炼侧模型名，不复用官方 model_id
+        bearer, label = os.environ.get("QWEN_API_KEY"), "DeepSeek(百炼)"
+    if not bearer:
+        raise RuntimeError("DeepSeek 需要 DEEPSEEK_API_KEY（官方端点）或 QWEN_API_KEY（百炼回退）")
+    body = {"model": model, "messages": prompt_messages, "temperature": 0.7,
             "max_tokens": 4096, "response_format": {"type": "json_object"}}
-    r = requests.post(url, headers={"Authorization": f"Bearer {bailian_key}", "Content-Type": "application/json"},
+    r = requests.post(url, headers={"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"},
                       json=body, timeout=150)
     if r.status_code != 200:
-        raise RuntimeError(f"DeepSeek(百炼) API 返回 {r.status_code}: {r.text[:400]}")
+        raise RuntimeError(f"{label} API 返回 {r.status_code}: {r.text[:400]}")
     return r.json()["choices"][0]["message"]["content"]
 
 
@@ -388,14 +403,17 @@ def call_model(model, prompt_messages):
     keyenv = model.get("api_key_env")
     key = os.environ.get(keyenv) if keyenv else None
     if not key:
-        if provider in ("kimi", "deepseek", "zhipu", "minimax"):
+        if provider in ("kimi", "zhipu", "minimax"):
             # 这些模型均经阿里云百炼(DashScope)托管，直接复用百炼 key（与千问同一把 QWEN_API_KEY），
-            # 允许对应厂商独立 key（KIMI_API_KEY/DEEPSEEK_API_KEY/ZHIPU_API_KEY/MINIMAX_API_KEY）缺失。
+            # 允许对应厂商独立 key（KIMI_API_KEY/ZHIPU_API_KEY/MINIMAX_API_KEY）缺失。
             key = os.environ.get("QWEN_API_KEY")
-        if not key:
+        elif provider == "deepseek":
+            # DeepSeek 交由 call_deepseek 内部解析：优先官方 DEEPSEEK_API_KEY，缺失则回退百炼。
+            pass
+        if not key and provider != "deepseek":
             raise RuntimeError(f"缺少环境变量 {keyenv}（{provider} 需要 API Key）")
     if provider == "deepseek":
-        return call_deepseek(model.get("api_model") or "deepseek-v3-0324", prompt_messages, key)
+        return call_deepseek(model.get("api_model") or "deepseek-chat", prompt_messages, key)
     if provider == "qwen":
         return call_qwen(model.get("api_model") or "qwen-plus", prompt_messages, key)
     if provider == "wenxin":

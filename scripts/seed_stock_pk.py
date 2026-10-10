@@ -83,9 +83,10 @@ MODELS = [
 ]
 
 # 真实模型 API 配置（规则版种子仍写 mode='rule'，api_* 仅记录能力，待 stock_pk_real.py 真实跑）
-# 注：deepseek/智谱/MiniMax/Kimi 均经阿里云百炼(DashScope)托管，统一走百炼兼容端点 + 同一把 QWEN_API_KEY。
+# 注：智谱/MiniMax/Kimi 均经阿里云百炼(DashScope)托管，统一走百炼兼容端点 + 同一把 QWEN_API_KEY；
+#     DeepSeek 走官方 api.deepseek.com + DEEPSEEK_API_KEY（百炼侧未开通，实测 400 Access denied）。
 _API_CONFIG = {
-    "ds": {"api_provider": "deepseek", "api_model": "deepseek-v3-0324", "api_key_env": "QWEN_API_KEY"},
+    "ds": {"api_provider": "deepseek", "api_model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY"},
     "doubao": {"api_provider": "volc-ark", "api_model": "ep-20260712083200-pjvq9", "api_key_env": "ARK_API_KEY"},
     "qwen": {"api_provider": "qwen", "api_model": "qwen-plus", "api_key_env": "QWEN_API_KEY"},
     "wenxin": {"api_provider": "wenxin", "api_model": "ernie-5.1", "api_key_env": "WENXIN_API_KEY"},

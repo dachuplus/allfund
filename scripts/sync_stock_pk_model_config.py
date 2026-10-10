@@ -8,9 +8,9 @@ sync_stock_pk_model_config.py — 股票组合 PK 模型 API 配置自愈脚本
   不触碰 mode / picks / persona / category_logic 等运行结果，避免覆盖真实选股结果。
 
 背景（2026-10-10 修正）：
-  deepseek / 智谱 / MiniMax / Kimi 均经阿里云百炼(DashScope)托管，
-  统一走百炼兼容端点 + 同一把 QWEN_API_KEY。原代码错写成各厂商独立端点/独立 key，
-  导致这些模型真实选股失败。本脚本把 DB 中的 api_provider/model/key_env 对齐到百炼路由，
+  智谱 / MiniMax / Kimi 均经阿里云百炼(DashScope)托管，走百炼兼容端点 + 同一把 QWEN_API_KEY。
+  DeepSeek 走官方 api.deepseek.com + DEEPSEEK_API_KEY（百炼侧未开通该服务，实测 400 Access denied）。
+  原代码路由混乱导致这些模型真实选股失败。本脚本把 DB 中的 api_provider/model/key_env 对齐到正确路由，
   由 run_stock_pk_monthly.py 在每次真实选股前调用，保证配置自修复、不依赖人工改库。
 
 仅在 CI（持有有效 SUPABASE_PAT）中运行；本地无 token 时静默跳过。
@@ -28,10 +28,11 @@ REF = "tqhtegazxykkqfcpejky"
 MGMT_URL = f"https://api.supabase.com/v1/projects/{REF}/database/query"
 MGMT_HEADERS = {"Authorization": f"Bearer {PAT}", "Content-Type": "application/json"}
 
-# 与 seed_stock_pk.py _API_CONFIG 保持一致的「百炼路由」权威配置
-# （仅 ds/zhipu/minimax/kimi 经百炼；qwen/wenxin/doubao 维持原厂商端点）
+# 与 seed_stock_pk.py _API_CONFIG 保持一致的权威配置
+# 智谱/MiniMax/Kimi 经百炼(DashScope)托管 → 统一 QWEN_API_KEY；
+# DeepSeek 走官方 api.deepseek.com → DEEPSEEK_API_KEY（百炼侧未开通 DeepSeek 服务，实测 400）。
 _CONFIG = {
-    "ds":      {"api_provider": "deepseek", "api_model": "deepseek-v3-0324", "api_key_env": "QWEN_API_KEY"},
+    "ds":      {"api_provider": "deepseek", "api_model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY"},
     "zhipu":   {"api_provider": "zhipu",    "api_model": "glm-5",            "api_key_env": "QWEN_API_KEY"},
     "minimax": {"api_provider": "minimax",  "api_model": "MiniMax-M2.5",     "api_key_env": "QWEN_API_KEY"},
     "kimi":    {"api_provider": "kimi",     "api_model": "kimi-k2.5",        "api_key_env": "QWEN_API_KEY"},

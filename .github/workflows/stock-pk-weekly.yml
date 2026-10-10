@@ -18,10 +18,10 @@ jobs:
       # 数据读写 / ETL 日志（log_etl_step.py）依赖 PAT，必须通过 Secret 配置
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_PAT: ${{ secrets.SUPABASE_PAT }}
-      # 真实 LLM 选股所需的 API Key。注意：deepseek/智谱/MiniMax/Kimi 均经阿里云百炼(DashScope)托管，
-      # 在代码内统一走 QWEN_API_KEY（无需各厂商独立 key）。下方仍注入旧 key 但以 QWEN_API_KEY 为准，
-      # 缺失 QWEN_API_KEY 则该四家模型回退跳过，不报错。
-      # 需在 GitHub Secrets 中补齐：QWEN_API_KEY（必需）/ ARK_API_KEY（豆包）/ WENXIN_API_KEY（文心）
+      # 真实 LLM 选股所需的 API Key。路由：智谱/MiniMax/Kimi 经阿里云百炼托管 → QWEN_API_KEY；
+      # DeepSeek 走官方端点 → DEEPSEEK_API_KEY（百炼侧未开通该服务）。下方各 key 缺失则该模型跳过，不报错。
+      # 需在 GitHub Secrets 中补齐：QWEN_API_KEY（智谱/MiniMax/Kimi/千问）、DEEPSEEK_API_KEY（DeepSeek）、
+      # ARK_API_KEY（豆包）、WENXIN_API_KEY（文心）
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       ARK_API_KEY: ${{ secrets.ARK_API_KEY }}
       QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
