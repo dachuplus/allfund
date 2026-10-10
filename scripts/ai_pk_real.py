@@ -53,9 +53,9 @@ MGMT_HEADERS = {"Authorization": f"Bearer {PAT}", "Content-Type": "application/j
 # Management API 偶发超时/连接中断（如 2026-09-01 整轮调仓因
 # "Connection terminated due to connection timeout" 直接失败，当月 0 数据）。
 # 这里统一做「超时 + 重试 + 退避」，避免一次瞬时故障报废整期调仓。
-MGMT_TIMEOUT = 180          # 单次请求超时（秒），比原来的 120 更宽松
-MGMT_MAX_RETRIES = 3        # 最多尝试 3 次
-MGMT_BACKOFF = 10           # 退避基数：第 n 次失败后 sleep 10*n 秒
+MGMT_TIMEOUT = 180          # 单次请求超时（秒）
+MGMT_MAX_RETRIES = 6        # 最多尝试 6 次（应对 Supabase Management API 偶发整段 544 超时，如 2026-10-01 整轮因此 0 数据）
+MGMT_BACKOFF = 15           # 退避基数：第 n 次失败后 sleep 15*n 秒（6 次累计等待约 225s，可跨过数分钟级瞬时故障）
 
 # ===== 候选池参数 =====
 POOL_PER_CAT = 25          # 每个二级分类取 Top N（按 k_all 倒序）作为单品候选

@@ -154,6 +154,33 @@ export function useAuth() {
         // 注意：blocked 不在此重置，封禁屏在登出后仍需保留，直至整页刷新
       }
     })
+
+    // 跨标签页登录态同步：每个浏览器标签页是独立的 JS 模块实例，各自持有
+    // 独立的 user ref。标准的 onAuthStateChange 只在「触发变更的同一标签页」内
+    // 回调，因此 A 标签页登录后 B 标签页读不到。这里监听 storage 事件（其他
+    // 标签页改动了 LS_LOGIN_AT 时本标签页会收到），重新拉取 session 并同步
+    // 登录态，实现「多个网页登录状态统一」。
+    window.addEventListener('storage', async (e) => {
+      if (e.key !== LS_LOGIN_AT) return
+      try {
+        const { data } = await supabase.auth.getSession()
+        const u = data?.session?.user || null
+        user.value = u
+        if (u) {
+          if (!checkSessionExpiry()) {
+            await loadPermissions(u.email)
+            await refreshUserData()
+          }
+        } else {
+          portfolios.value = []
+          profile.value = null
+          permissions.value = { is_admin: false, enabled_features: [] }
+          permissionsReady.value = true
+        }
+      } catch (err) {
+        console.error('[auth] 跨标签页同步失败:', err)
+      }
+    })
   }
 
   /** 加载当前用户的功能权限（管理员邮箱兜底全开，DB 不存在时也不报错） */

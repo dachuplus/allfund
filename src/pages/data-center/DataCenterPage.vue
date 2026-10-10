@@ -985,8 +985,8 @@
 
     <!-- 评分方法论 -->
     <div class="card" v-show="activeTab==='scoring'">
-      <div class="card-title">评分方法论 — V7 靠谱指数算法</div>
-      <p class="section-desc">ALLFUND 的"靠谱指数"（k_all）是对全市场基金进行量化评分的核心指标。以下详细说明从原始数据到最终评分的完整计算过程。</p>
+      <div class="card-title">评分方法论 — 基金 V7 / 股票成长 v1 / 指数评分</div>
+      <p class="section-desc">ALLFUND 当前对外提供三套相互独立的量化评分：基金「靠谱指数」（V7）、股票「靠谱成长」（v1）、指数「靠谱指数」（选品·指数 Tab）。三者数据源、公式、流水线均不共享，以下分节说明。</p>
 
       <!-- 第一步 -->
       <h2 class="method-step-title">第一步：原始数据采集</h2>
@@ -1172,6 +1172,100 @@
         </tbody>
       </table>
       <p class="api-note" style="margin-top:var(--space-md)">📐 用户可在"评分"页面自定义收益/回撤/夏普/卡玛/信息比率/跟踪误差的权重，实时计算个性化评分。</p>
+
+      <!-- 股票评分模型 -->
+      <h2 class="method-step-title">附一：股票评分模型（靠谱成长 v1）— 独立于基金评分</h2>
+      <p>股票评分用于「选品·股票」Tab，目标是筛选<strong>基本面高分成长股</strong>。它使用一套<strong>完全独立</strong>的五维公式，<strong>不复用</strong>基金的 V7 靠谱指数算法，覆盖沪深京港全市场（A 股 + 港股 + 北交所），当前覆盖约 9,067 只。</p>
+
+      <div class="formula-box">
+        <div class="formula-title">靠谱成长 v1 综合得分</div>
+        <div class="formula-body">
+          <strong>k_stock = 30% × 成长 + 25% × 质量 + 20% × 健康 + 15% × 估值 + 10% × 动量</strong>
+        </div>
+        <div class="formula-note">五个维度分别按全市场横截面折算为 0~100 的百分位得分后加权合成。</div>
+      </div>
+
+      <div class="dimension-grid">
+        <div class="dimension-card">
+          <div class="dim-header">成长维度 (30%)</div>
+          <div class="dim-detail">
+            <strong>数据</strong>：营收 / 利润同比增速、复合增长率<br>
+            <strong>含义</strong>：衡量企业业务扩张的速度与持续性
+          </div>
+        </div>
+        <div class="dimension-card">
+          <div class="dim-header">质量维度 (25%)</div>
+          <div class="dim-detail">
+            <strong>数据</strong>：ROE / ROIC、毛利率、经营性现金流质量<br>
+            <strong>含义</strong>：衡量盈利的真实质量与资本回报效率
+          </div>
+        </div>
+        <div class="dimension-card">
+          <div class="dim-header">健康维度 (20%)</div>
+          <div class="dim-detail">
+            <strong>数据</strong>：资产负债率、流动性比率、偿债覆盖<br>
+            <strong>含义</strong>：衡量财务稳健性与违约/清盘风险
+          </div>
+        </div>
+        <div class="dimension-card">
+          <div class="dim-header">估值维度 (15%)</div>
+          <div class="dim-detail">
+            <strong>数据</strong>：PE / PB / PS 历史分位<br>
+            <strong>含义</strong>：衡量当前定价的相对贵贱
+          </div>
+        </div>
+        <div class="dimension-card">
+          <div class="dim-header">动量维度 (10%)</div>
+          <div class="dim-detail">
+            <strong>数据</strong>：价格相对强度、中期趋势<br>
+            <strong>含义</strong>：衡量市场认同度与趋势延续性
+          </div>
+        </div>
+      </div>
+
+      <h2 class="method-step-title">股票评分数据流与护栏</h2>
+      <table class="field-table">
+        <thead><tr><th>阶段</th><th>脚本 / 表</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>拉取</td><td><code>fetch_stock_scores.py</code></td><td>东方财富 <code>datacenter-web</code> 源；港股年报 + 中报均覆盖</td></tr>
+          <tr><td>暂存</td><td><code>stock_scores_staging</code></td><td>写入过渡表，不对外暴露</td></tr>
+          <tr><td>晋升</td><td><code>promote_stock_scores.py</code></td><td>护栏校验通过后原子切换至生产表 <code>stock_scores</code></td></tr>
+        </tbody>
+      </table>
+      <p class="formula-note">护栏阈值：staging 有效条数 ≥ 5,000（A 股）/ 港股 ≥ 800，未达标则保留上一版本、不切换。前端进度以 0–100% 百分比展示（不显示 1/N 分式）。</p>
+
+      <!-- 指数评分模型 -->
+      <h2 class="method-step-title">附二：指数评分模型 — 选品·指数 Tab</h2>
+      <p>指数评分用于「选品·指数」Tab，数据源为<strong>中证（csindex）</strong>——全市场广覆盖的权威指数源。指数按属性分入三个池：<strong>broad（宽基）/ sector（行业）/ fixed（固定收益·主题）</strong>，<strong>不同池的分数不可横向比较</strong>；<code>mktcap_total</code> ≠ <code>mktcap_weighted</code>。</p>
+
+      <h2 class="method-step-title">指数评分三级流水线 + 护栏</h2>
+      <div class="flow-diagram">
+        <div class="flow-row">
+          <div class="flow-node">fetch_index_raw.py<br><small>中证源</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">index_scores_raw<br><small>L1 原始</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">compute_index_scores.py<br><small>L2 不联网</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">index_scores_staging</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">promote_index_scores.py<br><small>L3 护栏</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">index_scores</div>
+        </div>
+      </div>
+      <p class="formula-note"><code>setup_index_rpc.py</code> 建立 <code>index_scores_stats</code> / <code>index_scores_pool_total</code> 统计视图，供护栏与分页查询。</p>
+
+      <table class="field-table">
+        <thead><tr><th>护栏项</th><th>阈值</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>总条数</td><td style="text-align:center">≥ 60</td><td>晋升前指数总量下限</td></tr>
+          <tr><td>k_all 非空率</td><td style="text-align:center">≥ 80%</td><td>有效评分占比</td></tr>
+          <tr><td>PE 分位非空率</td><td style="text-align:center">≥ 90%</td><td>估值分位覆盖</td></tr>
+          <tr><td>broad / sector 各</td><td style="text-align:center">≥ 3</td><td>两池至少各有 3 只，避免空池</td></tr>
+        </tbody>
+      </table>
+      <p class="formula-note">WAF 限制：中证为 IP 级防火墙，云 CI 环境（GitHub / Azure）首请求即 403，本地非云 IP 才可通过，约 13 分钟恢复；请求间隔 &lt;1s 必触发、≥2s 安全。命中 WAF 时整批短路并保留上一版本（护栏兜底），生产表不更新、简报显示「跳过 / 限流兜底」。</p>
     </div>
 
     <!-- API 接口文档 -->
