@@ -82,13 +82,17 @@ MODELS = [
 
 # 真实模型 API 配置（规则版种子仍写 mode='rule'，api_* 仅记录能力，待 ai_pk_real.py 真实跑）
 _API_CONFIG = {
+    # ds 经百炼市场名 vanchin/deepseek-v3 走 call_qwen（实测 200，勿改为 deepseek-v3-0324 → 400 Access denied）
     "ds": {"api_provider": "qwen", "api_model": "vanchin/deepseek-v3", "api_key_env": "QWEN_API_KEY"},
     "doubao": {"api_provider": "volc-ark", "api_model": "ep-20260712083200-pjvq9", "api_key_env": "ARK_API_KEY"},
     "qwen": {"api_provider": "qwen", "api_model": "qwen-plus", "api_key_env": "QWEN_API_KEY"},
     "wenxin": {"api_provider": "wenxin", "api_model": "ernie-5.1", "api_key_env": "WENXIN_API_KEY"},
-    "zhipu": {"api_provider": "qwen", "api_model": "ZHIPU/GLM-5.2", "api_key_env": "QWEN_API_KEY"},
-    "kimi": {"api_provider": "qwen", "api_model": "kimi/kimi-k2.5", "api_key_env": "QWEN_API_KEY"},
-    "minimax": {"api_provider": "qwen", "api_model": "MiniMax/MiniMax-M3", "api_key_env": "QWEN_API_KEY"},
+    # 智谱/MiniMax/Kimi 均经百炼托管 → provider 为 qwen（走 call_qwen 百炼端点）+ QWEN_API_KEY。
+    # 模型名一律用「原生名」：实测 ZHIPU/GLM-5.2 → 200 但 content 为空；kimi/kimi-k2.5 → 404；
+    # 原生 glm-5 / kimi-k2.5 / MiniMax-M2.5 均 200 且有内容。
+    "zhipu": {"api_provider": "qwen", "api_model": "glm-5", "api_key_env": "QWEN_API_KEY"},
+    "kimi": {"api_provider": "qwen", "api_model": "kimi-k2.5", "api_key_env": "QWEN_API_KEY"},
+    "minimax": {"api_provider": "qwen", "api_model": "MiniMax-M2.5", "api_key_env": "QWEN_API_KEY"},
 }
 for m in MODELS:
     cfg = _API_CONFIG.get(m["id"])
