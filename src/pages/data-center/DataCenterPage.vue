@@ -574,13 +574,14 @@
         <div class="vd-row">
           <span class="vd-key">后端 / 数据中心</span>
           <span class="vd-val">
-            Supabase 项目 <code>tqhtegazxykkqfcpejky</code>（新加坡）正常。三条 GitHub Actions 流水线：
+            Supabase 项目 <code>tqhtegazxykkqfcpejky</code>（新加坡）正常。每日 GitHub Actions 流水线（按北京时间错峰）：
             <ul class="vd-list">
-              <li><code>update-scores.yml</code>：每日 21:30（北京时间）增量更新 fund_scores（3 级流水线 staging → test → promote）</li>
-              <li><code>update-allocation-quarterly.yml</code>：每日 22:30 资产配置季度更新</li>
-              <li><code>ai-pk-monthly.yml</code>：每月 1 号 UTC 15:00（北京时间 23:00）AI 大 PK 自动调仓</li>
+              <li><code>update-scores.yml</code>：每日 21:30 增量更新 fund_scores（3 级流水线 staging → test → promote）</li>
+              <li><code>update-allocation-quarterly.yml</code>：每日 22:30 资产配置 / 季度评分更新</li>
+              <li><code>update-stock-scores.yml</code>：每日 23:20 股票全市场评分（东财源，写入 stock_scores）</li>
+              <li><code>update-index-scores.yml</code>：每日 00:40 指数「靠谱指数」五维评分（中证源；云 IP 受 WAF 限制时护栏保持旧版本）</li>
             </ul>
-            所有 ETL 步骤通过 <code>etl_run_log</code> 表上报状态，前端通过本页「数据下载」卡实时查看。
+            估值（选品·估值页）为实时拉取蛋卷接口、不落库，故不计入 ETL 步骤；其余 ETL 步骤通过 <code>etl_run_log</code> 表上报状态，前端通过本页「数据下载」卡实时查看。
           </span>
         </div>
       </div>
@@ -2065,6 +2066,7 @@ const ETL_STEP_INFO = {
   '配置季度 · 季度评分分片': { title: '配置季度 · 季度评分分片', desc: '分片并行刷新 fund_quarterly_scores 季度净值数据' },
   '配置季度 · 季度评分切换': { title: '配置季度 · 季度评分切换', desc: '读库统一重算横截面季度评分（--score-only）' },
   '配置季度 · 合并表重建': { title: '配置季度 · 合并表重建', desc: '基于最新季度评分重建 fund_combined 合并表' },
+  '指数评分 · 每日更新': { title: '指数评分 · 每日更新', desc: '抓取中证指数行情与估值（PE/PB 历史分位），算五维评分并原子切换 index_scores 生产表；云 IP 受 WAF 限制时护栏保持上一版本（状态显示「跳过 / 限流兜底」）。' },
 }
 function stepInfo(name) {
   if (ETL_STEP_INFO[name]) return ETL_STEP_INFO[name]
@@ -2273,13 +2275,13 @@ function getMissingReason(dateKey) {
     const today = dateKeyOf(new Date())
     if (dateKey === today) {
       const now = new Date()
-      const passedSchedule = now.getHours() > 21 || (now.getHours() === 21 && now.getMinutes() >= 30)
-      if (!passedSchedule) {
-        return '尚未到当日 21:30 定时执行时间，属正常等待（每日北京时间 21:30 由 GitHub Actions 自动运行两条流水线：基金评分、资产配置/季度评分）。'
+      const beforeStart = !(now.getHours() > 21 || (now.getHours() === 21 && now.getMinutes() >= 30))
+      if (beforeStart) {
+        return '尚未到当日最早定时执行时间（基金评分 21:30 起，指数评分 00:40 收尾），属正常等待。每日流水线：基金 21:30 / 配置 22:30 / 股票 23:20 / 指数 00:40（北京时间）。'
       }
-      return '已过当日 21:30 执行时间但无任何运行记录：流水线可能未触发，或在启动阶段即失败（尚未写入 etl_run_log）。可到 GitHub Actions 查看对应 workflow 的运行状态与日志。'
+      return '已过执行窗口但无任何运行记录：流水线可能未触发，或启动即失败尚未写入 etl_run_log。可到 GitHub Actions 查看对应 workflow。注：估值页为实时拉取、不落库，无需 ETL 记录。'
     }
-    return '当日 ETL 未执行或启动即失败，未产生任何运行记录。常见原因：GitHub Actions 定时任务未触发（cron 被延迟/跳过）、仓库 Actions 被禁用、或运行环境初始化失败。可到 GitHub Actions 历史记录核实。'
+    return '当日 ETL 未执行或启动即失败，未产生任何运行记录。常见原因：cron 被延迟/跳过、仓库 Actions 被禁用、运行环境初始化失败。估值页实时拉取、不落库，其缺位不在此列。'
   } catch {
     return '当日无任何运行记录，ETL 可能未触发或启动即失败。'
   }

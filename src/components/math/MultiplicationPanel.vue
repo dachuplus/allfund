@@ -68,7 +68,7 @@
         </div>
       </div>
 
-      <!-- 表格：横向 / 纵向均可滚动，首行首列吸顶吸左 -->
+      <!-- 表格：允许左右横向滚动，纵向随页面滚动（不设内部纵向滚动条），首行首列吸顶吸左 -->
       <div class="mt-scroll" ref="scrollEl">
         <table class="mt-grid" @mouseover="onOver" @mouseleave="onLeave">
           <thead>
@@ -137,7 +137,7 @@ const TRICKS = [
   },
   {
     name: '十几 × 十几（两个十位都是 1）',
-    rule: '1a × 1b =（1 + a + b）作前面，（a × b）作后面；a + b ≥ 10 时向前进一。',
+    rule: '1a × 1b =（10 + a + b）× 10 + a × b（a、b 为个位）。即先算（10 + a + b）作前段，乘 10 后加上 a × b 作后段。例：13×12 =（10+3+2）×10 + 3×2 = 156。',
     demo: [p(13, 12), p(14, 15)],
   },
   {
@@ -321,10 +321,10 @@ function doLookup() {
   border: 1px solid #b1b4b6;
   padding: 4px 8px;
 }
-/* 表格容器：可滚动，首行首列吸顶吸左 */
+/* 表格容器：仅允许左右横向滚动，纵向不出现内部滚动条（整页纵向滚动替代） */
 .mt-scroll {
-  overflow: auto;
-  max-height: 72vh;
+  overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid #b1b4b6;
   background: #ffffff;
 }

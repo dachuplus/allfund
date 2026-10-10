@@ -171,6 +171,46 @@ jobs:
           print(r.stdout.strip() or r.stderr.strip())
           PY
 
+      - name: 步骤6 — 写入 ETL 运行日志（每日简报可见）
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, json, re
+          from datetime import datetime, timezone, timedelta
+          TZ = timezone(timedelta(hours=8))
+          today = datetime.now(TZ).strftime('%Y-%m-%d')
+          waf = os.path.exists('/tmp/WAF_BLOCKED.flag')
+          d = ''
+          try:
+              open('/tmp/_ci_idx.sql','w').write(
+                  "SELECT max(trade_date) AS d, count(*) AS n FROM index_scores")
+              r = subprocess.run(['python3','scripts/_pgsql.py','--file','/tmp/_ci_idx.sql'],
+                                 capture_output=True, text=True, timeout=130)
+              out = (r.stdout or '').strip()
+              try:
+                  data = json.loads(out)
+                  if isinstance(data, list) and data:
+                      d = (data[0].get('d') or '')
+                  elif isinstance(data, dict):
+                      d = data.get('d') or ''
+              except Exception:
+                  m = re.search(r'\d{4}-\d{2}-\d{2}', out)
+                  d = m.group(0) if m else ''
+          except Exception as e:
+              print('查询生产表失败:', e)
+          if waf:
+              status, msg = 'skipped', f'中证 WAF 拦截（云IP），生产表保持上一版本（最新 trade_date={d}）'
+          elif d == today:
+              status, msg = 'success', f'指数评分已刷新（trade_date={d}）'
+          elif d:
+              status, msg = 'skipped', f'本次未切换（生产最新 trade_date={d}，今日 {today}）；若连续多日未更新，请于本地非云IP手动重跑本 workflow'
+          else:
+              status, msg = 'error', '生产表 index_scores 无数据'
+          print('指数评分日志:', status, '|', msg)
+          subprocess.run(['python3','scripts/log_etl_step.py','--step','指数评分 · 每日更新',
+                          '--status',status,'--message',msg,'--run-date',today], check=False)
+          PY
+
       - name: 抓取失败不阻断（限流属常态）
         if: failure()
         run: |
