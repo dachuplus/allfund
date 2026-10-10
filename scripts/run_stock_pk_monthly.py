@@ -43,6 +43,12 @@ def main():
         sys.exit(1)
 
     # 3. 选股：优先真实大模型，缺失 key 则规则兜底
+    # 3.0 先自愈模型 API 配置（对齐百炼 Bailian 路由：deepseek/智谱/MiniMax/Kimi 统一走 QWEN_API_KEY）
+    try:
+        run([sys.executable, os.path.join(SCRIPT_DIR, "sync_stock_pk_model_config.py")])
+    except Exception as e:
+        print(f"[WARN] 模型配置同步失败（不影响后续）：{e}")
+
     llm_keys = [k for k in ("DEEPSEEK_API_KEY", "QWEN_API_KEY", "WENXIN_API_KEY",
                             "ZHIPU_API_KEY", "KIMI_API_KEY", "ARK_API_KEY", "OPENAI_API_KEY")
                 if os.environ.get(k)]

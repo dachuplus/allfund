@@ -281,13 +281,19 @@ def extract_json(text):
     raise ValueError(f"无法从返回文本中提取JSON: {text[:200]}…")
 
 
-def call_deepseek(prompt_messages, key):
-    url = "https://api.deepseek.com/v1/chat/completions"
-    body = {"model": "deepseek-chat", "messages": prompt_messages, "temperature": 0.7,
+def call_deepseek(model_id, prompt_messages, key=None):
+    # DeepSeek 由阿里云百炼(DashScope)提供，走百炼兼容端点 + 百炼 key（与千问同一把 QWEN_API_KEY）。
+    # 注：原实现错写成打 api.deepseek.com + DEEPSEEK_API_KEY，而本项目 DeepSeek 实际托管在百炼，
+    # 故改用 dashscope 端点 + QWEN_API_KEY。模型 deepseek-v3-0324 在百炼可识别；
+    # 若返回 400 Access denied，说明该百炼账号尚未开通 DeepSeek 服务（需在百炼控制台开通）。
+    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    bailian_key = os.environ.get("QWEN_API_KEY") or key
+    body = {"model": model_id or "deepseek-v3-0324", "messages": prompt_messages, "temperature": 0.7,
             "max_tokens": 4096, "response_format": {"type": "json_object"}}
-    r = requests.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    r = requests.post(url, headers={"Authorization": f"Bearer {bailian_key}", "Content-Type": "application/json"},
                       json=body, timeout=150)
-    r.raise_for_status()
+    if r.status_code != 200:
+        raise RuntimeError(f"DeepSeek(百炼) API 返回 {r.status_code}: {r.text[:400]}")
     return r.json()["choices"][0]["message"]["content"]
 
 
@@ -333,14 +339,31 @@ def call_wenxin(model_id, prompt_messages, key):
     return r.json()["choices"][0]["message"]["content"]
 
 
-def call_zhipu(model_id, prompt_messages, key):
-    url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-    body = {"model": model_id, "messages": prompt_messages, "temperature": 0.7, "max_tokens": 4096,
-            "response_format": {"type": "json_object"}}
-    r = requests.post(url, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+def call_zhipu(model_id, prompt_messages, key=None):
+    # 智谱由阿里云百炼(DashScope)提供，走百炼兼容端点 + 百炼 key（与千问同一把 QWEN_API_KEY）。
+    # 实测 glm-5 在百炼可 200。
+    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    bailian_key = os.environ.get("QWEN_API_KEY") or key
+    body = {"model": model_id or "glm-5", "messages": prompt_messages, "temperature": 0.7,
+            "max_tokens": 4096, "response_format": {"type": "json_object"}}
+    r = requests.post(url, headers={"Authorization": f"Bearer {bailian_key}", "Content-Type": "application/json"},
                       json=body, timeout=150)
     if r.status_code != 200:
-        raise RuntimeError(f"智谱 API 返回 {r.status_code}: {r.text[:400]}")
+        raise RuntimeError(f"智谱(百炼) API 返回 {r.status_code}: {r.text[:400]}")
+    return r.json()["choices"][0]["message"]["content"]
+
+
+def call_minimax(model_id, prompt_messages, key=None):
+    # MiniMax 由阿里云百炼(DashScope)提供，走百炼兼容端点 + 百炼 key（与千问同一把 QWEN_API_KEY）。
+    # 实测 MiniMax-M2.5 在百炼可 200。
+    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    bailian_key = os.environ.get("QWEN_API_KEY") or key
+    body = {"model": model_id or "MiniMax-M2.5", "messages": prompt_messages, "temperature": 0.7,
+            "max_tokens": 4096, "response_format": {"type": "json_object"}}
+    r = requests.post(url, headers={"Authorization": f"Bearer {bailian_key}", "Content-Type": "application/json"},
+                      json=body, timeout=150)
+    if r.status_code != 200:
+        raise RuntimeError(f"MiniMax(百炼) API 返回 {r.status_code}: {r.text[:400]}")
     return r.json()["choices"][0]["message"]["content"]
 
 
@@ -365,22 +388,24 @@ def call_model(model, prompt_messages):
     keyenv = model.get("api_key_env")
     key = os.environ.get(keyenv) if keyenv else None
     if not key:
-        if provider == "kimi":
-            # Kimi 经阿里云百炼提供，直接复用百炼 key（与千问同一把 QWEN_API_KEY），
-            # 允许 KIMI_API_KEY 缺失（本项目 Kimi 不单独持有 Moonshot key）。
+        if provider in ("kimi", "deepseek", "zhipu", "minimax"):
+            # 这些模型均经阿里云百炼(DashScope)托管，直接复用百炼 key（与千问同一把 QWEN_API_KEY），
+            # 允许对应厂商独立 key（KIMI_API_KEY/DEEPSEEK_API_KEY/ZHIPU_API_KEY/MINIMAX_API_KEY）缺失。
             key = os.environ.get("QWEN_API_KEY")
         if not key:
             raise RuntimeError(f"缺少环境变量 {keyenv}（{provider} 需要 API Key）")
     if provider == "deepseek":
-        return call_deepseek(prompt_messages, key)
+        return call_deepseek(model.get("api_model") or "deepseek-v3-0324", prompt_messages, key)
     if provider == "qwen":
         return call_qwen(model.get("api_model") or "qwen-plus", prompt_messages, key)
     if provider == "wenxin":
         return call_wenxin(model.get("api_model") or "ernie-4.5-8k-preview", prompt_messages, key)
     if provider == "zhipu":
-        return call_zhipu(model.get("api_model") or "glm-4-plus", prompt_messages, key)
+        return call_zhipu(model.get("api_model") or "glm-5", prompt_messages, key)
     if provider == "kimi":
         return call_kimi(prompt_messages, key)
+    if provider == "minimax":
+        return call_minimax(model.get("api_model") or "MiniMax-M2.5", prompt_messages, key)
     if provider == "volc-ark":
         apimodel = model.get("api_model") or ""
         if not apimodel.startswith("ep-"):

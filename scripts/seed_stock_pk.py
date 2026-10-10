@@ -83,14 +83,15 @@ MODELS = [
 ]
 
 # 真实模型 API 配置（规则版种子仍写 mode='rule'，api_* 仅记录能力，待 stock_pk_real.py 真实跑）
+# 注：deepseek/智谱/MiniMax/Kimi 均经阿里云百炼(DashScope)托管，统一走百炼兼容端点 + 同一把 QWEN_API_KEY。
 _API_CONFIG = {
-    "ds": {"api_provider": "deepseek", "api_model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY"},
+    "ds": {"api_provider": "deepseek", "api_model": "deepseek-v3-0324", "api_key_env": "QWEN_API_KEY"},
     "doubao": {"api_provider": "volc-ark", "api_model": "ep-20260712083200-pjvq9", "api_key_env": "ARK_API_KEY"},
     "qwen": {"api_provider": "qwen", "api_model": "qwen-plus", "api_key_env": "QWEN_API_KEY"},
     "wenxin": {"api_provider": "wenxin", "api_model": "ernie-5.1", "api_key_env": "WENXIN_API_KEY"},
-    "zhipu": {"api_provider": "zhipu", "api_model": "glm-5.2", "api_key_env": "ZHIPU_API_KEY"},
+    "zhipu": {"api_provider": "zhipu", "api_model": "glm-5", "api_key_env": "QWEN_API_KEY"},
     "kimi": {"api_provider": "kimi", "api_model": "kimi-k2.5", "api_key_env": "QWEN_API_KEY"},
-    "minimax": {"api_provider": "minimax", "api_model": "MiniMax-M3", "api_key_env": "MINIMAX_API_KEY"},
+    "minimax": {"api_provider": "minimax", "api_model": "MiniMax-M2.5", "api_key_env": "QWEN_API_KEY"},
 }
 for m in MODELS:
     cfg = _API_CONFIG.get(m["id"])
