@@ -22,6 +22,16 @@
         class="selection-tab"
         :class="{ 'selection-tab--active': route.name === 'tools-valuation' }"
       >估值</router-link>
+      <router-link
+        to="/tools/fund-index"
+        class="selection-tab"
+        :class="{ 'selection-tab--active': route.name === 'tools-fund-index' }"
+      >基金指数</router-link>
+      <router-link
+        to="/tools/tougu"
+        class="selection-tab"
+        :class="{ 'selection-tab--active': route.name === 'tools-tougu' }"
+      >投顾产品</router-link>
     </nav>
 
     <router-view v-slot="{ Component }">

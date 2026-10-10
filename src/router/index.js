@@ -82,18 +82,30 @@ const routes = [
           description: '估值工具：基于公开指数估值数据，按 PE / PB / 股息率 / ROE 及历史百分位对宽基、策略、行业主题指数做排行与筛选。',
           keywords: '估值,指数估值,行业估值,PE百分位,估值排行'
         }
+      },
+      {
+        path: 'fund-index',
+        name: 'tools-fund-index',
+        component: () => import('../pages/portfolio/FundIndexPanel.vue'),
+        meta: {
+          tab: 'tools',
+          title: '选品 · 基金指数',
+          description: '基金指数：按一级/二级分类聚合的靠谱指数分类指数，以及沪深公开基金指数产品的实时行情与历史走势。',
+          keywords: '基金指数,分类指数,基金指数行情'
+        }
+      },
+      {
+        path: 'tougu',
+        name: 'tools-tougu',
+        component: () => import('../pages/tougu/TouguPage.vue'),
+        meta: {
+          tab: 'tools',
+          title: '选品 · 投顾产品',
+          description: '公开披露高收益、稳健、养老三类投顾产品的近3月、近1年收益与最大回撤等历史数据，供客观查阅。',
+          keywords: '投顾产品,公开信息,稳健理财,养老储蓄'
+        }
       }
     ]
-  },
-  {
-    path: '/tools/tougu',
-    component: () => import('../pages/tougu/TouguPage.vue'),
-    meta: {
-      tab: 'tools',
-      title: '投顾产品公开信息',
-      description: '公开披露高收益、稳健、养老三类投顾产品的近3月、近1年收益与最大回撤等历史数据，供客观查阅。',
-      keywords: '投顾产品,公开信息,稳健理财,养老储蓄'
-    }
   },
   {
     path: '/tools/fund-rank',

@@ -356,17 +356,7 @@
       <AIPkPanel />
     </div>
 
-    <!-- ==================== 4. 基金指数 ==================== -->
-    <div v-if="activeTab === 'index'">
-      <FundIndexPanel />
-    </div>
-
-    <!-- ==================== 5. 投顾产品 ==================== -->
-    <div v-if="activeTab === 'tougu'">
-      <TouguPage />
-    </div>
-
-    <!-- ==================== 6. 股票组合 ==================== -->
+    <!-- ==================== 4. 股票组合 ==================== -->
     <div v-if="activeTab === 'stockpk'">
       <StockPkPanel />
     </div>
@@ -384,10 +374,8 @@ import { calcAllExpectedReturns, calcEnhancedRiskParityWeights } from '../../uti
 import { useAuth } from '../../composables/useAuth'
 import { toast, confirm } from '../../composables/useToast.js'
 import { createPortfolio as savePortfolioToDb, deletePortfolio } from '../../api/user-data'
-import FundIndexPanel from './FundIndexPanel.vue'
 import AIPkPanel from './AIPkPanel.vue'
 import StockPkPanel from './StockPkPanel.vue'
-import TouguPage from '../tougu/TouguPage.vue'
 
 const {
   user, isLoggedIn,
@@ -400,8 +388,6 @@ const tabs = [
   { key: 'custom', label: '自建组合' },
   { key: 'ai', label: 'AI 组合' },
   { key: 'aipk', label: 'AI 大 PK' },
-  { key: 'index', label: '基金指数' },
-  { key: 'tougu', label: '投顾产品' },
   { key: 'stockpk', label: '股票组合' }
 ]
 const activeTab = ref('custom')
