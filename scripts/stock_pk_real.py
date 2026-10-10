@@ -297,6 +297,13 @@ def call_deepseek(model_id, prompt_messages, key=None):
         _OFFICIAL_MODELS = ("deepseek-chat", "deepseek-reasoner", "deepseek-coder")
         model = model_id if (model_id in _OFFICIAL_MODELS) else "deepseek-chat"
         bearer, label = ds_key, "DeepSeek(官方)"
+        # 官方端点硬性要求：使用 response_format=json_object 时，prompt 中必须出现 "json"
+        # （已实测大小写均可）。当前业务 prompt 含 "JSON" 故天然满足；此处兜底，
+        # 防止后续 prompt 改写漏掉该词导致整批 400。
+        if not any("json" in (m.get("content") or "").lower() for m in prompt_messages):
+            prompt_messages = list(prompt_messages) + [
+                {"role": "system", "content": "Output must be valid json."}
+            ]
     else:
         url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
         model = "deepseek-v3-0324"  # 百炼侧模型名，不复用官方 model_id
