@@ -365,7 +365,12 @@ def call_model(model, prompt_messages):
     keyenv = model.get("api_key_env")
     key = os.environ.get(keyenv) if keyenv else None
     if not key:
-        raise RuntimeError(f"缺少环境变量 {keyenv}（{provider} 需要 API Key）")
+        if provider == "kimi":
+            # Kimi 经阿里云百炼提供，直接复用百炼 key（与千问同一把 QWEN_API_KEY），
+            # 允许 KIMI_API_KEY 缺失（本项目 Kimi 不单独持有 Moonshot key）。
+            key = os.environ.get("QWEN_API_KEY")
+        if not key:
+            raise RuntimeError(f"缺少环境变量 {keyenv}（{provider} 需要 API Key）")
     if provider == "deepseek":
         return call_deepseek(prompt_messages, key)
     if provider == "qwen":
