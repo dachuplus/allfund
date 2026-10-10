@@ -62,6 +62,13 @@
           <option value="E">E（0–39）</option>
         </select>
       </label>
+      <label class="ix-filter-item">
+        <span class="ix-filter-label">分类</span>
+        <select v-model="indexClass" class="ix-sel" @change="onFilterChange">
+          <option value="all">全部</option>
+          <option v-for="c in classOptions" :key="c" :value="c">{{ c }}</option>
+        </select>
+      </label>
       <span class="ix-count2">
         筛选结果 <b>{{ totalLabel }}</b> 只
         <template v-if="hasAnyFilter">
@@ -222,7 +229,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchIndexScores, fetchIndexPoolTotal, INDEX_POOLS } from '../../api/data.js'
+import { fetchIndexScores, fetchIndexPoolTotal, fetchIndexClassOptions, INDEX_POOLS } from '../../api/data.js'
 import { fmtScore, fmtNum, scoreColor } from '../../utils/format.js'
 
 const pool = ref('broad')
@@ -241,6 +248,8 @@ const hasMore = ref(false)
 const loading = ref(false)
 const poolCounts = ref({})
 const expanded = ref('')
+const indexClass = ref('all')
+const classOptions = ref([])
 
 const COLUMNS = [
   { key: 'code', label: '代码', num: false, group: 'base' },
@@ -273,24 +282,37 @@ const poolTotalLabel = computed(() =>
 )
 const totalLabel = computed(() => (total.value == null ? '—' : total.value.toLocaleString()))
 const hasAnyFilter = computed(() =>
-  !!search.value.trim() || onlyScored.value || (kAllMin.value !== '' && kAllMin.value != null) || grade.value !== 'all'
+  !!search.value.trim() || onlyScored.value || (kAllMin.value !== '' && kAllMin.value != null) || grade.value !== 'all' || (indexClass.value && indexClass.value !== 'all')
 )
 const totalPages = computed(() => {
   if (total.value != null) return Math.max(1, Math.ceil(total.value / pageSize.value))
   return Math.max(1, currentPage.value + (hasMore.value ? 1 : 0))
 })
 
+function fmtTradeDate(v) {
+  if (v == null || v === '') return ''
+  const s = String(v).trim()
+  // 已是带分隔符的日期：YYYY-MM-DD 或 YYYY-M-D（部分环境未补零）
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+  // 纯 8 位整数 YYYYMMDD
+  const digits = s.replace(/\D/g, '')
+  if (/^\d{8}$/.test(digits)) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+  return s
+}
 const dataDate = computed(() => {
   for (const r of rows.value) {
-    if (r.trade_date) return String(r.trade_date).slice(0, 4) + '-' + String(r.trade_date).slice(4, 6) + '-' + String(r.trade_date).slice(6, 8)
+    if (r.trade_date) return fmtTradeDate(r.trade_date)
   }
   return ''
 })
 
-function switchPool(k) {
+async function switchPool(k) {
   pool.value = k
   currentPage.value = 1
   expanded.value = ''
+  indexClass.value = 'all'
+  await loadClassOptions()
   load()
 }
 function toggleCard(code) { expanded.value = expanded.value === code ? '' : code }
@@ -372,6 +394,7 @@ async function load() {
       onlyScored: onlyScored.value,
       kAllMin: kAllMin.value,
       grade: grade.value,
+      indexClass: indexClass.value === 'all' ? '' : indexClass.value,
     })
     rows.value = res.rows || []
     total.value = res.total
@@ -406,6 +429,7 @@ function resetFilters() {
   onlyScored.value = false
   kAllMin.value = ''
   grade.value = 'all'
+  indexClass.value = 'all'
   currentPage.value = 1
   load()
 }
@@ -421,8 +445,19 @@ function sortCls(key) {
   return sortKey.value === key ? (sortAsc.value ? 'sort-asc' : 'sort-desc') : ''
 }
 
+async function loadClassOptions() {
+  try {
+    const opts = await fetchIndexClassOptions(pool.value)
+    classOptions.value = opts || []
+  } catch (e) {
+    console.warn('[IndexPage] 分类选项获取失败:', e)
+    classOptions.value = []
+  }
+}
+
 onMounted(() => {
   loadCounts()
+  loadClassOptions()
   load()
 })
 </script>

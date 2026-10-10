@@ -684,10 +684,11 @@ export const INDEX_POOLS = [
 function applyIndexFilters(query, params) {
   const {
     search = '', pool = null, onlyScored = false,
-    kAllMin = null, kAllMax = null, grade = 'all',
+    kAllMin = null, kAllMax = null, grade = 'all', indexClass = '',
   } = params
   if (search) query = query.ilike('name', `%${search}%`)
   if (pool) query = query.eq('pool', pool)
+  if (indexClass) query = query.eq('index_class', indexClass)
   if (onlyScored) query = query.not('k_all', 'is', null)
   if (kAllMin != null && kAllMin !== '') query = query.gte('k_all', Number(kAllMin))
   if (kAllMax != null && kAllMax !== '') query = query.lte('k_all', Number(kAllMax))
@@ -698,7 +699,7 @@ function applyIndexFilters(query, params) {
 async function fetchIndexCount(client, params) {
   const {
     search = '', pool = null, onlyScored = false,
-    kAllMin = null, kAllMax = null, grade = 'all',
+    kAllMin = null, kAllMax = null, grade = 'all', indexClass = '',
   } = params
   try {
     const { data, error } = await client.rpc('index_scores_stats', {
@@ -708,6 +709,7 @@ async function fetchIndexCount(client, params) {
       p_k_all_min: kAllMin != null && kAllMin !== '' ? Number(kAllMin) : null,
       p_k_all_max: kAllMax != null && kAllMax !== '' ? Number(kAllMax) : null,
       p_grade: grade || 'all',
+      p_index_class: indexClass || null,
     })
     if (!error && Array.isArray(data) && data.length) return Number(data[0].total) || 0
   } catch (e) {
@@ -726,12 +728,12 @@ export async function fetchIndexScores(params = {}) {
   const {
     search = '', pool = 'broad', sortKey = 'k_all', sortAsc = false,
     page = 1, pageSize = 50, onlyScored = false,
-    kAllMin = null, kAllMax = null, grade = 'all',
+    kAllMin = null, kAllMax = null, grade = 'all', indexClass = '',
   } = params
   const from = Math.max(0, (page - 1) * pageSize)
   const to = from + pageSize
   const maxRetries = 2
-  const fp = { search, pool, onlyScored, kAllMin, kAllMax, grade }
+  const fp = { search, pool, onlyScored, kAllMin, kAllMax, grade, indexClass }
 
   const total = await fetchIndexCount(client, fp)
 
@@ -769,4 +771,27 @@ export async function fetchIndexPoolTotal() {
     console.warn('[fetchIndexPoolTotal] 获取失败:', e)
   }
   return null
+}
+
+/** 某池下可选的 index_class 值（用于分类筛选下拉）。返回去重、按中文排序的数组。 */
+export async function fetchIndexClassOptions(pool) {
+  const client = supabase || supabaseDirect
+  if (!client || !pool) return []
+  try {
+    const { data, error } = await client
+      .from('index_scores')
+      .select('index_class')
+      .eq('pool', pool)
+    if (!error && Array.isArray(data)) {
+      const set = new Set()
+      for (const r of data) {
+        const c = r && r.index_class
+        if (c) set.add(c)
+      }
+      return [...set].sort((a, b) => a.localeCompare(b, 'zh'))
+    }
+  } catch (e) {
+    console.warn('[fetchIndexClassOptions] 获取失败:', e)
+  }
+  return []
 }

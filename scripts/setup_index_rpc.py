@@ -31,13 +31,15 @@ MGMT_API = 'https://api.supabase.com/v1/projects/tqhtegazxykkqfcpejky/database/q
 
 STATS = """
 DROP FUNCTION IF EXISTS public.index_scores_stats(text, text, boolean, numeric, numeric, text);
+DROP FUNCTION IF EXISTS public.index_scores_stats(text, text, boolean, numeric, numeric, text, text);
 CREATE FUNCTION public.index_scores_stats(
   p_search    text    DEFAULT NULL,
   p_pool      text    DEFAULT NULL,
   p_only_scored boolean DEFAULT false,
   p_k_all_min numeric DEFAULT NULL,
   p_k_all_max numeric DEFAULT NULL,
-  p_grade     text    DEFAULT 'all'
+  p_grade     text    DEFAULT 'all',
+  p_index_class text  DEFAULT NULL
 )
 RETURNS TABLE(total bigint)
 LANGUAGE sql
@@ -48,12 +50,13 @@ AS $$
   FROM public.index_scores s
   WHERE (p_search IS NULL OR s.name ILIKE '%' || p_search || '%')
     AND (p_pool IS NULL OR s.pool = p_pool)
+    AND (p_index_class IS NULL OR s.index_class = p_index_class)
     AND (NOT p_only_scored OR s.k_all IS NOT NULL)
     AND (p_k_all_min IS NULL OR s.k_all >= p_k_all_min)
     AND (p_k_all_max IS NULL OR s.k_all <= p_k_all_max)
     AND (p_grade IS NULL OR p_grade = 'all' OR s.grade = p_grade);
 $$;
-GRANT EXECUTE ON FUNCTION public.index_scores_stats(text, text, boolean, numeric, numeric, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.index_scores_stats(text, text, boolean, numeric, numeric, text, text) TO anon, authenticated;
 """
 
 POOL_TOTAL = """
