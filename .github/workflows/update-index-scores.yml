@@ -6,15 +6,15 @@ name: 指数评分每日更新
 #   21:30 基金评分 / 21:45 标签资金流 / 22:30 配置季度 / 23:20 股票评分 / 00:10 风格因子
 #   本workflow 北京时间 00:40（UTC 16:40）—— 放在最后，因为指数数据是日频、越晚越新鲜。
 #
-# ⚠️ 中证官网拦截（2026-10-08~09 复测后的准确结论，纠正旧注释）：
-#   - 旧版 timeout=15 太短才是上次 137 只失败的**主因**（响应偶发 7–15s 被误判限流）；
-#     已改为默认 30s，并**显式识别 403 WAF**。
-#   - 真限流 = HTTP 403 + 反爬 HTML，属 **IP 级 WAF 拦截**；**云环境（GitHub Actions）首次请求即 403**，
-#     本地非云 IP 才通。故 CI 跑本 workflow 时 PE 大概率被拦，生产表靠护栏保持旧版本（符合"限流兜底"预期）。
-#   - 速率敏感非计数敏感：间隔 <1s 必触发、≥2s 安全（默认 2.5s）。
-#   - fetch_index_raw.py 命中 WAF 会写 /tmp/WAF_BLOCKED.flag 并整批短路；本 workflow 检测到即跳过后续轮次与冷却，
-#     直接走 compute/promote（护栏不过则拒绝切换，生产表不变）。
-#   - 脚本自动跳过 index_scores_raw 里已抓到的，天然增量、幂等。
+# ⚠️ 数据源（2026-10-10 改写后）：原 csindex（中证官网）在云 CI IP 上被 WAF 403 拦截
+#    （首次请求即拦，本地非云 IP 才通），导致 index_scores 长期卡在 10/8。
+#    现已改用云可达的免费源（用户确认「用东财的数据接口」）：
+#      - 成分股列表：EastMoney datacenter-web RPT_INDEX_CONSTITUENT（按 INDEX_CODE 裸6位，云可达）
+#      - 成分股权重 / 指数级 PE：内部 stock_scores（mktcap 推导权重、Σmktcap/Σ(mktcap/pe_ttm) 算指数PE）
+#      - 指数收盘/日期：腾讯 gtimg（展示用，不可达时回退 EastMoney CM_CLOSE）
+#      - 估值分位：同池横截面 PE 分位（用真实指数PE，免5年历史），彻底去 csindex 依赖
+#   因此 CI 跑本 workflow 不再被 WAF 拦，单次全量抓取即可（约 3-5 分钟），无需多轮冷却。
+#   若 EastMoney 整体不可达（极少见），fetch 会写 /tmp/WAF_BLOCKED.flag，promote 护栏保旧数据。
 #
 # 安全性（三级流水线，与 fund/stock 一致）：
 #   步骤1 fetch_index_raw.py   → 只写 index_scores_raw（原始落地，不算分）
@@ -29,31 +29,16 @@ on:
     - cron: '40 16 * * *'   # 北京时间每日 00:40
   workflow_dispatch:
     inputs:
-      rounds:
-        description: '抓取轮数（中证限流，每轮间隔需等待冷却；3 轮约能抓 60–100 只）'
+      limit:
+        description: '调试用：本次最多抓多少只（0=全部 universe）'
         required: false
         type: string
-        default: '3'
-      per_round:
-        description: '每轮最多抓多少只'
-        required: false
-        type: string
-        default: '40'
+        default: '0'
       interval:
-        description: '每次请求间隔秒（中证速率敏感，<1s必触发WAF，建议 ≥2）'
+        description: '每只间隔秒（EastMoney 轻量，0.35 即可；留余量防偶发限流'
         required: false
         type: string
-        default: '2.5'
-      timeout:
-        description: 'index-perf 请求超时秒（默认30；旧版15太短易误判限流）'
-        required: false
-        type: string
-        default: '30'
-      sleep_mins:
-        description: '轮间冷却等待分钟数（中证被限流后需 20 分钟以上恢复）'
-        required: false
-        type: string
-        default: '21'
+        default: '0.35'
 
 env:
   PYTHONUNBUFFERED: '1'
@@ -61,13 +46,9 @@ env:
 jobs:
   update-index-scores:
     runs-on: ubuntu-latest
-    # 限流下要多轮 + 冷却等待，给足时间
     timeout-minutes: 180
-    # ⚠️ secret 映射说明：仓库里**确定存在**的是 SUPABASE_MGMT_TOKEN
-    # （update-scores.yml 就是 `SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}` 这样映射的），
-    # 而 `secrets.SUPABASE_PAT` 这个名字未见于任何已验证可用的 workflow。
-    # 这里两个都注入（同一个值），脚本的 `SUPABASE_PAT or SUPABASE_MGMT_TOKEN`
-    # 无论命中哪个都能工作，避免因secret 名字对不上而整条流水线失败。
+    # secret 映射：仓库里确定存在的是 SUPABASE_MGMT_TOKEN；
+    # 两个都注入（同一值），脚本的 `SUPABASE_PAT or SUPABASE_MGMT_TOKEN` 都能工作。
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
@@ -89,42 +70,17 @@ jobs:
             exit 1
           fi
           echo "凭据已配置: SUPABASE_PAT=${#SUPABASE_PAT} 字符, SUPABASE_MGMT_TOKEN=${#SUPABASE_MGMT_TOKEN} 字符"
+          # 本流水线全部用标准库（urllib/subprocess），无需 pip install 第三方包。
 
-      - name: 安装依赖
-        run: pip install akshare requests
-
-      - name: 抓取原始数据（分轮，规避中证 WAF/限流）
+      - name: 抓取原始数据（东财成分 + stock_scores 权/PE + gtimg 收盘）
         run: |
-          ROUNDS="${{ github.event.inputs.rounds || '3' }}"
-          PER_ROUND="${{ github.event.inputs.per_round || '60' }}"
-          INTERVAL="${{ github.event.inputs.interval || '2.5' }}"
-          TIMEOUT="${{ github.event.inputs.timeout || '30' }}"
-          SLEEP_MINS="${{ github.event.inputs.sleep_mins || '21' }}"
+          LIMIT="${{ github.event.inputs.limit || '0' }}"
+          INTERVAL="${{ github.event.inputs.interval || '0.35' }}"
           rm -f /tmp/WAF_BLOCKED.flag
-          echo "轮数=$ROUNDS 每轮=$PER_ROUND 间隔=${INTERVAL}s 超时=${TIMEOUT}s 轮间冷却=${SLEEP_MINS}min"
-
-          for i in $(seq 1 "$ROUNDS"); do
-            echo ""
-            echo "============================================"
-            echo "  第 $i/$ROUNDS 轮抓取  开始 $(date '+%H:%M:%S')"
-            echo "============================================"
-            # --limit / --interval / --timeout 控制单轮规模、速率与超时；
-            # 已抓到的会自动跳过（index_scores_raw 里有记录），所以重跑是幂等的。
-            python scripts/fetch_index_raw.py --limit "$PER_ROUND" --interval "$INTERVAL" --timeout "$TIMEOUT" || \
-              echo "[WARN] 第 $i 轮有失败，继续下一轮"
-
-            # 命中中证 WAF（云环境常见）：本轮已整体短路，后续轮次与冷却均无意义，直接收尾
-            if [ -f /tmp/WAF_BLOCKED.flag ]; then
-              echo ">>> 检测到中证 WAF 拦截（$(cat /tmp/WAF_BLOCKED.flag)），跳过后续轮次与冷却等待"
-              break
-            fi
-
-            if [ "$i" -lt "$ROUNDS" ]; then
-              echo ">>> 中证冷却等待 ${SLEEP_MINS} 分钟…"
-              sleep $((SLEEP_MINS * 60))
-            fi
-          done
-          echo "全部轮次结束 $(date '+%H:%M:%S')"
+          echo "全量抓取：limit=$LIMIT 间隔=${INTERVAL}s  开始 $(date '+%H:%M:%S')"
+          python scripts/fetch_index_raw.py --limit "$LIMIT" --interval "$INTERVAL" || \
+            echo "[WARN] fetch 有失败，继续 compute/promote（护栏会保旧数据）"
+          echo "抓取结束 $(date '+%H:%M:%S')"
 
       - name: 步骤2 — 由原始数据算五维评分（写 staging）
         run: |
@@ -147,7 +103,6 @@ jobs:
       - name: 步骤4 — 确保 RPC 存在（精确计数用，CDN 对 Prefer 头会502）
         run: |
           # 幂等：DROP FUNCTION IF EXISTS 后重建，重复跑无副作用。
-          # 防的是「函数缺失或签名过期」导致前端总数显示异常。
           python scripts/setup_index_rpc.py
 
       - name: 步骤5 — 输出本轮结果摘要
@@ -199,11 +154,11 @@ jobs:
           except Exception as e:
               print('查询生产表失败:', e)
           if waf:
-              status, msg = 'skipped', f'中证 WAF 拦截（云IP），生产表保持上一版本（最新 trade_date={d}）'
+              status, msg = 'skipped', f'EastMoney 整体不可达（云IP偶发），生产表保持上一版本（最新 trade_date={d}）'
           elif d == today:
               status, msg = 'success', f'指数评分已刷新（trade_date={d}）'
           elif d:
-              status, msg = 'skipped', f'本次未切换（生产最新 trade_date={d}，今日 {today}）；若连续多日未更新，请于本地非云IP手动重跑本 workflow'
+              status, msg = 'skipped', f'本次未切换（生产最新 trade_date={d}，今日 {today}）；若连续多日未更新，请检查 EastMoney 可达性'
           else:
               status, msg = 'error', '生产表 index_scores 无数据'
           print('指数评分日志:', status, '|', msg)
@@ -211,9 +166,9 @@ jobs:
                           '--status',status,'--message',msg,'--run-date',today], check=False)
           PY
 
-      - name: 抓取失败不阻断（限流属常态）
+      - name: 抓取失败不阻断（限流/偶发不可达属常态）
         if: failure()
         run: |
-          echo "::warning::指数评分流水线本次未全部成功（多半是中证官网限流）。"
-          echo "生产表保持上一次成功版本，不受影响；下次调度会自动增量补齐。"
+          echo "::warning::指数评分流水线本次未全部成功（多半是数据源偶发不可达）。"
+          echo "生产表保持上一次成功版本，不受影响；下次调度会自动重试。"
           exit 0

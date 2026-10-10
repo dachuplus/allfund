@@ -23,9 +23,9 @@ import sys
 import json
 import subprocess
 
+# TOKEN 在 main() 内 _load_env_local() 之后确定（.env.local 可能含 SUPABASE_PAT）。
+# 此处先占位，main() 开头会重新赋值；勿在此 sys.exit（会先于 env 加载触发）。
 TOKEN = os.environ.get('SUPABASE_PAT') or os.environ.get('SUPABASE_MGMT_TOKEN')
-if not TOKEN:
-    sys.exit('请设置环境变量 SUPABASE_PAT')
 MGMT_API = 'https://api.supabase.com/v1/projects/tqhtegazxykkqfcpejky/database/query'
 
 MIN_TOTAL = 60
@@ -138,7 +138,9 @@ def validate():
     if max_date:
         try:
             from datetime import date, datetime
-            d = datetime.strptime(str(max_date)[:8], '%Y%m%d').date()
+            # 兼容带/不带分隔符的日期（2026-10-09 / 20261008）
+            digits = ''.join(ch for ch in str(max_date) if ch.isdigit())[:8]
+            d = datetime.strptime(digits, '%Y%m%d').date()
             age = (date.today() - d).days
             print(f'   数据年龄 {age} 天（上限 {MAX_AGE_DAYS}）')
             if age > MAX_AGE_DAYS:
@@ -157,6 +159,10 @@ def validate():
 
 def main():
     _load_env_local()
+    global TOKEN
+    TOKEN = os.environ.get('SUPABASE_PAT') or os.environ.get('SUPABASE_MGMT_TOKEN')
+    if not TOKEN:
+        sys.exit('请设置环境变量 SUPABASE_PAT')
     print('=== [1/3] 校验 staging ===')
     if validate() is None:
         print('\n已保留生产表 index_scores 旧数据，未做任何切换。')

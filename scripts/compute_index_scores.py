@@ -9,7 +9,9 @@ compute_index_scores.py — 【第2级】从 index_scores_raw 算五维评分 �
 
 五维（权重按用户提供的框架，适配指数无财报的实际情况）
   成长性 25%   近3年净利复合 60% + 营收同比 40%          ← 缩尾加权
-  估值   25%   中证官方 PE 近5年分位(反向) 70% + PB(反向) 30%
+  估值   25%   同池横截面指数PE分位(反向) 70% + PB(反向) 30%
+              （指数PE由 stock_scores 汇总口径 Σmktcap/Σ(mktcap/pe_ttm) 算出，
+                估值维满足「必须用指数级 PE」铁律；分位改同池横截面，免5年历史）
   市值流动性 15% 加权平均市值 40% + 前十大集中度(适度) 30% + 成分数 30%
   质量   20%   ROE 40% + 毛利率 25% + 经营现金流/净利 20% + 资产负债率(反向) 15%
   股东回报 15%股息率 70% + 每10股派息 30%
@@ -35,9 +37,9 @@ import json
 import math
 import subprocess
 
+# PAT 在 main() 内 _load_env_local() 之后确定（.env.local 可能含 SUPABASE_PAT）。
+# 此处先占位，main() 开头会重新赋值；勿在此 sys.exit（会先于 env 加载触发）。
 PAT = os.environ.get('SUPABASE_PAT') or os.environ.get('SUPABASE_MGMT_TOKEN')
-if not PAT:
-    sys.exit('请设置环境变量 SUPABASE_PAT')
 MGMT_API = 'https://api.supabase.com/v1/projects/tqhtegazxykkqfcpejky/database/query'
 
 # 维度权重
@@ -209,6 +211,10 @@ def lit(v):
 
 def main():
     _load_env_local()
+    global PAT
+    PAT = os.environ.get('SUPABASE_PAT') or os.environ.get('SUPABASE_MGMT_TOKEN')
+    if not PAT:
+        sys.exit('请设置环境变量 SUPABASE_PAT')
     print('=== [1/5] 建表 + RLS ===')
     pg(DDL)
     print('  ok')
@@ -366,7 +372,8 @@ def main():
         print(f'  池 {pool_name}: {len(sub)} 只')
         g = percentile_rank({x['code']: x['_cagr'] for x in sub}, True)
         g2 = percentile_rank({x['code']: x['_revyoy'] for x in sub}, True)
-        v = percentile_rank({x['code']: x['_pe_pct'] for x in sub}, False)
+        # 估值分位：同池横截面「指数级 PE」分位（越低越好）。替代原 5 年历史分位。
+        v = percentile_rank({x['code']: x['_pe'] for x in sub}, False)
         v2 = percentile_rank({x['code']: x['_pb'] for x in sub}, False)
         m = percentile_rank({x['code']: x['_mktcap'] for x in sub}, True)
         m2 = {x['code']: conc_score(x['_conc']) for x in sub}
@@ -379,6 +386,7 @@ def main():
         dd2 = percentile_rank({x['code']: x['_payout'] for x in sub}, True)
         for x in sub:
             c = x['code']
+            x['_pe_pct'] = v.get(c)   # 同池横截面 PE 分位（写回 pe_pct_5y 列展示）
             x['k_growth'] = sub_score({'a': g.get(c), 'b': g2.get(c)},
                                       {'a': W_CAGR, 'b': W_REVYOY})
             x['k_value'] = sub_score({'a': v.get(c), 'b': v2.get(c)},

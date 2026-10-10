@@ -91,11 +91,28 @@
 
     <!-- 主内容区 -->
     <main class="app-main" :class="{ 'pc-main': !isMobile }">
-      <div v-if="!routeAllowed" class="no-feature-access">
-        <p class="no-feature-access__title">无访问权限</p>
-        <p class="no-feature-access__desc">您暂无「{{ currentFeatureLabel }}」功能的访问权限。</p>
-        <button class="no-feature-access__btn" @click="handleRequestAccess">申请访问权限</button>
-        <p class="no-feature-access__account">当前登录账号：{{ user?.email || '未知' }}</p>
+      <div v-if="!routeAllowed" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
+        <div class="no-feature-access__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="10.5" width="15" height="10.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+            <circle cx="12" cy="15.3" r="1.3" fill="currentColor" stroke="none" />
+            <line x1="12" y1="16.6" x2="12" y2="18.6" />
+          </svg>
+        </div>
+        <h1 id="nfa-title" class="no-feature-access__title">无访问权限</h1>
+        <p class="no-feature-access__desc">
+          您当前的账号尚未开通 <strong class="no-feature-access__feature">「{{ currentFeatureLabel }}」</strong> 功能。
+        </p>
+        <p class="no-feature-access__hint">提交申请后由管理员审核开通，无需重新注册账号。</p>
+        <div class="no-feature-access__actions">
+          <button class="no-feature-access__btn" @click="handleRequestAccess">申请访问权限</button>
+          <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
+        </div>
+        <p class="no-feature-access__account">
+          <span class="no-feature-access__account-label">当前登录账号</span>
+          <span class="no-feature-access__account-value">{{ user?.email || '未知' }}</span>
+        </p>
       </div>
       <router-view v-else v-slot="{ Component }">
         <keep-alive :include="['FundRankPage']">
@@ -242,6 +259,10 @@ async function handleLogout() {
 
 function onLoggedIn() {
   hideLogin()
+}
+
+function goHome() {
+  router.push('/')
 }
 
 /* ---- 权限申请弹窗 ---- */
@@ -568,9 +589,9 @@ const currentFeatureLabel = computed(() => {
 }
 .stranger-card {
   background: #ffffff;
-  border: 4px solid #003078;
+  border: 1px solid #b1b4b6; border-top: 6px solid #1d70b8;
   max-width: 480px; width: 100%;
-  padding: 40px 32px;
+  padding: 40px 32px 36px;
   text-align: center;
 }
 .stranger-brand {
@@ -607,25 +628,50 @@ const currentFeatureLabel = computed(() => {
 .stranger-request:hover { background: #f3f3f3; }
 
 .no-feature-access {
-  max-width: 600px; margin: 60px auto; padding: 40px;
+  max-width: 520px; margin: 72px auto; padding: 40px 40px 36px;
   text-align: center;
-  background: #ffffff; border: 2px solid var(--border); border-left: 6px solid #d4351c;
+  background: #ffffff;
+  border: 1px solid #b1b4b6; border-top: 6px solid #1d70b8;
+}
+.no-feature-access__icon {
+  width: 64px; height: 64px; margin: 0 auto 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: #1d70b8; color: #ffffff;
 }
 .no-feature-access__title {
-  font-size: 24px; font-weight: 700; color: #d4351c; margin: 0 0 var(--space-md);
+  font-size: 26px; font-weight: 700; color: #0b0c0c;
+  margin: 0 0 14px; letter-spacing: 0.5px;
 }
 .no-feature-access__desc {
-  font-size: 16px; color: var(--text-secondary); margin: 0;
+  font-size: 16px; color: #505a5f; line-height: 1.6; margin: 0 0 6px;
 }
-.no-feature-access__account {
-  font-size: 14px; color: var(--text-secondary); margin: var(--space-sm) 0 0;
-  background: #f3f2f1; border-left: 4px solid #1d70b8; padding: 8px 12px;
-  word-break: break-all; text-align: left;
+.no-feature-access__feature { color: #1d70b8; font-weight: 700; }
+.no-feature-access__hint {
+  font-size: 14px; color: #505a5f; margin: 0 0 28px;
+}
+.no-feature-access__actions {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px;
 }
 .no-feature-access__btn {
-  display: inline-block; margin-top: var(--space-md);
-  padding: 10px 24px; font-size: 16px; font-weight: 700;
-  color: #fff; background: #1d70b8; border: none; cursor: pointer;
+  padding: 12px 28px; font-size: 16px; font-weight: 600;
+  color: #ffffff; background: #1d70b8; border: 2px solid #1d70b8; cursor: pointer;
 }
-.no-feature-access__btn:hover { background: #003078; }
+.no-feature-access__btn:hover { background: #003078; border-color: #003078; }
+.no-feature-access__btn--ghost {
+  padding: 12px 28px; font-size: 16px; font-weight: 600;
+  color: #1d70b8; background: #ffffff; border: 2px solid #1d70b8; cursor: pointer;
+}
+.no-feature-access__btn--ghost:hover { background: #f3f2f1; }
+.no-feature-access__account {
+  font-size: 13px; color: #505a5f;
+  border-top: 1px solid #b1b4b6; padding-top: 16px; margin: 0;
+  display: flex; flex-direction: column; gap: 4px; align-items: center;
+}
+.no-feature-access__account-label { color: #505a5f; }
+.no-feature-access__account-value { color: #0b0c0c; font-weight: 600; word-break: break-all; }
+@media (max-width: 480px) {
+  .no-feature-access { margin: 40px 16px; padding: 32px 20px 28px; }
+  .no-feature-access__btn, .no-feature-access__btn--ghost { width: 100%; }
+}
 </style>
