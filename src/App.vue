@@ -54,7 +54,7 @@
     <header class="govuk-header">
       <div class="govuk-header__container">
         <div class="govuk-header__logo">
-          <router-link to="/" class="govuk-header__logotype-text" style="text-decoration:none;color:#fff">靠谱指数 · 量化研究</router-link>
+          <router-link to="/" class="govuk-header__logotype-text" style="text-decoration:none;color:#fff">靠谱工具 · 量化研究</router-link>
         </div>
         <nav class="govuk-header__nav">
           <router-link
