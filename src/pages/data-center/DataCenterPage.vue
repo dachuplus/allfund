@@ -193,7 +193,7 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.33</strong></td>
+              <td><strong>v4.0.34</strong></td>
               <td>2026-10-04</td>
               <td><code>本次提交</code></td>
               <td><span class="version-current">当前线上</span></td>
@@ -590,7 +590,7 @@
     <!-- 用户权限管理（仅管理员可见） -->
     <div class="card" v-if="isOwner" v-show="activeTab==='users'">
       <div class="card-title">用户权限管理</div>
-      <p class="section-desc">为注册用户开通功能：勾选需开通的功能后点击「保存」生效。未开通任何功能的用户登录后将显示「陌生人，无访问权限」。勾选「管理员」即授予该用户数据中心(管理)管理权限，可继续管理其他用户（主管理员账号固定不可改）。</p>
+      <p class="section-desc">为注册用户开通功能：勾选需开通的功能后点击「保存」生效。未开通任何功能的用户登录后将显示「陌生人，无访问权限」。勾选「管理员」即授予该用户数据中心(管理)管理权限，可继续管理其他用户（主管理员账号固定不可改）。「删除」为永久注销该账号及其全部数据（含权限记录），不可恢复。</p>
 
       <!-- 添加用户 -->
       <div class="perm-add">
@@ -2618,26 +2618,34 @@ async function loadPermissionsList() {
   }
 }
 
+// 删除账号本体：调用 admin-delete-user Edge Function 删除 auth.users 记录。
+// app_users.id 外键 ON DELETE CASCADE，账号删除后用户列表行自动消失。
+// 仅主管理员（57502460@qq.com）可调用，Edge Function 侧二次校验。
+async function deleteUserAccount(email) {
+  const { supabase, rewriteSupabaseUrl } = await import('../../api/supabase.js')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('未登录或会话已过期')
+  const url = rewriteSupabaseUrl(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ email }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
+}
+
 // 踢出用户：调用 Edge Function 永久删除该账号（仅管理员）
 async function kickUser(v) {
   if (!v.email || v.email === 'anonymous') return
   const ok = await confirm('踢出用户', `确定要踢出用户「${displayUsername(v.email)}」吗？此操作将永久删除该账号及其全部数据，不可恢复。`)
   if (!ok) return
   try {
-    const { supabase, rewriteSupabaseUrl } = await import('../../api/supabase.js')
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) throw new Error('未登录或会话已过期')
-    const url = rewriteSupabaseUrl(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ email: v.email }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    await deleteUserAccount(v.email)
     toast('已踢出用户 ' + displayUsername(v.email), 'success')
     visitorList.value = visitorList.value.filter(x => x.email !== v.email)
     // 同步刷新权限列表（该用户可能已在 user_permissions 中有记录）
@@ -2698,20 +2706,46 @@ async function saveRow(row) {
   }
 }
 
+// 删除用户：① 删除账号本体（auth.users → app_users 级联删除）② 清理 user_permissions 残留记录。
+// ⚠️ 历史 bug：旧实现只 deletePermissions()，而列表数据来自 app_users，
+//    未在 user_permissions 中建档的用户（注册后从未授权）删了权限表 0 行也不报错，
+//    刷新后用户依然在列表里 —— 表现为「点击删除按钮无效」。现改为先删账号。
 async function removeRow(row) {
-  const ok = await confirm('确定删除？', `将删除 ${row.user_email} 的权限记录，该用户登录后将变为「陌生人，无访问权限」。`)
+  const email = row.user_email
+  if (!email) return
+  if (email === adminEmail) { permMsg.value = '主管理员账号不可删除'; permMsgType.value = 'perm-msg--error'; return }
+  const ok = await confirm('确定删除用户？', `将永久删除用户「${displayUsername(email)}」的账号及其全部数据（含已开通的功能权限），不可恢复。`)
   if (!ok) return
   row._saving = true
   permMsg.value = ''
   try {
-    await deletePermissions(row.user_email)
+    let accountErr = null
+    try {
+      await deleteUserAccount(email)
+    } catch (e) {
+      accountErr = e
+    }
+    if (accountErr) {
+      // 账号不存在（例如仅手工添加过权限、从未注册成功的邮箱）→ 至少把权限记录清掉
+      const msg = String(accountErr?.message || '')
+      if (!/user not found|404|not found/i.test(msg)) throw accountErr
+    }
+    // 清权限残留（无记录时 PostgREST 不报错，属预期）
+    try {
+      await deletePermissions(email)
+    } catch (e) {
+      console.warn('[perm] 清理权限记录失败（可能本就没记录）', e)
+    }
     await loadPermissionsList()
-    permMsg.value = `已删除 ${row.user_email} 的权限`
+    permMsg.value = accountErr
+      ? `账号不存在，已清理 ${displayUsername(email)} 的权限记录`
+      : `已删除用户 ${displayUsername(email)}`
     permMsgType.value = 'perm-msg--ok'
   } catch (e) {
     permMsg.value = '删除失败：' + (e?.message || '未知错误')
     permMsgType.value = 'perm-msg--error'
   } finally {
+    // 列表重建后 row 引用可能已失效，容错赋值
     row._saving = false
   }
 }

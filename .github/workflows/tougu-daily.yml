@@ -1,0 +1,42 @@
+name: 投顾产品每日更新
+
+on:
+  # 定时触发：北京时间每日 09:00（UTC 01:00）
+  schedule:
+    - cron: '0 1 * * *'
+  # 手动触发
+  workflow_dispatch:
+  # 远程触发（无需登录 GitHub 点击）：
+  #   POST /repos/dachuplus/allfund/dispatches  body {"event_type":"tougu-run"}
+  repository_dispatch:
+    types: [tougu-run]
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  tougu-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # CI 仅配置 SUPABASE_MGMT_TOKEN；脚本兼容 SUPABASE_PAT 或 SUPABASE_MGMT_TOKEN
+      SUPABASE_PAT: ${{ secrets.SUPABASE_PAT }}
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 拉取并更新投顾产品
+        run: |
+          echo "============================================"
+          echo "  fetch_tougu_products"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/fetch_tougu_products.py
+          echo "完成时间: $(date '+%Y-%m-%d %H:%M:%S')"

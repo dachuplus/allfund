@@ -65,31 +65,6 @@
       </div>
     </div>
 
-    <!-- ==================== 2. 股债对比 ==================== -->
-    <div v-if="activeTab === 'fed'">
-      <div class="card">
-        <div class="card-title">
-          股债性价比
-          <span class="card-subtitle">FED Model — 风险溢价指标</span>
-        </div>
-        <p class="card-desc">股债利差 = 1/PE − 10年期国债收益率，利差越大股票越便宜</p>
-        <div class="fed-grid">
-          <div class="fed-card" v-for="idx in fedIndices" :key="idx.key">
-            <div class="fed-name">{{ idx.name }}</div>
-            <div class="fed-spread" :style="{ color: idx.spread > 3 ? 'var(--color-up)' : 'var(--color-down)' }">
-              {{ idx.spread }}%
-            </div>
-            <div class="fed-label">股债利差</div>
-            <div class="fed-details">
-              <div class="fed-row"><span>PE</span><span>{{ idx.pe }}倍</span></div>
-              <div class="fed-row"><span>PE百分位</span><span>{{ idx.pePercentile }}%</span></div>
-            </div>
-          </div>
-        </div>
-        <p class="data-source">数据参考：公开网络 | 中国10年期国债收益率 {{ bondY10y }}%</p>
-      </div>
-    </div>
-
     <!-- ==================== 3+4. 资产配置（资产对比 + 资产配比 合并） ==================== -->
     <div v-if="activeTab === 'asset'">
       <!-- 资产配比（置顶） -->
@@ -191,11 +166,21 @@
           <span class="comm-best-tag">★ 当前性价比最高</span>
           <span class="comm-best-name">{{ commodityBest.name }}</span>
           <span class="comm-best-reason">{{ commodityBest.reason }}</span>
+          <a
+            v-if="commodityBest.link"
+            class="comm-link" :href="commodityBest.link" target="_blank" rel="noopener noreferrer"
+          >查看行情</a>
         </div>
 
         <div class="comm-grid">
           <div class="comm-item" :class="{ 'comm-item--best': c.isBest }" v-for="c in commodityItems" :key="c.key">
-            <div class="comm-label">{{ c.label }}</div>
+            <div class="comm-head">
+              <span class="comm-label">{{ c.label }}</span>
+              <a
+                v-if="c.link"
+                class="comm-link" :href="c.link" target="_blank" rel="noopener noreferrer"
+              >行情</a>
+            </div>
             <div class="comm-bar-wrap">
               <div class="comm-bar"><div class="comm-fill" :style="{ width: c.percentile + '%', background: c.color }"></div></div>
               <span class="comm-pct">估值分 {{ c.percentile }}</span>
@@ -225,6 +210,29 @@
       </div>
       <p class="data-source">数据来源：公开网络（沪深300日线 / 全市场市盈率 / 新发基金），自建复合算法，仅供参考研究，不构成投资建议。</p>
       <p v-if="jqrCards.length === 0" class="data-source" style="color:#b95900">暂无特色指标数据。</p>
+
+      <!-- 股债性价比（原「股债对比」tab 迁移至此） -->
+      <div class="card">
+        <div class="card-title">
+          股债性价比
+          <span class="card-subtitle">FED Model — 风险溢价指标</span>
+        </div>
+        <p class="card-desc">股债利差 = 1/PE − 10年期国债收益率，利差越大股票越便宜</p>
+        <div class="fed-grid">
+          <div class="fed-card" v-for="idx in fedIndices" :key="idx.key">
+            <div class="fed-name">{{ idx.name }}</div>
+            <div class="fed-spread" :style="{ color: idx.spread > 3 ? 'var(--color-up)' : 'var(--color-down)' }">
+              {{ idx.spread }}%
+            </div>
+            <div class="fed-label">股债利差</div>
+            <div class="fed-details">
+              <div class="fed-row"><span>PE</span><span>{{ idx.pe }}倍</span></div>
+              <div class="fed-row"><span>PE百分位</span><span>{{ idx.pePercentile }}%</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="data-source">数据参考：公开网络 | 中国10年期国债收益率 {{ bondY10y }}%</p>
+      </div>
     </div>
   </div>
 </template>
@@ -245,7 +253,6 @@ import JqrIndicator from '../../components/JqrIndicator.vue'
 const tabs = [
   { key: 'macro',    label: '宏观策略' },
   { key: 'asset',    label: '资产配置' },
-  { key: 'fed',      label: '股债对比' },
   { key: 'factor',   label: '风格因子' },
   { key: 'jqr',      label: '特色指标' },
 ]
@@ -923,6 +930,29 @@ async function loadBondFactors() {
 }
 
 // ===== 加载大宗商品信号（读 style_factors 生产表，category='commodity'） =====
+// 外链映射：主力合约代码 -> 新浪期货行情页（逐品种实测返回 200；未收录品种不留链接，宁空不假）
+const COMM_QUOTE_LINKS = {
+  AG0: 'https://finance.sina.com.cn/futures/quotes/AG0.shtml',
+  AL0: 'https://finance.sina.com.cn/futures/quotes/AL0.shtml',
+  AU0: 'https://finance.sina.com.cn/futures/quotes/AU0.shtml',
+  C0:  'https://finance.sina.com.cn/futures/quotes/C0.shtml',
+  CF0: 'https://finance.sina.com.cn/futures/quotes/CF0.shtml',
+  CU0: 'https://finance.sina.com.cn/futures/quotes/CU0.shtml',
+  HC0: 'https://finance.sina.com.cn/futures/quotes/HC0.shtml',
+  I0:  'https://finance.sina.com.cn/futures/quotes/I0.shtml',
+  J0:  'https://finance.sina.com.cn/futures/quotes/J0.shtml',
+  JM0: 'https://finance.sina.com.cn/futures/quotes/JM0.shtml',
+  M0:  'https://finance.sina.com.cn/futures/quotes/M0.shtml',
+  NI0: 'https://finance.sina.com.cn/futures/quotes/NI0.shtml',
+  P0:  'https://finance.sina.com.cn/futures/quotes/P0.shtml',
+  RB0: 'https://finance.sina.com.cn/futures/quotes/RB0.shtml',
+  RU0: 'https://finance.sina.com.cn/futures/quotes/RU0.shtml',
+  SC0: 'https://finance.sina.com.cn/futures/quotes/SC0.shtml',
+  SR0: 'https://finance.sina.com.cn/futures/quotes/SR0.shtml',
+  TA0: 'https://finance.sina.com.cn/futures/quotes/TA0.shtml',
+  Y0:  'https://finance.sina.com.cn/futures/quotes/Y0.shtml',
+  ZN0: 'https://finance.sina.com.cn/futures/quotes/ZN0.shtml',
+}
 async function loadCommodityFactors() {
   try {
     const rows = await fetchStyleFactors('commodity')
@@ -939,6 +969,7 @@ async function loadCommodityFactors() {
         signalLabel: r.signal_label || '',
         color: r.color || '#1d70b8',
         reason: r.reason || '',
+        link: COMM_QUOTE_LINKS[r.factor_key] || '',
         isBest,
       }
     })
@@ -967,8 +998,6 @@ const JQR_META = {
     zones: [[0.45, '#00703c'], [0.55, '#b1b4b6'], [1, '#d4351c']] },
   equity_bond_gap: { name: '股债风险溢价', desc: '股票盈利收益率与10年国债收益率之差（越高股越优）', color: '#f47738', range: '0 - 100',
     zones: [[0.45, '#00703c'], [0.55, '#b1b4b6'], [1, '#d4351c']] },
-  mcap_gdp:       { name: '市值GDP比',    desc: '全市场总市值与GDP之比（巴菲特指标）', color: '#1d70b8', range: '0 - 100',
-    zones: [[0.30, '#00703c'], [0.85, '#b1b4b6'], [1, '#d4351c']] },
 }
 
 function buildJqrCard(metric, row) {
@@ -1000,11 +1029,6 @@ function buildJqrCard(metric, row) {
     else if (v < 55) { signalLabel = '中性'; signalClass = 'neutral' }
     else if (v < 75) { signalLabel = '股票较优'; signalClass = 'hot' }
     else { signalLabel = '股票超配'; signalClass = 'hot' }
-  } else if (metric === 'mcap_gdp') {
-    if (v < 30) { signalLabel = '显著低估'; signalClass = 'cold' }
-    else if (v < 70) { signalLabel = '适中'; signalClass = 'neutral' }
-    else if (v < 85) { signalLabel = '偏高'; signalClass = 'hot' }
-    else { signalLabel = '高估偏热'; signalClass = 'hot' }
   }
   const subLines = []
   if (metric === 'fear_greed') {
@@ -1028,10 +1052,6 @@ function buildJqrCard(metric, row) {
     if (detail.e_yield != null) subLines.push({ k: '股票盈利收益率', v: detail.e_yield + '%' })
     if (detail.bond_yield != null) subLines.push({ k: '10年国债收益率', v: detail.bond_yield + '%' })
     if (detail.gap != null) subLines.push({ k: '收益差', v: detail.gap + '%' })
-  } else if (metric === 'mcap_gdp') {
-    if (detail.total_mcap != null) subLines.push({ k: '总市值(万亿)', v: detail.total_mcap })
-    if (detail.gdp != null) subLines.push({ k: 'GDP(万亿)', v: detail.gdp })
-    if (detail.ratio != null) subLines.push({ k: '市值/GDP', v: detail.ratio })
   }
   // 估值温度计：按数值映射温度档位与颜色（偏低 / 正常 / 偏高 / 高估）
   let tempLevel = null, tempColor = null
@@ -1043,7 +1063,7 @@ function buildJqrCard(metric, row) {
   }
   return {
     key: metric, name: meta.name, desc: meta.desc,
-    value: v, valueLabel: v != null ? (metric === 'mcap_gdp' ? v.toFixed(0) + '%' : v) : '--', color: meta.color, range: meta.range,
+    value: v, valueLabel: v != null ? v : '--', color: meta.color, range: meta.range,
     signalLabel, signalClass, date: row.date || '--', subLines,
     tempLevel, tempColor,
   }
@@ -1052,7 +1072,7 @@ function buildJqrCard(metric, row) {
 async function loadJqr() {
   if (!supabase) return
   try {
-    const metrics = ['fear_greed', 'market_temp', 'fund_issuance', 'equity_bond_gap', 'mcap_gdp']
+    const metrics = ['fear_greed', 'market_temp', 'fund_issuance', 'equity_bond_gap']
     const res = await Promise.all(metrics.map(m =>
       supabase.from('jqr_indicators').select('date,value,detail').eq('metric', m).order('date', { ascending: true }).limit(3000)
     ))
@@ -1270,7 +1290,11 @@ function handleResize() {
 .comm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); }
 .comm-item { border: 1px solid var(--border); padding: var(--space-md); background: #fff; }
 .comm-item--best { border-color: #00703c; box-shadow: 0 0 0 1px #00703c inset; }
-.comm-label { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-xs); }
+.comm-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+.comm-label { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.comm-link { font-size: 12px; font-weight: 700; color: #1d70b8; text-decoration: underline; white-space: nowrap; }
+.comm-link:hover { color: #003078; text-decoration-thickness: 3px; }
+.comm-link:focus { outline: 3px solid #ffdd00; outline-offset: 0; background: #ffdd00; }
 .comm-bar-wrap { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: 6px; }
 .comm-bar { flex: 1; height: 14px; background: #f3f2f1; }
 .comm-fill { height: 100%; transition: width 0.5s ease; }

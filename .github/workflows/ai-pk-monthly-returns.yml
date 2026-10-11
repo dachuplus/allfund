@@ -1,0 +1,43 @@
+name: 基金组合月度收益记录
+
+on:
+  # 定时触发：北京时间每日 23:40（UTC 15:40）
+  # 需晚于 update-scores（21:30），确保 fund_scores 的近1月收益已刷新
+  schedule:
+    - cron: '40 15 * * *'
+  # 手动触发
+  workflow_dispatch:
+  # 远程触发（无需登录 GitHub 点击）：
+  #   POST /repos/dachuplus/allfund/dispatches  body {"event_type":"ai-pk-returns-run"}
+  repository_dispatch:
+    types: [ai-pk-returns-run]
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  ai-pk-returns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # CI 仅配置 SUPABASE_MGMT_TOKEN；脚本兼容 SUPABASE_PAT 或 SUPABASE_MGMT_TOKEN
+      SUPABASE_PAT: ${{ secrets.SUPABASE_PAT }}
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 记录各模型月度组合收益
+        run: |
+          echo "============================================"
+          echo "  record_ai_pk_monthly_returns"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/record_ai_pk_monthly_returns.py
+          echo "完成时间: $(date '+%Y-%m-%d %H:%M:%S')"

@@ -133,6 +133,37 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 月度收益时间线（按时间线记录每个模型的月度收益） -->
+      <div class="aipk-monthly">
+        <div class="aipk-table-title">月度收益时间线</div>
+        <p class="aipk-monthly-note">
+          记录每个模型每期持仓的<strong>组合月度收益</strong>（成分基金近1月真实收益按权重加权，期末定格），
+          用于逐月横向观察各模型的实际效果。未记录月份显示「--」。
+        </p>
+        <div class="aipk-table-wrap" v-if="monthlyRows.length && monthlyMonths.length">
+          <table class="aipk-table aipk-table--monthly">
+            <thead>
+              <tr>
+                <th class="aipk-th-model">模型</th>
+                <th v-for="mm in monthlyMonths" :key="mm">{{ mm }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in monthlyRows" :key="row.model.id">
+                <td class="aipk-td-model">
+                  <span class="aipk-dot" :style="{ background: row.model.color }"></span>{{ row.model.name }}
+                </td>
+                <td
+                  v-for="(v, i) in row.cells" :key="row.model.id + '-' + monthlyMonths[i]"
+                  :class="retClass(v)"
+                >{{ fmtRet(v) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="aipk-monthly-empty" v-else>暂无月度收益记录（数据随每日更新逐月累积）</div>
+      </div>
     </div>
 
     <!-- 调仓时间线 -->
@@ -418,6 +449,7 @@ function providerLabel(p) {
 const models = ref([])
 const picksMap = ref({})      // { model_id: { period_month, picks:[{code,name,weight}] } }
 const fundReturns = ref({})    // { code: { ...returns } }
+const monthlyReturns = ref([]) // [{ model_id, period_month, ret }] 月度收益时间线
 const loading = ref(true)
 
 const RETURN_COLS = [
@@ -524,6 +556,26 @@ const ranking = computed(() => {
   return arr
 })
 
+// ===== 月度收益时间线 =====
+// 数据来源：ai_pk_monthly_returns（由 scripts/record_ai_pk_monthly_returns.py 每日写入）
+const monthlyMonths = computed(() => {
+  const set = new Set()
+  monthlyReturns.value.forEach(r => { if (r?.period_month) set.add(r.period_month) })
+  return [...set].sort().reverse().slice(0, 12)   // 最多展示最近 12 期
+})
+const monthlyRows = computed(() => {
+  if (!monthlyMonths.value.length) return []
+  const map = {}
+  monthlyReturns.value.forEach(r => {
+    if (!r?.model_id || !r?.period_month) return
+    map[`${r.model_id}|${r.period_month}`] = (r.ret == null || r.ret === '') ? null : Number(r.ret)
+  })
+  return orderedModels.value.map(m => ({
+    model: m,
+    cells: monthlyMonths.value.map(mm => map[`${m.id}|${mm}`] ?? null),
+  }))
+})
+
 const timelinePeriods = computed(() => {
   const set = new Set()
   Object.values(picksMap.value).forEach(p => { if (p?.period_month) set.add(p.period_month) })
@@ -590,6 +642,17 @@ async function loadAll() {
       const map = {}
       ;(fr || []).forEach(f => { map[f.c] = f })
       fundReturns.value = map
+    }
+
+    // 月度收益时间线（表未建或读取失败时静默降级，不影响主流程）
+    try {
+      const { data: mr } = await supabase
+        .from('ai_pk_monthly_returns')
+        .select('model_id,period_month,ret,fund_count,as_of')
+      monthlyReturns.value = mr || []
+    } catch (e) {
+      console.warn('[AIPkPanel] 月度收益时间线读取失败', e)
+      monthlyReturns.value = []
     }
   } catch (e) {
     console.error('[AIPkPanel]', e)
@@ -1251,6 +1314,12 @@ async function toggleModelActive(m) {
 .aipk-th-model { text-align: left !important; }
 .aipk-td-model { text-align: left !important; font-weight: 700; white-space: nowrap; }
 .aipk-td-model .aipk-dot { margin-right: 6px; vertical-align: middle; }
+
+/* 月度收益时间线 */
+.aipk-monthly { margin-top: var(--space-lg); padding-top: var(--space-md); border-top: 1px solid var(--border); }
+.aipk-monthly-note { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 var(--space-sm); }
+.aipk-table--monthly { min-width: 560px; }
+.aipk-monthly-empty { font-size: 14px; color: var(--text-secondary); padding: var(--space-md) 0; }
 
 /* 涨跌配色 */
 .ret-pos { color: #d4351c; }
