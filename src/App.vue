@@ -223,11 +223,25 @@ async function logVisitor() {
     const ipData = await ipRes.json()
     ip = ipData.ip || null
     try {
-      const geoRes = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN`)
-      const geo = await geoRes.json()
-      region = `${geo.regionName || ''}${geo.city ? ' ' + geo.city : ''}`.trim()
+      // ⚠️ 2026-10-11 修复：原用 http://ip-api.com，在 https 页面属「混合内容」，
+      //     会被浏览器直接拦截（try/catch 静默吞掉）→ 访客地区恒为空。
+      //     改为 https 的 ipwho.is，与数据中心「用户分析-地区列」同一数据源。
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 4000)
+      const geoRes = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, { signal: ctrl.signal })
+      clearTimeout(timer)
+      if (geoRes.ok) {
+        const geo = await geoRes.json()
+        if (geo && geo.success !== false) {
+          const loc = [geo.region, geo.city].filter(Boolean).join(' ')
+          region = (geo.country === 'China' || geo.country_code === 'CN')
+            ? (loc || geo.country || '')
+            : (loc ? `${loc}, ${geo.country || ''}` : (geo.country || ''))
+          region = region.trim()
+        }
+      }
     } catch (e) {
-      region = ''   // ip-api 不可达时地区留空，正常写入
+      region = ''   // 解析不可达时地区留空，正常写入
     }
   } catch (e) {
     ip = null
