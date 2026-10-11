@@ -26,7 +26,7 @@ export async function fetchTouguProducts(filters = {}) {
 // fund_scores 表实际列（核心视图）：代码/名称/分类/详情/评分
 // 合规：不再向前端下发短周期（<3 个月）评分列 k0w/k1m ——《证券投资基金评价业务管理暂行办法》
 // 第十四条第(七)项禁止发布单一指标排名期间少于 3 个月的结果，页面对应周期已一并下架。
-const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y'
+const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly'
 export function fetchFundScores(params = {}) {
   const key = 'fundScores:' + JSON.stringify(params)
   return withCache(key, 60000, () => fetchFundScoresImpl(params))
@@ -328,7 +328,7 @@ export function scaleFilterExpr(ranges) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, scaleMin, scaleMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
   if (supabase) {
     // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
     //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
@@ -378,6 +378,9 @@ async function fetchFundScoresImpl(params = {}) {
       if (dailyLimit === '1') query = query.gte('daily_change', 20)
       else if (dailyLimit === '0') query = query.or('daily_change.lt.20,daily_change.is.null')
     }
+    // 异常收益标注（2026-10-11）：'1' 仅看异常 / '0' 剔除异常（服务端 ret_anomaly 列）
+    if (retAnomaly === '1') query = query.eq('ret_anomaly', true)
+    else if (retAnomaly === '0') query = query.eq('ret_anomaly', false)
     // 基金规模区间（亿元）：服务端下推。多选区间 → or=(and(gte,lte),...)；单区间仍走 gte/lte（与旧行为一致）
     if (scaleRanges && scaleRanges.length) {
       if (scaleRanges.length === 1) {

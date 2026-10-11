@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}))
     const {
       t0, t1, search,
-      etf, lof, dk, sg, zz, dailyLimit,
+      etf, lof, dk, sg, zz, dailyLimit, retAnomaly,
       scaleMin, scaleMax, scaleRanges,
       shareClasses, mainCode, holding, holdingPeriods,
       filterCN,
@@ -157,6 +157,9 @@ Deno.serve(async (req: Request) => {
       if (dailyLimit === '1') query = query.gte('daily_change', 20)
       else if (dailyLimit === '0') query = query.or('daily_change.lt.20,daily_change.is.null')
     }
+    // 异常收益标注（2026-10-11）：'1' 仅看异常 / '0' 剔除异常（与 data.js 口径一致）
+    if (retAnomaly === '1') query = query.eq('ret_anomaly', true)
+    else if (retAnomaly === '0') query = query.eq('ret_anomaly', false)
     if (scaleRanges && scaleRanges.length) {
       if (scaleRanges.length === 1) {
         const [mn, mx] = scaleRanges[0]

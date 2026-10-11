@@ -252,6 +252,27 @@ def main():
     except Exception as e:
         print(f'  [WARN] 配置类列备份回填失败（不影响评分切换）: {e}', flush=True)
 
+    # ── 2.3 重算异常收益标注 ret_anomaly（2026-10-11 新增）────────────────
+    # 背景：013835.OF（中加优享纯债债券C）单月收益 221.98% 属数据源脏值，其
+    #       r1m≈r3m≈r6m≈r1y≈ytd≈222~227（各期累计几乎相同）＝单点净值毛刺的典型签名。
+    # 规则（阈值经全表实证校准：债基正常 r1y 最高 25.18%，全表 r1m 最低 -21.24%）：
+    #   ① 单月收益离谱：r1m>100 或 r1m<-60（任何类型）
+    #   ② 债券型收益上限：r1m>15 / r3m>25 / r6m>35 / r1y>50
+    #   ③ 单点净值毛刺：r1y>50 且 (r1y-r1m)<10（各期累计几乎相同）
+    # staging 不带该列（promote INSERT 走 DEFAULT false），故每次切换后全表重算，
+    # 保证夜跑后标注不丢、新脏数据自动被标记。前端「更多筛选-异常」+ 名称旁红标使用该列。
+    print('\n[2.3] 重算异常收益标注 ret_anomaly', flush=True)
+    try:
+        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS ret_anomaly boolean NOT NULL DEFAULT false", timeout=120)
+        pg("""UPDATE fund_scores SET ret_anomaly = COALESCE(
+                  (r1m > 100) OR (r1m < -60)
+                  OR (t0 = '债券型' AND (r1m > 15 OR r3m > 25 OR r6m > 35 OR r1y > 50))
+                  OR (r1y > 50 AND r1m IS NOT NULL AND (r1y - r1m) < 10), false)""", timeout=300)
+        _anom = pg("SELECT count(*) AS cnt FROM fund_scores WHERE ret_anomaly")[0]['cnt']
+        print(f'  ✓ 异常收益标注完成，当前 {_anom} 只被标记', flush=True)
+    except Exception as e:
+        print(f'  [WARN] ret_anomaly 重算失败（不影响评分切换）: {e}', flush=True)
+
     # ── 2.5 重新应用标签（tags）到 fund_scores ──────────────────────────
     # fund_scores.tags 由 fund_tag_funds 派生，不在 PROMOTE_COLS 内（staging 无该列），
     # 故每次切换后需从 fund_tag_funds 重新聚合写入，保证夜跑后标签不丢。

@@ -170,6 +170,16 @@
                 </div>
               </div>
 
+              <!-- 异常收益（数据源脏值标注，如单点净值毛刺） -->
+              <div class="filter-row">
+                <span class="filter-label">异常</span>
+                <div class="filter-chips">
+                  <div class="filter-chip" :class="{ active: filterAnomaly === '' }" @click="mToggleFlag('ANOM', '')">全部</div>
+                  <div class="filter-chip" :class="{ active: filterAnomaly === '1' }" @click="mToggleFlag('ANOM', '1')">是</div>
+                  <div class="filter-chip" :class="{ active: filterAnomaly === '0' }" @click="mToggleFlag('ANOM', '0')">否</div>
+                </div>
+              </div>
+
               <!-- 基金规模区间（亿元）：多选预设，或自定义区间 -->
               <div class="filter-row">
                 <span class="filter-label">规模</span>
@@ -195,7 +205,7 @@
 
               <!-- 筛选说明 -->
               <div class="filter-tip">
-                注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。ETF/LOF/定开/申购状态/单日涨跌基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
+                注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。ETF/LOF/定开/申购状态/单日涨跌/异常基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。「异常」为收益数据合理性校验标注（如单月收益超 100%、债券型收益超上限、各期累计收益几乎相同等数据源脏值特征），名称旁带红标，选基时建议选「否」剔除。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
                 机构占比、股票占比数据暂未收录，后续版本更新。
               </div>
             </div>
@@ -296,7 +306,7 @@
             class="fund-row"
           >
             <td class="col-code"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.c }}</a></td>
-            <td class="col-name"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.n || '基金' + fund.c }}</a></td>
+            <td class="col-name"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.n || '基金' + fund.c }}</a><span v-if="fund.ret_anomaly" class="anom-badge" title="收益数据异常（疑似单点净值毛刺或源数据脏值），筛选「异常-否」可剔除">异常</span></td>
             <td class="col-manager" :title="fund.fund_manager">{{ fund.fund_manager || '--' }}</td>
             <td class="col-t1" :title="fund.t1_tt || fund.t1">{{ fund.t1_tt || fund.t1 || '--' }}</td>
             <td class="col-scale">{{ fmtFundScale(fund.fund_scale) }}</td>
@@ -338,6 +348,7 @@
         <div class="fund-card-top">
           <a class="fund-code" :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.c }}</a>
           <a class="fund-name" :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.n || '基金' + fund.c }}</a>
+          <span v-if="fund.ret_anomaly" class="anom-badge" title="收益数据异常（疑似单点净值毛刺或源数据脏值），筛选「异常-否」可剔除">异常</span>
           <span class="fund-card-actions" @click.stop>
             <span class="action-icon" :class="{ active: likesMap[fund.c] > 0 }" title="点赞" @click="thumbUp(fund)">
               <SvgIcon name="thumbs-up" :size="16" />
@@ -759,6 +770,7 @@ const filterETF = ref('')
 const filterLOF = ref('')
 const filterFOF = ref('')
 const filterZZ = ref('')       // 指增（指数增强）：''全部 '1'是 '0'否
+const filterAnomaly = ref('')  // 异常收益标注：''全部 '1'仅看异常 '0'剔除异常
 const filterCN = ref('')       // 场内：''全部 '1'是(ETF/LOF/REITs不计联接) '0'否(场外+ETF联接)
 const filterDK = ref('')
 const filterDailyLimit = ref('')
@@ -1066,6 +1078,7 @@ async function loadData(reset = true, _retryCount = 0) {
       zz: filterZZ.value || undefined,
       sg: filterSG.value || undefined,
       dailyLimit: filterDailyLimit.value || undefined,
+      retAnomaly: filterAnomaly.value || undefined,
       scaleRanges: scaleRanges.value.length ? scaleRanges.value : undefined,
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
@@ -1156,6 +1169,7 @@ function clearMoreFilters() {
   filterLOF.value = ''
   filterFOF.value = ''
   filterZZ.value = ''
+  filterAnomaly.value = ''
   filterDK.value = ''
   filterDailyLimit.value = ''
   filterSG.value = ''
@@ -1170,7 +1184,7 @@ let moreFilterSnapshot = null
 
 function openMoreFilter() {
   moreFilterSnapshot = {
-    sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value,
+    sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value, anom: filterAnomaly.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
     sp: [...scalePicks.value], scu: scaleCustom.value,
@@ -1186,6 +1200,7 @@ function cancelMoreFilter() {
     filterLOF.value = moreFilterSnapshot.lof
     filterFOF.value = moreFilterSnapshot.fof
     filterZZ.value = moreFilterSnapshot.zz
+    filterAnomaly.value = moreFilterSnapshot.anom || ''
     filterCN.value = moreFilterSnapshot.cn
     filterDK.value = moreFilterSnapshot.dk
     filterDailyLimit.value = moreFilterSnapshot.dl
@@ -1224,7 +1239,7 @@ function mToggleCN(val) { filterCN.value = filterCN.value === val ? '' : val }
 function mToggleSG(val) { filterSG.value = filterSG.value === val ? '' : val }
 function mToggleDailyLimit(val) { filterDailyLimit.value = filterDailyLimit.value === val ? '' : val }
 function mToggleFlag(type, val) {
-  const map = { ETF: filterETF, LOF: filterLOF, FOF: filterFOF, DK: filterDK, ZZ: filterZZ }
+  const map = { ETF: filterETF, LOF: filterLOF, FOF: filterFOF, DK: filterDK, ZZ: filterZZ, ANOM: filterAnomaly }
   const r = map[type]
   if (!r) return
   const next = r.value === val ? '' : val
@@ -1264,6 +1279,7 @@ const activeMoreFilterCount = computed(() => {
   if (filterLOF.value) n++
   if (filterFOF.value) n++
   if (filterZZ.value) n++
+  if (filterAnomaly.value) n++
   if (filterCN.value) n++
   if (filterDK.value) n++
   if (filterDailyLimit.value) n++
@@ -1670,6 +1686,20 @@ onUnmounted(() => {
   min-width: 0; line-height: 1.4; text-decoration: none;
 }
 .fund-name:hover { color: var(--link); text-decoration: underline; }
+/* 异常收益红标（gov.uk 风格：无圆角） */
+.anom-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  background: #d4351c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: help;
+}
 
 .fund-card-mgr {
   font-size: 13px; color: var(--text-secondary);
