@@ -152,8 +152,10 @@ function cacheKey(opts) {
 }
 
 /**
- * 列表文章（带缓存）。
- * 命中缓存 → 瞬间返回旧数据，同时后台静默刷新（下次打开就是新的）。
+ * 列表文章（带缓存，SWR 模式）。
+ * 命中缓存/静态 JSON → 瞬间返回旧数据，同时后台静默刷新；
+ * 刷新完成后若列表有变化（如新发布文章），通过 onRefresh 回调实时更新当前页面。
+ * （2026-10-11 修复：此前后台刷新只写缓存"供下次打开用"，导致新文章必须手动刷新一次才可见。）
  *
  * 提速链路（按优先级）：
  *  1) localStorage 缓存（5 分钟内）
@@ -162,15 +164,23 @@ function cacheKey(opts) {
  *  3) /api/articles（同域边缘函数，15s 超时）→ 边缘偶尔抽风时回退
  *  4) 直连 Supabase（15s 超时兜底，迫使慢路径快速失败而非白屏60s+）
  */
-export async function listArticles({ status = 'published', authorEmail = null, limit = 50, offset = 0, tag = null, category = null } = {}) {
+export async function listArticles({ status = 'published', authorEmail = null, limit = 50, offset = 0, tag = null, category = null, onRefresh = null } = {}) {
   const ck = cacheKey({ status, authorEmail, tag, category })
   const hasCat = !!category && category !== 'all'
+  // 后台刷新回来后与"当前展示的列表"比对，有变化才回调（避免无意义重渲染）。
+  // fresh 与 cached 均按 is_pinned desc + published_at desc 排序，故逐 id 比对前缀即可。
+  const notifyIfChanged = (shown, fresh) => {
+    if (!onRefresh || !Array.isArray(fresh) || !fresh.length) return
+    const sig = (arr) => arr.map((a) => a.id).join(',')
+    if (sig(fresh) !== sig(shown.slice(0, fresh.length))) onRefresh(fresh.slice(0, limit))
+  }
 
   // ===== 1. localStorage 缓存命中（最快） =====
   const cached = readCache(ck)
   if (cached && offset === 0) {
-    // 后台静默刷新（不阻塞 UI）
+    // 后台静默刷新（不阻塞 UI）；完成后实时更新当前页面
     refreshListInBackground({ status, authorEmail, limit, tag, category }, ck)
+      .then((fresh) => notifyIfChanged(cached, fresh))
     return cached.slice(0, limit)
   }
 
@@ -190,9 +200,11 @@ export async function listArticles({ status = 'published', authorEmail = null, l
           if (hasCat) list = list.filter((a) => a.category === category)
           if (list.length) {
             writeCache(ck, list)
-            // 后台静默刷新（让本地缓存与服务端/边缘函数/Supabase 一致）
+            const shown = list.slice(0, limit)
+            // 静态 JSON 是部署时烘焙的，可能不含刚发布的文章 → 后台刷新回来后实时补上
             refreshListInBackground({ status, authorEmail, limit, tag, category }, ck)
-            return list.slice(0, limit)
+              .then((fresh) => notifyIfChanged(shown, fresh))
+            return shown
           }
         }
       }
@@ -252,7 +264,7 @@ export async function listArticles({ status = 'published', authorEmail = null, l
   }
 }
 
-/** 后台静默刷新：失败时静默忽略，不弹错误 */
+/** 后台静默刷新：成功返回最新列表（已排序），失败静默返回 null，不弹错误 */
 async function refreshListInBackground(opts, ck) {
   try {
     const FIELDS = 'id,title,summary,status,published_at,updated_at,views,tags,cover_image,author_email,is_pinned,scheduled_at,category'
@@ -266,8 +278,12 @@ async function refreshListInBackground(opts, ck) {
     q = q.order('published_at', { ascending: false, nullsFirst: false })
     q = q.range(0, Math.max(0, (opts.limit || 50) - 1))
     const { data, error } = await withTimeout(q, '文章列表(后台刷新)')
-    if (!error && data) writeCache(ck, data)
+    if (!error && data) {
+      writeCache(ck, data)
+      return data
+    }
   } catch { /* 静默：缓存仍有效，下次再试 */ }
+  return null
 }
 
 /**

@@ -327,13 +327,17 @@ async function load() {
   }, 5000)
   // 分类过滤：当前选中分类（博客/影视/美食/游戏）
   const cat = category.value
+  // 后台静默刷新回调：新文章发布后无需手动刷新页面（仅当用户仍停留在同一分类/视图时应用）
+  const onRefresh = (fresh) => {
+    if (category.value === cat) articles.value = fresh
+  }
   try {
     if (canManageContent.value && view.value === 'mine') {
       const email = user.value?.email
       // 「我的全部」仅显示草稿/定时文章，已发布的不在此显示
-      articles.value = await listArticles({ status: 'draft', authorEmail: email, limit: 200, category: cat })
+      articles.value = await listArticles({ status: 'draft', authorEmail: email, limit: 200, category: cat, onRefresh })
     } else {
-      articles.value = await listArticles({ status: 'published', limit: 200, category: cat })
+      articles.value = await listArticles({ status: 'published', limit: 200, category: cat, onRefresh })
     }
   } catch (e) {
     const msg = toErrorMessage(e)

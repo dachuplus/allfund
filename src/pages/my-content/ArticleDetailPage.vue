@@ -93,9 +93,13 @@ async function switchArticle(a) {
 
 async function load() {
   const id = route.params.id
-  // 并行加载侧边栏列表（只加载一次）
+  // 并行加载侧边栏列表（只加载一次）；后台刷新有新文章时实时更新侧栏
   if (!articleList.value.length) {
-    articleList.value = await listArticles({ status: 'published', limit: 200 }).catch(() => [])
+    articleList.value = await listArticles({
+      status: 'published',
+      limit: 200,
+      onRefresh: (fresh) => { articleList.value = fresh },
+    }).catch(() => [])
   }
   await loadArticle(id)
 }
