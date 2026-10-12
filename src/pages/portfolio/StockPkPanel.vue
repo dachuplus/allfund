@@ -134,6 +134,37 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 周度收益时间线（按时间线记录每个模型的周度组合收益） -->
+      <div class="aipk-monthly">
+        <div class="aipk-table-title">周度收益时间线</div>
+        <p class="aipk-monthly-note">
+          记录每个模型每期持仓的<strong>组合周度收益</strong>（成分股票近1月真实收益按权重加权，期末定格），
+          用于逐期横向观察各模型的实际效果。未记录期次显示「--」。
+        </p>
+        <div class="aipk-table-wrap" v-if="monthlyRows.length && monthlyMonths.length">
+          <table class="aipk-table aipk-table--monthly">
+            <thead>
+              <tr>
+                <th class="aipk-th-model">时间</th>
+                <th v-for="m in orderedModels" :key="m.id">
+                  <span class="aipk-dot" :style="{ background: m.color }"></span>{{ m.name }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in monthlyRows" :key="row.month">
+                <td class="aipk-td-model">{{ formatPeriod(row.month) }}</td>
+                <td
+                  v-for="(v, i) in row.cells" :key="row.month + '-' + orderedModels[i].id"
+                  :class="retClass(v)"
+                >{{ fmtRet(v) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="aipk-monthly-empty" v-else>暂无周度收益记录（数据随每日更新逐期累积）</div>
+      </div>
     </div>
 
     <!-- 调仓时间线 -->
@@ -419,6 +450,7 @@ function providerLabel(p) {
 const models = ref([])
 const picksMap = ref({})      // { model_id: { period_month, picks:[{code,name,weight}] } }
 const stockReturns = ref({})    // { code: { ...returns } }
+const monthlyReturns = ref([])  // 周度组合收益时间线：[{ model_id, period_month, ret, stock_count, as_of }]
 const loading = ref(true)
 
 const RETURN_COLS = [
@@ -523,6 +555,27 @@ const timelinePeriods = computed(() => {
 })
 const latestPeriod = computed(() => timelinePeriods.value[0] || null)
 
+// ===== 周度收益时间线（镜像 AI 大 PK 月度收益时间线）=====
+// 纵向为时间线（期次），横向为模型；期次越多纵向越长，便于滚动回溯。
+const monthlyMonths = computed(() => {
+  const set = new Set()
+  monthlyReturns.value.forEach(r => { if (r?.period_month) set.add(r.period_month) })
+  // 周度期次增长快，展示最近 16 期
+  return [...set].sort().reverse().slice(0, 16)
+})
+const monthlyRows = computed(() => {
+  if (!monthlyMonths.value.length) return []
+  const map = {}
+  monthlyReturns.value.forEach(r => {
+    if (!r?.model_id || !r?.period_month) return
+    map[`${r.model_id}|${r.period_month}`] = (r.ret == null || r.ret === '') ? null : Number(r.ret)
+  })
+  return monthlyMonths.value.map(mm => ({
+    month: mm,
+    cells: orderedModels.value.map(m => map[`${m.id}|${mm}`] ?? null),
+  }))
+})
+
 function formatPeriod(p) {
   if (!p) return ''
   const m = String(p).match(/^(\d{4})-(\d{2})-W(\d+)$/)
@@ -591,6 +644,17 @@ async function loadAll() {
       const map = {}
       ;(fr || []).forEach(f => { map[f.code] = f })
       stockReturns.value = map
+    }
+
+    // 周度组合收益时间线（数据随每日 CI 逐期累积，缺失行显示 --）
+    try {
+      const { data: mr } = await supabase
+        .from('stock_pk_monthly_returns')
+        .select('model_id,period_month,ret,stock_count,as_of')
+      monthlyReturns.value = mr || []
+    } catch (e2) {
+      console.warn('[StockPkPanel] 周度收益时间线读取失败', e2)
+      monthlyReturns.value = []
     }
   } catch (e) {
     console.error('[StockPkPanel]', e)
@@ -1273,6 +1337,12 @@ async function toggleModelActive(m) {
 .aipk-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
 .aipk-table th, .aipk-table td { padding: 8px 6px; text-align: center; border: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .aipk-table thead th { background: #f3f2f1; font-weight: 700; }
+
+/* 周度收益时间线 */
+.aipk-monthly { margin-top: var(--space-lg); padding-top: var(--space-md); border-top: 1px solid var(--border); }
+.aipk-monthly-note { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 var(--space-sm); }
+.aipk-table--monthly { min-width: 560px; }
+.aipk-monthly-empty { font-size: 14px; color: var(--text-secondary); padding: var(--space-md) 0; }
 .aipk-th-model, .aipk-th-sort { cursor: pointer; user-select: none; }
 .aipk-th-sort:hover, .aipk-th-model:hover { background: #e2e2e1; }
 .sort-arrow { font-size: 10px; margin-left: 2px; color: #1d70b8; }
