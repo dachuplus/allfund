@@ -181,11 +181,13 @@ function segsToPath(segs) {
 function paint(regionIdx) {
   if (won.value) return
   errMsg.value = ''
+  // 调色板编号是 1-based，colors 数组存 0-based 色索引
+  const colorIdx = curColor.value - 1
   // 涂色前先检查：若同色邻居已存在，提示
   const neighborSame = adj.value[regionIdx].some(
-    (nb) => colors.value[nb] === curColor.value
+    (nb) => colors.value[nb] === colorIdx
   )
-  colors.value[regionIdx] = curColor.value
+  colors.value[regionIdx] = colorIdx
   if (neighborSame) {
     errMsg.value = '注意：有相邻区域已经是第 ' + curColor.value + ' 色'
   }
