@@ -145,17 +145,17 @@
           <table class="aipk-table aipk-table--monthly">
             <thead>
               <tr>
-                <th class="aipk-th-model">模型</th>
-                <th v-for="mm in monthlyMonths" :key="mm">{{ mm }}</th>
+                <th class="aipk-th-model">时间</th>
+                <th v-for="m in orderedModels" :key="m.id">
+                  <span class="aipk-dot" :style="{ background: m.color }"></span>{{ m.name }}
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in monthlyRows" :key="row.model.id">
-                <td class="aipk-td-model">
-                  <span class="aipk-dot" :style="{ background: row.model.color }"></span>{{ row.model.name }}
-                </td>
+              <tr v-for="row in monthlyRows" :key="row.month">
+                <td class="aipk-td-model">{{ row.month }}</td>
                 <td
-                  v-for="(v, i) in row.cells" :key="row.model.id + '-' + monthlyMonths[i]"
+                  v-for="(v, i) in row.cells" :key="row.month + '-' + orderedModels[i].id"
                   :class="retClass(v)"
                 >{{ fmtRet(v) }}</td>
               </tr>
@@ -570,9 +570,10 @@ const monthlyRows = computed(() => {
     if (!r?.model_id || !r?.period_month) return
     map[`${r.model_id}|${r.period_month}`] = (r.ret == null || r.ret === '') ? null : Number(r.ret)
   })
-  return orderedModels.value.map(m => ({
-    model: m,
-    cells: monthlyMonths.value.map(mm => map[`${m.id}|${mm}`] ?? null),
+  // 纵向为时间线、横向为模型：每行一个月份，单元格为该月各模型收益
+  return monthlyMonths.value.map(mm => ({
+    month: mm,
+    cells: orderedModels.value.map(m => map[`${m.id}|${mm}`] ?? null),
   }))
 })
 
