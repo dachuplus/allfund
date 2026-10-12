@@ -2,10 +2,10 @@
   <div class="sd">
     <div class="sd-hud">
       <select v-model="level" class="sd-select">
-        <option :value="30">入门（30 空）</option>
-        <option :value="36">简单（36 空）</option>
-        <option :value="40">中等（40 空）</option>
-        <option :value="45">困难（45 空）</option>
+        <option :value="10">入门（10 空）</option>
+        <option :value="20">简单（20 空）</option>
+        <option :value="30">中等（30 空）</option>
+        <option :value="40">困难（40 空）</option>
         <option :value="48">专家（48 空）</option>
       </select>
       <div class="sd-stat">用时：{{ time }}</div>
@@ -78,7 +78,7 @@
 import { ref, computed } from 'vue'
 import { generate, solve, candidates, isSolved } from './sudokuCore.js'
 
-const level = ref(45)
+const level = ref(10)
 const board = ref([])
 const given = ref([])
 const solution = ref([])
@@ -224,15 +224,25 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 
 .sd-wrap { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
 .sd-board {
-  display: grid; grid-template-rows: repeat(9, 34px);
-  width: 306px; border: 2px solid #0b0c0c; background: #fff;
+  display: grid;
+  grid-template-columns: repeat(9, 34px);
+  grid-template-rows: repeat(9, 34px);
+  width: 310px; height: 310px;
+  border: 2px solid #0b0c0c; background: #fff;
 }
-.sd-row { display: grid; grid-template-columns: repeat(9, 34px); }
+.sd-row { display: contents; }
 .sd-cell {
-  border: 1px solid #d8d8d8; display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  border-right: 1px solid #d8d8d8;
+  border-bottom: 1px solid #d8d8d8;
+  display: flex; align-items: center; justify-content: center;
   font-size: 17px; cursor: pointer; position: relative;
   font-weight: 700; color: #1d70b8;
 }
+/* 最后一列/行不画右侧/下侧内边框，避免与外层边框重复 */
+.sd-row .sd-cell:last-child { border-right: 0; }
+.sd-row:last-child .sd-cell { border-bottom: 0; }
+/* 3×3 宫分界线加粗为 2px */
 .sd-cell.sd-box-r { border-right: 2px solid #0b0c0c; }
 .sd-cell.sd-box-b { border-bottom: 2px solid #0b0c0c; }
 .sd-cell.sd-given { color: #0b0c0c; background: #f3f2f1; }
