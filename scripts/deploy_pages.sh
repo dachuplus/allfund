@@ -70,6 +70,17 @@ cat > dist/package.json <<'JSON'
 }
 JSON
 
+echo "==> 3.1/4 同步 edgeone.json（apex dachu.me → www.dachu.me 的 301 重定向）"
+# EdgeOne Pages 读取**部署产物根目录**的 edgeone.json。我们上传的是 ./dist，
+# 因此必须把仓库根的 edgeone.json 拷进 dist/ 才会生效（Vite 不会自动复制根目录文件）。
+# "$host" → "$wwwhost" 是平台内置的「非 www 跳 www」语义，仅对自定义域名生效。
+if [ -f edgeone.json ]; then
+  cp edgeone.json dist/edgeone.json
+  echo "已同步 edgeone.json → dist/edgeone.json"
+else
+  echo "⚠️ 仓库根 edgeone.json 不存在，跳过（apex→www 重定向将不生效）"
+fi
+
 echo "==> 3.5/4 确保下载文件不进公网产物（dist/downloads 已下线）"
 # 2026-09-22 起：数据下载中心改为「Supabase 私有桶 downloads + RLS 管理员门控」。
 # 原因：EdgeOne Pages 是静态托管，会绕过前端路由守卫，dist/downloads/*.xlsx 与根目录
