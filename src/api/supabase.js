@@ -31,13 +31,13 @@ const baseFetch = (typeof fetch !== 'undefined' ? fetch : (...a) => Promise.reje
  * 用 query 携带目标路径，避免多级路由匹配问题；path 值整体 encodeURIComponent。
  */
 const SUPABASE_HOST = 'tqhtegazxykkqfcpejky.supabase.co'
-// 代理地址：在本站域名（dachu.me / www.dachu.me / 本地调试）上用**同源相对路径**，
-// 避免跨域（www 上硬编码 https://dachu.me 会产生跨域 POST，需预检、易被拦）；
-// 其余环境（如非本站托管）回退到固定 dachu.me 代理。
+// 代理地址：在本站域名（www.dachu.me / 本地调试）上用**同源相对路径**，
+// 避免跨域（硬编码绝对域名会产生跨域 POST，需预检、易被拦）；
+// 其余环境（如非本站托管）回退到固定 www.dachu.me 代理。
 const PROXY_BASE = (typeof location !== 'undefined' &&
-  /^(dachu\.me|www\.dachu\.me|localhost|127\.0\.0\.1)$/.test(location.hostname))
+  /^(www\.dachu\.me|localhost|127\.0\.0\.1)$/.test(location.hostname))
   ? '/api/sb-proxy'
-  : 'https://dachu.me/api/sb-proxy'
+  : 'https://www.dachu.me/api/sb-proxy'
 
 /**
  * ⚠️ EdgeOne CDN 对带 Range 头的请求会在边缘层直接返回 416

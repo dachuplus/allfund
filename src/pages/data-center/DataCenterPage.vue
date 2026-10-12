@@ -193,7 +193,7 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.43</strong></td>
+              <td><strong>v4.0.44</strong></td>
               <td>2026-10-04</td>
               <td><code>本次提交</code></td>
               <td><span class="version-current">当前线上</span></td>
@@ -401,7 +401,7 @@
 
         <div class="vd-title">v4.0.11 · 2026-10-01（当前线上）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.11</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpl5qkk91anj</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dpl5qkk91anj</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>be24fcd98a8d59e76e4965752ca93d262828fe18</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.10 → v4.0.11）</span></div>
         <div class="vd-row">
@@ -419,7 +419,7 @@
 
         <div class="vd-title">v4.0.10 · 2026-10-01（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.10</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp8m3cden8i9</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dp8m3cden8i9</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>a648050e542bb1bca1b0938f425f0ebe8b2522d4</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.9 → v4.0.10）</span></div>
         <div class="vd-row">
@@ -436,7 +436,7 @@
 
         <div class="vd-title">v4.0.9 · 2026-10-01（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.9</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dphayvc0ok7f</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dphayvc0ok7f</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>84cb531bd9feafe8924a3cfd1d541710c3c8dd9b</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.8 → v4.0.9）</span></div>
         <div class="vd-row">
@@ -453,7 +453,7 @@
 
         <div class="vd-title">v4.0.8 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.8</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpe120o3rde8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dpe120o3rde8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>1ad953371b5545774ef1fca5f40c7d3ed93e837a</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.7 → v4.0.8）</span></div>
         <div class="vd-row">
@@ -468,7 +468,7 @@
 
         <div class="vd-title">v4.0.7 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.7</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp5jmyz9q4l0</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dp5jmyz9q4l0</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>8594d2bf208e48ea65c3dfa12fcfe140b4c43e3e</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.6 → v4.0.7）</span></div>
         <div class="vd-row">
@@ -482,7 +482,7 @@
 
         <div class="vd-title">v4.0.6 · 2026-09-30（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.6</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpid29i5x6ih</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dpid29i5x6ih</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>0e472750d54882df20011b128f9c2dcfd9571bc3</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">若干 commit（v4.0.4 → v4.0.6）</span></div>
         <div class="vd-row">
@@ -498,7 +498,7 @@
 
         <div class="vd-title">v4.0.4 · 2026-09-29（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.4</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpnl6up7919x</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dpnl6up7919x</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>890a2a0650b6b02cfddd776b70fc5daad6549f10</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.3 → v4.0.4）</span></div>
         <div class="vd-row">
@@ -513,7 +513,7 @@
 
         <div class="vd-title">v4.0.3 · 2026-09-28（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.3</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dpyvkr9te4w8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dpyvkr9te4w8</code>（入口 chunk 名随构建变化，详见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>c14647bc306b049cd44d3f3ad50a705ce7859029</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.2 → v4.0.3）</span></div>
         <div class="vd-row">
@@ -527,7 +527,7 @@
 
         <div class="vd-title">v4.0.2 · 2026-09-28（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.2</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me 生产环境（部署 ID 见线上 <code>version.json</code> hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me 生产环境（部署 ID 见线上 <code>version.json</code> hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>d5cb7257602b2fca28e69053c212d388dd57750a</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0.1 → v4.0.2）</span></div>
         <div class="vd-row">
@@ -542,7 +542,7 @@
 
         <div class="vd-title">v4.0.1 · 2026-09-24（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.1</code></span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me，部署 ID <code>dp2xbjlgftxt</code>（入口 chunk 名随构建变化，详见线上 version.json hash）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me，部署 ID <code>dp2xbjlgftxt</code>（入口 chunk 名随构建变化，详见线上 version.json hash）</span></div>
         <div class="vd-row"><span class="vd-key">GitHub Commit</span><span class="vd-val"><code>337e165c9c454114e399c724d935af854576a75c</code></span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">1 个 commit（v4.0 → v4.0.1）</span></div>
         <div class="vd-row">
@@ -557,7 +557,7 @@
 
         <div class="vd-title">v4.0 · 2026-09-10（历史）</div>
         <div class="vd-row"><span class="vd-key">package.json</span><span class="vd-val"><code>version: 4.0.0</code>（同步修正长期未维护的占位值 1.0.0）</span></div>
-        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">dachu.me 权限墙版，部署 ID <code>dpn7odsislil</code>，全局 CSS <code>index-BaxHFwTw.css</code> 188409B text/css（合并修复生效）</span></div>
+        <div class="vd-row"><span class="vd-key">EdgeOne 部署</span><span class="vd-val">www.dachu.me 权限墙版，部署 ID <code>dpn7odsislil</code>，全局 CSS <code>index-BaxHFwTw.css</code> 188409B text/css（合并修复生效）</span></div>
         <div class="vd-row"><span class="vd-key">距上一版本</span><span class="vd-val">397 个 commit（v3.3 → v4.0）</span></div>
         <div class="vd-row">
           <span class="vd-key">主要变更</span>

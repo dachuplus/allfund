@@ -6,7 +6,7 @@
  *       由本函数转发到 Supabase 新加坡节点（经 EdgeOne 优化骨干网），
  *       绕开浏览器跨境直连的不稳定，提升登录 / 查库速度。
  *
- * 备案边界：dachu.me 为 EdgeOne overseas 海外节点，本函数亦运行在海外，
+ * 备案边界：www.dachu.me 为 EdgeOne overseas 海外节点，本函数亦运行在海外，
  *          转发目标 Supabase 新加坡同样在境外 —— 全链路无中国大陆境内接入点，不触发 ICP 备案。
  *
  * 安全性：不存储任何密钥。前端请求自带的 apikey / Authorization 头原样透传。
@@ -104,8 +104,8 @@ function jsonError(msg, status) {
 }
 
 // ─── CORS（2026-10-11 新增）─────────────────────────────────────────────
-// 背景：www.dachu.me 上线后页面 origin 与 dachu.me 不同源，所有经 sb-proxy 的
-// 请求变跨域。Supabase 网关对 /rest/v1 的 OPTIONS 预检会回 200+CORS 头，
+// 背景：此前页面在 www.dachu.me 与 apex dachu.me 并存时二者 origin 不同源，经 sb-proxy 的
+// 请求会跨域（现已统一为 www.dachu.me，仍保留 CORS 头以兼容非本站托管回退）。Supabase 网关对 /rest/v1 的 OPTIONS 预检会回 200+CORS 头，
 // 但对 /functions/v1 的 OPTIONS（预检不带 apikey）回 401 且**无任何 CORS 头**
 // → 浏览器拦截后续 POST，前端表现为 "Failed to fetch"（删除用户即此症状）。
 // 修法：① OPTIONS 预检在边缘直接应答，不转发上游；

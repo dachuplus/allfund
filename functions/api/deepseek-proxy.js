@@ -4,14 +4,14 @@
  *
  * 作用：项目前端的「AI 自动建组合 / 风险平价 / 标签金句」此前直接在前端用
  *       VITE_DEEPSEEK_API_KEY 调用 https://api.deepseek.com/v1/chat/completions，
- *       该 key 被 Vite 打包进公开 JS（dachu.me 的 PortfolioPage / FundRankPage chunk
+ *       该 key 被 Vite 打包进公开 JS（www.dachu.me 的 PortfolioPage / FundRankPage chunk
  *       明文可见），任何访客都能提取并在外部滥用、烧掉余额。
  *
  *       本函数把 key 收回到服务端（EdgeOne Pages 环境变量 DEEPSEEK_API_KEY），
  *       前端改为调用同源 /api/deepseek-proxy，请求体原样转发，Authorization 头
  *       由本函数在服务端注入 —— 密钥永不进前端包。
  *
- * 备案边界：dachu.me 为 EdgeOne overseas 海外节点，本函数亦运行在海外，
+ * 备案边界：www.dachu.me 为 EdgeOne overseas 海外节点，本函数亦运行在海外，
  *          转发目标 api.deepseek.com 在境外 —— 全链路无中国大陆境内接入点，不触发 ICP 备案。
  *
  * 安全性：不存储密钥，仅读取 context.env.DEEPSEEK_API_KEY。仅允许 POST，

@@ -23,7 +23,7 @@ function objectUrl(name) {
   const base = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
   if (!base) throw new Error('缺少 VITE_SUPABASE_URL 配置，无法定位下载地址')
   const url = rewriteSupabaseUrl(`${base}/storage/v1/object/downloads/${encodeURIComponent(name)}`)
-  // 必须落到同源代理上；若改写失败会打到 dachu.me 自身，SPA 回退会返回网页而不是文件
+  // 必须落到同源代理上；若改写失败会打到 www.dachu.me 自身，SPA 回退会返回网页而不是文件
   if (url.indexOf('/api/sb-proxy') === -1) throw new Error('下载地址改写失败，请联系管理员')
   return url
 }

@@ -11,7 +11,7 @@
 
 上传通道（自动选择，无需手工指定）：
     - direct：直连 https://<ref>.supabase.co（GitHub Actions / 正常网络走这条，最快）
-    - proxy ：经同域 EdgeOne 函数 https://dachu.me/api/sb-proxy 转发
+    - proxy ：经同域 EdgeOne 函数 https://www.dachu.me/api/sb-proxy 转发
               （本机开发沙箱屏蔽了 *.supabase.co 的 TLS，只能走这条）
 
 ⚠️ EdgeOne Pages Functions 的请求体上限是 5 MB（实测 4.69 MB 通过、5.38 MB 返回 545）。
@@ -44,7 +44,7 @@ import urllib.request
 
 PROJECT_REF = os.environ.get('SUPABASE_PROJECT_REF', 'tqhtegazxykkqfcpejky')
 SUPABASE_DIRECT = f'https://{PROJECT_REF}.supabase.co'
-DEFAULT_PROXY = 'https://dachu.me/api/sb-proxy'
+DEFAULT_PROXY = 'https://www.dachu.me/api/sb-proxy'
 DEFAULT_BUCKET = 'downloads'
 DEFAULT_SOURCE = 'exports/downloads'
 

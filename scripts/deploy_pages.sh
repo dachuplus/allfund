@@ -132,4 +132,4 @@ echo "==> 4/4 部署文件夹 ./dist 到 EdgeOne Pages (overseas)"
 # 部署文件夹（而非 zip）更可靠地触发 Functions 构建；functions/ + package.json 同在 dist 根目录
 "$NODE_BIN" "$EDGEONE_BIN" pages deploy ./dist -n dachu -a overseas $USE_TOKEN_FLAG
 
-echo "==> 完成。正式访问 https://dachu.me"
+echo "==> 完成。正式访问 https://www.dachu.me"

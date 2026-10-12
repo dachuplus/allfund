@@ -13,7 +13,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://tqhtegazxykkqfcpej
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
 
 serve(async (req) => {
-  // CORS（前端 fetch 直接打到 dachu.me 同源 sb-proxy，理论上不需 CORS；
+  // CORS（前端 fetch 直接打到 www.dachu.me 同源 sb-proxy，理论上不需 CORS；
   // 但保留以防有人直连 supabase.co 调试）
   if (req.method === 'OPTIONS') {
     return new Response(null, {
