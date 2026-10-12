@@ -113,7 +113,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'logged-in'])
-const { markLogin } = useAuth()
+const { markLogin, user: globalAuthUser } = useAuth()
 
 const mode = ref('signin')      // 'signin' | 'signup' | 'reset'
 const accType = ref('email')    // 'email' | 'phone'
@@ -366,6 +366,26 @@ async function authLoginViaEdgeFunction(email, password) {
       // 被静默吞掉 → 表现为「提示登录成功，但实际未登录」。
       if (supabase && supabase.auth && typeof supabase.auth._notifyAllSubscribers === 'function') {
         await supabase.auth._notifyAllSubscribers('SIGNED_IN', session)
+      }
+      // ── 终检：确认全局登录态真的建立（用户截图实证的兜底）──
+      // 实测存在时序：toast 已提示「登录成功」，但全局 user 仍为 null —— 导航栏仍显示
+      // 「登录 / 注册」，权限屏显示「当前登录账号：未知」（App.vue 的 user?.email || '未知'
+      // 在 user=null 时同样渲染「未知」）。根源是「手写 storage + 私有 notify」绕过了
+      // auth-js 的会话状态机（currentSession 从未被设置），个别时序下订阅回调不生效。
+      // 这里轮询全局 user 最多 1.5s：仍无有效 email 则整页刷新 ——
+      // 刷新后 init() 从 storage 恢复会话，该恢复路径已用真实浏览器实测可靠。
+      const sessionReady = await new Promise((resolve) => {
+        const started = Date.now()
+        const tick = () => {
+          if (globalAuthUser.value && globalAuthUser.value.email) return resolve(true)
+          if (Date.now() - started > 1500) return resolve(false)
+          setTimeout(tick, 100)
+        }
+        tick()
+      })
+      if (!sessionReady) {
+        console.warn('[LoginDialog] 登录态未同步到全局，整页刷新以恢复会话')
+        window.location.reload()
       }
     } catch (e) {
       console.warn('[LoginDialog] 写入 supabase session 失败，但 token 已获取:', e)
