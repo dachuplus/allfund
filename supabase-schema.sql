@@ -314,3 +314,22 @@ CREATE INDEX IF NOT EXISTS idx_stock_pk_picks_model_period
 
 ALTER TABLE public.stock_pk_picks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "stock_pk_picks_public_read" ON public.stock_pk_picks FOR SELECT TO anon USING (true);
+
+-- ============================================================
+-- 14. guestbook_messages - 留言板
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.guestbook_messages (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name VARCHAR(30) NOT NULL DEFAULT '匿名',        -- 昵称
+  content TEXT NOT NULL,                           -- 留言内容
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_guestbook_messages_created_at
+  ON public.guestbook_messages(created_at DESC);
+
+ALTER TABLE public.guestbook_messages ENABLE ROW LEVEL SECURITY;
+-- 公开读取：anon 与 authenticated 均可查看
+CREATE POLICY "Allow public read on guestbook_messages" ON public.guestbook_messages FOR SELECT TO anon, authenticated USING (true);
+-- 公开写入：anon 与 authenticated 均可留言（内容长度在应用层校验）
+CREATE POLICY "Allow public insert on guestbook_messages" ON public.guestbook_messages FOR INSERT TO anon, authenticated WITH CHECK (true);

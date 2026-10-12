@@ -176,6 +176,16 @@ const routes = [
     }
   },
   {
+    path: '/guestbook',
+    component: () => import('../pages/guestbook/GuestbookPage.vue'),
+    meta: {
+      tab: 'home',
+      title: '留言板',
+      description: 'ALLFUND-留言板：欢迎留言分享观点与建议，仅代表个人观点，不构成投资建议。',
+      keywords: 'ALLFUND,留言板,观点交流'
+    }
+  },
+  {
     path: '/profile',
     component: () => import('../pages/profile/ProfilePage.vue'),
     meta: {

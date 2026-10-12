@@ -128,6 +128,7 @@
       <!-- 底部访客计数条（对齐 1400px 内容列，gov.uk 风格） -->
       <footer v-if="visitorCount !== null" class="site-visitor-bar">
         <span class="site-visitor-bar__text">你是第 <strong>{{ visitorCount }}</strong> 位访客</span>
+        <router-link to="/guestbook" class="site-visitor-bar__link">留言板</router-link>
       </footer>
     </main>
 
@@ -574,7 +575,11 @@ const currentFeatureLabel = computed(() => {
   margin-top: var(--space-xl);
   padding-top: var(--space-md);
   border-top: 1px solid var(--border);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
   font-size: 13px;
   color: var(--text-secondary);
   background: transparent;
@@ -582,6 +587,14 @@ const currentFeatureLabel = computed(() => {
 .site-visitor-bar__text strong {
   color: var(--brand);
   font-weight: 700;
+}
+.site-visitor-bar__link {
+  color: #1d70b8;
+  text-decoration: underline;
+  font-size: 13px;
+}
+.site-visitor-bar__link:hover {
+  color: #155389;
 }
 @media (max-width: 768px) {
   .mobile-header { display: flex; }
