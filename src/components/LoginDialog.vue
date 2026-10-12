@@ -360,8 +360,12 @@ async function authLoginViaEdgeFunction(email, password) {
       if (storageKey && supabase.auth.storage) {
         supabase.auth.storage.setItem(storageKey, JSON.stringify(session))
       }
+      // 必须 await：_notifyAllSubscribers 是 async，内部会 await 所有 onAuthStateChange
+      // 订阅者回调（useAuth 正是在该回调里设置全局 user）。不 await 则登录流程可能在
+      // 状态同步完成前就走到「登录成功」，且回调抛错会以未处理的 Promise rejection
+      // 被静默吞掉 → 表现为「提示登录成功，但实际未登录」。
       if (supabase && supabase.auth && typeof supabase.auth._notifyAllSubscribers === 'function') {
-        supabase.auth._notifyAllSubscribers('SIGNED_IN', session)
+        await supabase.auth._notifyAllSubscribers('SIGNED_IN', session)
       }
     } catch (e) {
       console.warn('[LoginDialog] 写入 supabase session 失败，但 token 已获取:', e)

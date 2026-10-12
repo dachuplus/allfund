@@ -191,6 +191,19 @@ function directTimeoutFetch(input, init = {}) {
 export const supabaseDirect = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { fetch: directTimeoutFetch },
+      // ⚠️ 关键：只读客户端必须隔离 auth 存储，不能与主客户端共用 session。
+      // 此前直连客户端与主客户端共用默认 storageKey（sb-<ref>-auth-token），
+      // 同一浏览器上下文出现两个 GoTrueClient 争抢同一份会话（控制台实测告警：
+      // "Multiple GoTrueClient instances ... under the same storage key"）。
+      // 两者会各自 _recoverAndRefresh 并**并发刷新同一个 refresh_token**，
+      // 其中一次刷新失败即触发 _removeSession()，把刚登录的会话清掉
+      // → 表现为「提示登录成功，但实际未登录 / 会话很快失效」。
+      // 只读查询本就不需要登录态：关闭持久化 + 独立 storageKey，彻底与主客户端解耦。
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        storageKey: 'sb-allfund-direct-readonly',
+      },
     })
   : null
 
