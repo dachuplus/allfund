@@ -1,7 +1,18 @@
 <template>
   <div class="page-fund-rank">
-    <!-- 热门标签（行业/概念） -->
-    <HotTags ref="hotTagsRef" />
+    <!-- 功能切换 Tab：评分（默认）/ 热门，两者并列 -->
+    <div class="fund-view-tabs">
+      <button type="button" class="fund-view-tab" :class="{ active: activeTab === 'score' }" @click="activeTab = 'score'">评分</button>
+      <button type="button" class="fund-view-tab" :class="{ active: activeTab === 'hot' }" @click="activeTab = 'hot'">热门</button>
+    </div>
+
+    <!-- 热门基金（标签功能区） -->
+    <div v-show="activeTab === 'hot'">
+      <HotTags ref="hotTagsRef" />
+    </div>
+
+    <!-- 基金评分主区 -->
+    <div v-show="activeTab === 'score'">
 
     <!-- 顶部：搜索（用「搜索」按钮提交，不用回车 —— 中文输入法选词的 Enter
          会误触发 @keyup.enter，导致每选一次候选词就发一次全表查询把页面卡死） -->
@@ -424,6 +435,7 @@
       <p class="bottom-line">评分说明：靠谱指数评分基于公开净值数据，综合收益率、最大回撤、夏普比率、卡玛比率、信息比率、跟踪误差等指标，按百分位加权计算，取值 0~100 分。评分仅反映历史数据的相对位置，不代表未来表现。</p>
       <p class="bottom-warning">风险提示：评分基于历史公开数据自动计算，不构成任何投资建议，不作为投资依据，亦不预测未来收益。市场有风险，投资需谨慎。</p>
     </div>
+    </div><!-- /基金评分主区 -->
 
     <!-- 详情弹窗 -->
     <Teleport to="body">
@@ -849,6 +861,7 @@ function applyScoreIndicator() {
 // 搜索/周期/分页/排序
 const searchText = ref('')
 const currentPeriod = ref('k1')     // 默认按 1 年评分排序
+const activeTab = ref('score')      // 选品-基金视图：默认显示「评分」，与「热门」并列切换
 const sortAsc = ref(false)        // 靠谱指数排序方向（false=降序，true=升序）
 const sortField = ref('')          // 客户端排序列（非评分列）：'c'|'n'|'equityPct'|'bondPct'
 const sortDir = ref('desc')        // 客户端排序方向
@@ -1428,6 +1441,13 @@ onUnmounted(() => {
 <style scoped>
 /* ========== gov.uk 风格靠谱指数 ========== */
 .page-fund-rank { min-height: 100vh; }
+
+/* 选品-基金 视图切换 Tab（评分/热门），gov.uk 风格：无圆角/阴影，激活态蓝色下划线 */
+.fund-view-tabs { display: flex; align-items: stretch; background: #ffffff; border-bottom: 1px solid var(--border); padding: 0 16px; }
+.fund-view-tab { appearance: none; -webkit-appearance: none; background: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 18px; font-size: 16px; line-height: 1.4; color: var(--text-secondary); cursor: pointer; font-family: inherit; }
+.fund-view-tab:hover { color: var(--text-primary); }
+.fund-view-tab.active { color: #1d70b8; border-bottom-color: #1d70b8; font-weight: 700; }
+@media (max-width: 640px) { .fund-view-tabs { padding: 0 12px; } .fund-view-tab { padding: 10px 14px; font-size: 15px; } }
 
 /* 顶部栏 */
 .top-bar {
