@@ -276,6 +276,28 @@ export async function fetchCsiPe(codes) {
 }
 
 /**
+ * 定投助手回测引擎：同源 EdgeOne 边缘函数 /api/dtip-backtest
+ * （函数内直连中证官方 PE 全史 + 新浪/东财历史收盘，walk-forward 模拟每周一估值分位定投）
+ *
+ * @param {string[]} codes 6 位指数代码，如 ['000300','932000']
+ * @param {number} weeks 回测周数，默认 52（≈1 年）
+ * @returns {Promise<{weeks:number, ok:number, total:number, summary:Object|null, data:Array}>}
+ *   data[i] = { code, name, ok, weeksActual, startDate, endDate, latestDate, peLast, pctLast,
+ *     zoneLast, amountLast, priceLast, shares, netInvested, marketValue, totalProfit, profitPct,
+ *     irr, trades:[{date,zone,zoneKey,type,amount,price,sharesAdded,sharesAfter,valueAfter}] }
+ */
+export async function fetchDtipBacktest(codes, weeks = 52) {
+  const list = (codes || []).filter(c => /^\d{6}$/.test(c))
+  if (!list.length) return { weeks, ok: 0, total: 0, summary: null, data: [] }
+  const qs = `codes=${list.join(',')}&weeks=${weeks}`
+  const res = await fetch(`/api/dtip-backtest?${qs}`, {
+    signal: AbortSignal.timeout(25000)
+  })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  return await res.json()
+}
+
+/**
  * 定投助手成交价数据源：东财 push2 实时/收盘行情（指数）
  * （push2 支持 CORS 直连；注意中证2000(932000) 的 secid 市场段为 2，其余沪市指数为 1）
  *
