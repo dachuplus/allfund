@@ -10,16 +10,18 @@
  *   期末以最新收盘价计市值，统计累计净投入、当前市值、累计收益、收益率、XIRR 等。
  *
  * 数据源：
- *   - PE 全史：中证指数官网 csindex.com.cn（与 /api/csi-pe 同源）
- *   - 历史收盘：新浪财经 K 线（主）/ 东方财富 push2his（回退）
- *   两端在 EdgeOne 海外边缘节点出网，与本地沙箱不同，部署后实测可用性。
+ *   - PE 全史：中证指数官网 csindex.com.cn（与 /api/csi-pe 同源，海外边缘节点可达）
+ *   - 历史收盘：腾讯财经 K 线 web.ifzq.gtimg.cn（主，覆盖 6/7 指数且为最新数据）
+ *              / 新浪财经 K 线（回退，沪市 5 大指数可用，但中证全指偏陈旧）
+ *   注：东方财富 push2his 在 EdgeOne 海外节点被墙（返回空），已移除，避免 11s 级超时拖垮整批。
+ *   中证2000(932000) 在免费可直连源均无历史行情，回测对其返回「暂不支持」并保留在估值看板。
  *
  * 安全：仅允许 6 位数字指数代码；只读公开接口，无密钥。
  */
 
 const CSI_BASE = 'https://www.csindex.com.cn/csindex-home/perf/indexCsiDsPe'
+const TENCENT_KLINE = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get'
 const SINA_KLINE = 'https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData'
-const EM_KLINE = 'https://push2his.eastmoney.com/api/qt/stock/kline/get'
 const TIMEOUT_MS = 11000
 
 // 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js 保持一致）
@@ -144,30 +146,30 @@ async function fetchCloseSina(code) {
   }
 }
 
-// 东方财富 push2his K 线（回退源）
-async function fetchCloseEm(secid) {
+// 腾讯财经 K 线（主源）：web.ifzq.gtimg.cn，返回 data[sym].day = [[date,open,close,high,low,vol],...]
+async function fetchCloseTencent(code) {
+  const symbol = `sh${code}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const url = `${EM_KLINE}?secid=${encodeURIComponent(secid)}&fields1=f1f2f3f4f5f6&fields2=f51f52f53f54f55f56f57f58f59f60f61&klt=101&fqt=1&beg=20160101&end=20500101`
-    const res = await fetch(url, {
+    const res = await fetch(`${TENCENT_KLINE}?param=${symbol},day,,,1500,qfq`, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
-        'Referer': 'https://quote.eastmoney.com/',
+        'Referer': 'https://gu.qq.com/',
       },
     })
     if (!res.ok) return { ok: false, http: res.status }
     const json = await res.json()
-    const klines = (json && json.data && json.data.klines) || []
-    if (!klines.length) return { ok: false, msg: 'empty' }
-    const series = klines
-      .map(s => String(s).split(','))
-      .map(arr => ({ d: arr[0], close: normNum(arr[2]) }))
-      .filter(r => r.d && r.close > 0)
+    const node = (json && json.data && json.data[symbol]) || {}
+    const rows = node.qfqday || node.day || []
+    if (!Array.isArray(rows) || !rows.length) return { ok: false, msg: 'empty' }
+    const series = rows
+      .map(r => (Array.isArray(r) ? { d: String(r[0]).slice(0, 10), close: normNum(r[2]) } : null))
+      .filter(r => r && r.d && r.close > 0)
       .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
     if (!series.length) return { ok: false, msg: 'no valid close' }
-    return { ok: true, series, source: 'eastmoney', lastDate: series[series.length - 1].d }
+    return { ok: true, series, source: 'tencent', lastDate: series[series.length - 1].d }
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) }
   } finally {
@@ -176,20 +178,13 @@ async function fetchCloseEm(secid) {
 }
 
 async function fetchClose(code) {
-  const secid = (code.startsWith('932') ? '2.' : '1.') + code
-  // 主源：新浪
+  // 主源：腾讯财经 K 线（覆盖 6/7 指数，且为最新数据；中证2000 无历史 → 回退）
+  const tx = await fetchCloseTencent(code)
+  if (tx.ok) return tx
+  // 回退：新浪（沪市 5 大指数可用，但中证全指偏陈旧；仅作主源失败兜底）
   const sina = await fetchCloseSina(code)
-  if (sina.ok) {
-    // 若新浪数据过旧（如 000985 返回 2016 陈旧数据），改用东财
-    const last = new Date(sina.lastDate)
-    const cutoff = new Date(Date.now() - 30 * 86400000)
-    if (last >= cutoff) return sina
-  }
-  const em = await fetchCloseEm(secid)
-  if (em.ok) return em
-  // 两端都失败，退回新浪（即便旧，至少给个结果 + 标记）
-  if (sina.ok) return { ...sina, stale: true }
-  return sina.ok ? sina : em
+  if (sina.ok) return sina
+  return tx.ok ? tx : sina
 }
 
 // ===== 回测核心（walk-forward）=====
@@ -288,7 +283,7 @@ function backtest(peResult, closeResult, weeks) {
     totalProfit,
     profitPct,
     irr,
-    closeSource: closeResult.source + (closeResult.stale ? '(stale)' : ''),
+    closeSource: closeResult.source,
   }
 }
 
@@ -341,7 +336,7 @@ export async function onRequest(context) {
   }
 
   return new Response(JSON.stringify({
-    source: 'csindex.com.cn + sina/eastmoney',
+    source: 'csindex.com.cn (PE) + tencent/sina (close)',
     weeks,
     ok: okList.length,
     total: results.length,
