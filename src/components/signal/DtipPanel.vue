@@ -102,7 +102,7 @@
       </div>
 
       <div class="dtip-form">
-        <label class="fld">
+        <label class="fld fld-date">
           <span class="fld-label">日期</span>
           <input type="date" v-model="form.date" class="fld-input" />
         </label>
@@ -499,7 +499,7 @@ onMounted(() => {
 
 /* 规则表 */
 .rule-table th, .rule-table td { text-align: left; }
-.rule-table td:first-child { font-weight: 700; white-space: nowrap; }
+.rule-table td:first-child { white-space: nowrap; }
 
 /* 刷新按钮（与页面标题行右侧小按钮一致） */
 .refresh-btn {
@@ -524,6 +524,30 @@ onMounted(() => {
 .row-active td { font-weight: 700; }
 /* 估值区间标签复用全局 .tag（tag-green / tag-blue / tag-red），与全站 gov.uk 标签规范一致 */
 .tag { white-space: nowrap; }
+
+/* 数据表（DtipPanel 独立组件，父级 SignalPage 的 scoped .data-table 不会渗入，需自包含） */
+.table-wrap { overflow-x: auto; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.data-table th {
+  text-align: left;
+  padding: var(--space-sm);
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.data-table td {
+  padding: var(--space-sm);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.data-table th.num, .data-table td.num { text-align: right; }
 
 /* 指数 tabs（gov.uk 下划线 tab，与 SignalPage 一致） */
 .dtip-tabs {
@@ -565,11 +589,22 @@ onMounted(() => {
 .zone-amount { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .zone-sub { margin-top: 8px; font-size: 14px; color: var(--text-secondary); }
 
-/* 记录表单 */
+/* 记录表单：三字段+按钮保持在同一行，底部对齐 */
 .dtip-form {
-  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  align-items: flex-end;
+  overflow-x: auto;
 }
-.fld { display: flex; flex-direction: column; gap: 6px; min-width: 180px; flex: 1; }
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 120px;
+}
+.fld-date { flex: 0 0 150px; min-width: 120px; }
 .fld-label { font-size: 14px; font-weight: 700; color: var(--text-secondary); }
 .fld-input {
   appearance: none; -webkit-appearance: none;
@@ -581,7 +616,7 @@ onMounted(() => {
   width: 100%;
 }
 .fld-input:focus { outline: 3px solid #ffdd00; outline-offset: 0; border-color: var(--brand); }
-.fld-hint { font-size: 13px; color: var(--text-secondary); }
+.fld-hint { font-size: 13px; color: var(--text-secondary); min-height: 1.3em; }
 .submit-btn {
   appearance: none; -webkit-appearance: none;
   background: var(--brand);
@@ -590,6 +625,11 @@ onMounted(() => {
   font-size: 16px; font-weight: 700;
   padding: 9px 28px;
   cursor: pointer; font-family: inherit;
+  flex: 0 0 auto;
+}
+@media (max-width: 560px) {
+  .dtip-form { flex-wrap: wrap; }
+  .fld-date { flex: 1 1 100%; }
 }
 .submit-btn:hover { background: #16599b; border-color: #16599b; }
 .submit-btn:disabled { opacity: 0.5; cursor: default; }
