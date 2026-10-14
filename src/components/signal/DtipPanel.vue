@@ -2,10 +2,9 @@
   <div class="dtip-panel">
     <!-- ============ 1. 规则说明 ============ -->
     <div class="card">
-      <div class="card-title">定投助手<span class="card-subtitle">估值分位定投 · 周度记录</span></div>
+      <div class="card-title">定投助手<span class="card-subtitle">估值分位策略定投 · 周度跟踪</span></div>
       <p class="card-desc">
-        按指数 PE(TTM) 在<strong>自身历史</strong>中的分位自动决定每周定投金额：越低估买得越多，再高估则卖出。
-        分位采用中证指数官网官方口径（当前 PE 在该指数发布以来全部历史中的百分位）。
+        依据指数 PE（TTM）相对其发布以来全部历史的百分位确定每周定投金额：估值分位越低，定投金额越高；分位越高，定投金额越低；分位进入极高区间时执行卖出。估值分位口径取自中证指数有限公司官方数据。
       </p>
       <div class="table-wrap">
         <table class="data-table rule-table">
@@ -19,27 +18,27 @@
           </thead>
           <tbody>
             <tr v-for="z in ZONES" :key="z.key">
-              <td :class="z.color">{{ z.label }}</td>
+              <td><span class="tag" :class="z.tagClass">{{ z.label }}</span></td>
               <td>{{ z.rangeText }}</td>
-              <td :class="z.color">{{ z.sideText }}</td>
-              <td :class="z.color">{{ z.amountText }}</td>
+              <td>{{ z.sideText }}</td>
+              <td>{{ z.amountText }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="data-source">数据来源：中证指数官网（官方 PE / 历史分位）· 东方财富（实时行情）。仅供参考研究，不构成投资建议。</p>
+      <p class="data-source">数据来源：中证指数有限公司（官方 PE / 历史分位）· 东方财富（实时行情）。以上内容仅供研究参考，不构成任何投资建议。</p>
     </div>
 
     <!-- ============ 2. 指数估值看板 ============ -->
     <div class="card">
       <div class="card-title">
         指数估值分位
-        <span class="card-subtitle">中证指数官方 PE · 每日更新</span>
+        <span class="card-subtitle">中证指数官方 PE · 每30分钟更新</span>
         <button class="refresh-btn" type="button" :disabled="loadingEva" @click="loadEva">{{ loadingEva ? '加载中…' : '刷新' }}</button>
       </div>
       <div class="error-card" v-if="evaError">
         <p>估值数据加载失败：{{ evaError }}</p>
-        <p class="err-hint">如处于本地开发环境，/api/csi-pe 为 EdgeOne 边缘函数，请以线上环境验证。</p>
+        <p class="err-hint">提示：/api/csi-pe 为 EdgeOne 边缘函数，建议在线上环境查看；本地调试可直连中证指数官网核对。</p>
       </div>
       <p class="val-loading" v-else-if="loadingEva">估值数据加载中…</p>
       <div class="table-wrap" v-else>
@@ -51,8 +50,8 @@
               <th class="num">全史分位</th>
               <th class="num">近5年分位</th>
               <th class="num">近3年分位</th>
-              <th>所处区间</th>
-              <th class="num">建议每周金额</th>
+              <th>估值区间</th>
+              <th class="num">建议周定投金额</th>
             </tr>
           </thead>
           <tbody>
@@ -62,12 +61,12 @@
               <td class="num" :class="pctClass(evaByCode[idx.code] && evaByCode[idx.code].pct_all)">{{ fmt(evaByCode[idx.code] && evaByCode[idx.code].pct_all, 2) }}%</td>
               <td class="num" :class="pctClass(evaByCode[idx.code] && evaByCode[idx.code].pct_5y)">{{ fmt(evaByCode[idx.code] && evaByCode[idx.code].pct_5y, 2) }}%</td>
               <td class="num" :class="pctClass(evaByCode[idx.code] && evaByCode[idx.code].pct_3y)">{{ fmt(evaByCode[idx.code] && evaByCode[idx.code].pct_3y, 2) }}%</td>
-              <td><span class="zone-badge" :class="zoneOf(idx.code).color">{{ zoneOf(idx.code).label }}</span></td>
-              <td class="num" :class="zoneOf(idx.code).color">{{ zoneOf(idx.code).amountText }}</td>
+              <td><span class="tag" :class="zoneOf(idx.code).tagClass">{{ zoneOf(idx.code).label }}</span></td>
+              <td class="num">{{ zoneOf(idx.code).amountText }}</td>
             </tr>
           </tbody>
         </table>
-        <p class="data-source" v-if="evaDate">估值数据日期：{{ evaDate }}（样本量见指数详情，中证A500/中证2000 等新指数历史较短，分位按发布以来计算）</p>
+        <p class="data-source" v-if="evaDate">估值数据日期：{{ evaDate }}（样本区间为指数发布以来；中证A500、中证2000 等新指数历史较短，分位按发布以来计算）</p>
       </div>
     </div>
 
@@ -87,13 +86,14 @@
     <div class="card">
       <div class="card-title">
         记录每周定投
-        <span class="card-subtitle">{{ activeName }} · 价格与金额已按当前区间自动带出，可手动修改</span>
+        <span class="card-subtitle">{{ activeName }} · 成交价与金额已按当前估值区间自动带入，可手动修改</span>
       </div>
 
-      <div class="zone-banner" :class="curZone.color">
+      <div class="zone-banner" :class="curZone.tagClass === 'tag-green' ? 'is-cheap' : curZone.tagClass === 'tag-red' ? 'is-expensive' : 'is-neutral'">
         <div class="zone-main">
-          <span class="zone-label">当前区间：{{ curZone.label }}</span>
-          <span class="zone-amount">{{ curZone.amountText }}</span>
+          <span class="zone-label">当前估值区间</span>
+          <span class="tag" :class="curZone.tagClass">{{ curZone.label }}</span>
+          <span class="zone-amount">本周操作：{{ curZone.actionText }}</span>
         </div>
         <div class="zone-sub" v-if="curEva">
           PE(TTM) {{ fmt(curEva.pe, 2) }} · 全史分位 {{ fmt(curEva.pct_all, 2) }}% · 近5年 {{ fmt(curEva.pct_5y, 2) }}%
@@ -114,7 +114,7 @@
         <label class="fld">
           <span class="fld-label">金额（元，买入为正 / 卖出为负）</span>
           <input type="number" step="100" v-model.number="form.amount" class="fld-input" />
-          <span class="fld-hint">{{ curZone.sideText }} {{ curZone.amountText }}</span>
+          <span class="fld-hint">{{ curZone.actionText }}</span>
         </label>
         <button type="button" class="submit-btn" :disabled="!canSubmit" @click="submitRecord">记录</button>
       </div>
@@ -125,7 +125,7 @@
     <div class="card">
       <div class="card-title">
         定投记录
-        <span class="card-subtitle">{{ activeName }} · 共 {{ sortedRecords.length }} 笔 · 数据仅存本机浏览器</span>
+        <span class="card-subtitle">{{ activeName }} · 共 {{ sortedRecords.length }} 笔 · 数据仅保存在本地浏览器</span>
         <button v-if="sortedRecords.length" class="refresh-btn danger" type="button" @click="clearRecords">{{ clearArmed ? '再次点击确认清空' : '清空记录' }}</button>
       </div>
       <p class="val-loading" v-if="!sortedRecords.length">暂无记录。在上方表单记录第一笔每周定投。</p>
@@ -161,11 +161,11 @@
 
     <!-- ============ 6. 收益统计 ============ -->
     <div class="card" v-if="sortedRecords.length">
-      <div class="card-title">收益统计<span class="card-subtitle">{{ activeName }} · 按记录与最新收盘价计算</span></div>
+      <div class="card-title">收益统计<span class="card-subtitle">{{ activeName }} · 基于定投记录与最新收盘价计算</span></div>
 
       <div class="stat-grid">
         <div class="stat-cell">
-          <div class="stat-label">账户总收益</div>
+          <div class="stat-label">账户收益</div>
           <div class="stat-value" :class="stats.totalProfit >= 0 ? 'text-up' : 'text-down'">
             {{ fmt(stats.totalProfit, 2) }} 元
           </div>
@@ -174,39 +174,39 @@
           </div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">年化总收益</div>
+          <div class="stat-label">总收益（年化）</div>
           <div class="stat-value" :class="(stats.totalAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.totalAnn != null ? fmt(stats.totalAnn * 100, 2) + '%' : '--' }}
           </div>
           <div class="stat-sub">持有 {{ stats.days }} 天<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">时间加权收益（年化）</div>
+          <div class="stat-label">时间加权收益率（年化）</div>
           <div class="stat-value" :class="(stats.twrAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.twrAnn != null ? fmt(stats.twrAnn * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">剔除申赎时点影响 · 期间 {{ fmt(stats.twrTotal * 100, 2) }}%<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
+          <div class="stat-sub">剔除资金申赎时点影响 · 区间收益 {{ fmt(stats.twrTotal * 100, 2) }}%<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">资金加权收益（年化）</div>
+          <div class="stat-label">资金加权收益率（年化）</div>
           <div class="stat-value" :class="(stats.mwrAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.mwrAnn != null ? fmt(stats.mwrAnn * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">按资金占用时间加权<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
+          <div class="stat-sub">按资金实际占用时间加权<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">IRR 收益（年化）</div>
+          <div class="stat-label">内部收益率 IRR（年化）</div>
           <div class="stat-value" :class="(stats.irr ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.irr != null ? fmt(stats.irr * 100, 2) + '%' : '--' }}
           </div>
           <div class="stat-sub">现金流内部收益率（XIRR）<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
-          <div class="stat-label">每周定投收益</div>
+          <div class="stat-label">累计定投收益</div>
           <div class="stat-value" :class="stats.sumProfit >= 0 ? 'text-up' : 'text-down'">
             {{ fmt(stats.sumProfit, 2) }} 元
           </div>
-          <div class="stat-sub">各笔浮动/已实现收益合计</div>
+          <div class="stat-sub">各笔浮动收益与已实现收益合计</div>
         </div>
       </div>
 
@@ -216,7 +216,7 @@
         <span>当前市值 <b>{{ fmt(stats.marketValue, 2) }}</b> 元</span>
         <span>最新价 <b>{{ fmt(stats.curPrice, 2) }}</b></span>
       </div>
-      <p class="data-source">口径说明：账户总收益 =（当前市值 − 净投入）/ 净投入；时间加权按相邻成交价链式相乘；资金加权按资金占用时间加权；IRR 以每笔现金流与最新市值求解。记录与价格均为本机演示数据，非真实交易。</p>
+      <p class="data-source">口径说明：账户收益 =（当前市值 − 净投入）/ 净投入；时间加权收益率按相邻成交价链式复利；资金加权收益率按资金实际占用时间加权；内部收益率（IRR）以每笔现金流与最新市值求解。定投记录与行情均为本地演示数据，非真实交易。</p>
     </div>
   </div>
 </template>
@@ -238,13 +238,15 @@ const DCA_INDICES = [
   { code: '000985', name: '中证全指', secid: '1.000985' },
 ]
 
-// ===== 5 档估值区间 → 每周金额（用户 2026-10-13 指定规则）=====
+// ===== 5 档估值区间 → 每周定投金额（PE 历史分位策略）=====
+// 区间命名采用专业估值术语：估值分位越低，定投金额越高；分位进入极高区间执行卖出。
+// 标签色：tag-green = 低估（机会）/ tag-blue = 合理（中性）/ tag-red = 高估（风险），与全站信号规范一致。
 const ZONES = [
-  { key: 'deep_low',  label: '再低估', min: 0,       max: 10,       amount:  3000, side: 'buy',  color: 'text-down', rangeText: '< 10%',      sideText: '买入', amountText: '+3000 元' },
-  { key: 'low',       label: '低估',   min: 10,      max: 30,       amount:  2000, side: 'buy',  color: 'text-down', rangeText: '10% ~ 30%',  sideText: '买入', amountText: '+2000 元' },
-  { key: 'normal',    label: '普通',   min: 30,      max: 70,       amount:  1000, side: 'buy',  color: '',          rangeText: '30% ~ 70%',  sideText: '买入', amountText: '+1000 元' },
-  { key: 'high',      label: '高估',   min: 70,      max: 90,       amount:   500, side: 'buy',  color: 'text-up',   rangeText: '70% ~ 90%',  sideText: '买入', amountText: '+500 元' },
-  { key: 'deep_high', label: '再高估', min: 90,      max: Infinity, amount: -3000, side: 'sell', color: 'text-up',   rangeText: '≥ 90%',      sideText: '卖出', amountText: '−3000 元' },
+  { key: 'deep_low',  label: '极度低估', min: 0,       max: 10,       amount:  3000, side: 'buy',  tagClass: 'tag-green', rangeText: '< 10%',      sideText: '买入', amountText: '+3000 元', actionText: '买入 3000 元' },
+  { key: 'low',       label: '低估',   min: 10,      max: 30,       amount:  2000, side: 'buy',  tagClass: 'tag-green', rangeText: '10% ~ 30%',  sideText: '买入', amountText: '+2000 元', actionText: '买入 2000 元' },
+  { key: 'normal',    label: '估值合理', min: 30,      max: 70,       amount:  1000, side: 'buy',  tagClass: 'tag-blue',  rangeText: '30% ~ 70%',  sideText: '买入', amountText: '+1000 元', actionText: '买入 1000 元' },
+  { key: 'high',      label: '高估',   min: 70,      max: 90,       amount:   500, side: 'buy',  tagClass: 'tag-red',   rangeText: '70% ~ 90%',  sideText: '买入', amountText: '+500 元',  actionText: '买入 500 元' },
+  { key: 'deep_high', label: '极度高估', min: 90,      max: Infinity, amount: -3000, side: 'sell', tagClass: 'tag-red',   rangeText: '≥ 90%',      sideText: '卖出', amountText: '−3000 元', actionText: '卖出 3000 元' },
 ]
 
 const LS_KEY = 'af_dtip_records_v1'
@@ -317,7 +319,7 @@ const curQuote = computed(() => quotes.value[(DCA_INDICES.find(i => i.code === a
 function zoneOf(code) {
   const eva = evaByCode.value[code]
   const pct = eva && eva.pct_all
-  if (pct == null) return { key: 'unknown', label: '数据缺失', color: '', amountText: '--', sideText: '--', amount: 0 }
+  if (pct == null) return { key: 'unknown', label: '数据缺失', tagClass: '', amountText: '--', sideText: '--', amount: 0, actionText: '--' }
   for (const z of ZONES) {
     if (pct >= z.min && pct < z.max) return z
   }
@@ -520,17 +522,8 @@ onMounted(() => {
 .val-loading { padding: 24px 0; color: var(--text-secondary); }
 .row-active { background: #f0f6fb; }
 .row-active td { font-weight: 700; }
-.zone-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  font-size: 13px; font-weight: 700;
-  border: 1px solid var(--border);
-  background: #f8f8f8;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.zone-badge.text-up { color: var(--color-up); border-color: var(--color-up); }
-.zone-badge.text-down { color: var(--color-down); border-color: var(--color-down); }
+/* 估值区间标签复用全局 .tag（tag-green / tag-blue / tag-red），与全站 gov.uk 标签规范一致 */
+.tag { white-space: nowrap; }
 
 /* 指数 tabs（gov.uk 下划线 tab，与 SignalPage 一致） */
 .dtip-tabs {
@@ -559,19 +552,18 @@ onMounted(() => {
 /* 当前区间横幅 */
 .zone-banner {
   border: 1px solid var(--border);
-  border-left: 6px solid var(--border);
+  border-left: 5px solid var(--border);
   padding: 14px 16px;
   margin-bottom: var(--space-md);
-  background: #f8f8f8;
+  background: var(--bg-card);
 }
-.zone-banner.text-up { border-left-color: var(--color-up); }
-.zone-banner.text-down { border-left-color: var(--color-down); }
-.zone-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; }
-.zone-label { font-size: 18px; font-weight: 700; }
-.zone-amount { font-size: 22px; font-weight: 700; }
-.zone-banner.text-up .zone-amount { color: var(--color-up); }
-.zone-banner.text-down .zone-amount { color: var(--color-down); }
-.zone-sub { margin-top: 6px; font-size: 14px; color: var(--text-secondary); }
+.zone-banner.is-cheap { border-left-color: var(--color-down); }
+.zone-banner.is-expensive { border-left-color: var(--color-up); }
+.zone-banner.is-neutral { border-left-color: var(--brand); }
+.zone-main { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.zone-label { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.zone-amount { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.zone-sub { margin-top: 8px; font-size: 14px; color: var(--text-secondary); }
 
 /* 记录表单 */
 .dtip-form {
@@ -581,7 +573,7 @@ onMounted(() => {
 .fld-label { font-size: 14px; font-weight: 700; color: var(--text-secondary); }
 .fld-input {
   appearance: none; -webkit-appearance: none;
-  border: 2px solid var(--border);
+  border: 2px solid var(--brand);
   background: #ffffff;
   padding: 8px 10px;
   font-size: 16px; font-family: inherit;
