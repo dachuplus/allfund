@@ -114,7 +114,7 @@
         <p>回测数据加载失败：{{ btError }}</p>
         <p class="err-hint">提示：/api/dtip-backtest 为 EdgeOne 边缘函数，依赖中证官方与公开行情，建议在线上环境查看。</p>
       </div>
-      <p class="val-loading" v-else-if="loadingBt">回测计算中（拉取 PE 全史与历史行情，约数秒）…</p>
+      <p class="val-loading" v-else-if="loadingBt">回测计算中（边缘函数逐指数拉取 PE 全史与历史行情，首次约 10–20 秒，后续命中 CDN 缓存更快）…</p>
       <div v-else-if="btData">
         <!-- 组合汇总 -->
         <div class="stat-grid" v-if="btData.summary">
