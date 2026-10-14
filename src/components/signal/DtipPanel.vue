@@ -106,7 +106,7 @@
     <div class="card">
       <div class="card-title">
         自动定投回测 · 策略效果模拟
-        <span class="card-subtitle">过去 {{ btWeeks }} 周每周一按估值分位定投 · 数据源边缘函数实时计算</span>
+        <span class="card-subtitle">过去 10 年（约 {{ btWeeks }} 周）每周一按估值分位定投 · 初始本金各指数 10 万元</span>
         <button class="refresh-btn" type="button" :disabled="loadingBt" @click="loadBacktest">{{ loadingBt ? '计算中…' : '重新计算' }}</button>
       </div>
 
@@ -119,14 +119,14 @@
         <!-- 组合汇总 -->
         <div class="stat-grid" v-if="btData.summary">
           <div class="stat-cell">
-            <div class="stat-label">组合累计净投入</div>
+            <div class="stat-label">组合初始本金</div>
             <div class="stat-value">{{ fmt(btData.summary.netInvested, 0) }} 元</div>
-            <div class="stat-sub">已买入 {{ fmt(btData.summary.totalInvested, 0) }} / 已赎回 {{ fmt(btData.summary.totalWithdrawn, 0) }}</div>
+            <div class="stat-sub">{{ btData.summary.indices }} 个指数 × {{ fmt(btData.summary.initCapital, 0) }} 元</div>
           </div>
           <div class="stat-cell">
-            <div class="stat-label">组合当前市值</div>
+            <div class="stat-label">组合现值（权益+现金）</div>
             <div class="stat-value">{{ fmt(btData.summary.marketValue, 0) }} 元</div>
-            <div class="stat-sub">覆盖 {{ btData.summary.indices }} 个指数</div>
+            <div class="stat-sub">已买入 {{ fmt(btData.summary.totalInvested, 0) }} / 已赎回 {{ fmt(btData.summary.totalWithdrawn, 0) }}</div>
           </div>
           <div class="stat-cell">
             <div class="stat-label">组合累计收益</div>
@@ -144,31 +144,27 @@
               <tr>
                 <th>指数</th>
                 <th class="num">回测周数</th>
-                <th class="num">净投入</th>
-                <th class="num">当前市值</th>
+                <th class="num">初始本金</th>
+                <th class="num">组合现值</th>
                 <th class="num">累计收益</th>
                 <th class="num">收益率</th>
                 <th class="num">XIRR</th>
-                <th>行情源</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="idx in DCA_INDICES" :key="idx.code" :class="{ 'row-active': idx.code === activeCode }" @click="activeCode = idx.code">
                 <td>{{ idx.name }}</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok">{{ btByCode[idx.code].weeksActual }}</td>
-                <td class="num" v-else colspan="1">--</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok">{{ fmt(btByCode[idx.code].netInvested, 0) }}</td>
-                <td class="num" v-else>--</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok">{{ fmt(btByCode[idx.code].marketValue, 0) }}</td>
-                <td class="num" v-else>--</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok" :class="btByCode[idx.code].totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(btByCode[idx.code].totalProfit, 0) }}</td>
-                <td class="num" v-else>--</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok" :class="btByCode[idx.code].profitPct != null ? (btByCode[idx.code].profitPct >= 0 ? 'text-up' : 'text-down') : ''">{{ btByCode[idx.code].profitPct != null ? fmt(btByCode[idx.code].profitPct * 100, 2) + '%' : '--' }}</td>
-                <td class="num" v-else>--</td>
-                <td class="num" v-if="btByCode[idx.code] && btByCode[idx.code].ok" :class="(btByCode[idx.code].irr ?? 0) >= 0 ? 'text-up' : 'text-down'">{{ btByCode[idx.code].irr != null ? fmt(btByCode[idx.code].irr * 100, 2) + '%' : '--' }}</td>
-                <td class="num" v-else>--</td>
-                <td v-if="btByCode[idx.code] && btByCode[idx.code].ok">{{ btByCode[idx.code].closeSource }}</td>
-                <td v-else class="text-na">数据暂不可用</td>
+                <template v-if="btByCode[idx.code] && btByCode[idx.code].ok">
+                  <td class="num">{{ btByCode[idx.code].weeksActual }}</td>
+                  <td class="num">{{ fmt(btByCode[idx.code].netInvested, 0) }}</td>
+                  <td class="num">{{ fmt(btByCode[idx.code].marketValue, 0) }}</td>
+                  <td class="num" :class="btByCode[idx.code].totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(btByCode[idx.code].totalProfit, 0) }}</td>
+                  <td class="num" :class="btByCode[idx.code].profitPct != null ? (btByCode[idx.code].profitPct >= 0 ? 'text-up' : 'text-down') : ''">{{ btByCode[idx.code].profitPct != null ? fmt(btByCode[idx.code].profitPct * 100, 2) + '%' : '--' }}</td>
+                  <td class="num" :class="(btByCode[idx.code].irr ?? 0) >= 0 ? 'text-up' : 'text-down'">{{ btByCode[idx.code].irr != null ? fmt(btByCode[idx.code].irr * 100, 2) + '%' : '--' }}</td>
+                </template>
+                <template v-else>
+                  <td colspan="6" class="text-na">数据暂不可用</td>
+                </template>
               </tr>
             </tbody>
           </table>
@@ -182,19 +178,19 @@
               <thead>
                 <tr>
                   <th>日期</th>
-                  <th>估值区间</th>
+                  <th class="zone-col">估值区间</th>
                   <th>操作</th>
                   <th class="num">金额</th>
                   <th class="num">成交价</th>
                   <th class="num">本期份额</th>
                   <th class="num">累计份额</th>
-                  <th class="num">累计市值</th>
+                  <th class="num">组合现值</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(t, i) in activeBt.trades" :key="i">
+                <tr v-for="(t, i) in activeBt.trades.slice().reverse()" :key="i">
                   <td>{{ t.date }}</td>
-                  <td><span class="tag" :class="zoneTagClass(t.zoneKey)">{{ t.zone }}</span></td>
+                  <td class="zone-col"><span class="tag" :class="zoneTagClass(t.zoneKey)">{{ t.zone }}</span></td>
                   <td><span class="op-tag" :class="t.type === 'buy' ? 'op-buy' : 'op-sell'">{{ t.type === 'buy' ? '买入' : '卖出' }}</span></td>
                   <td class="num" :class="t.amount >= 0 ? 'cash-out' : 'cash-in'">{{ t.amount >= 0 ? '+' : '−' }}{{ fmt(Math.abs(t.amount), 0) }}</td>
                   <td class="num">{{ fmt(t.price, 2) }}</td>
@@ -212,12 +208,116 @@
         </div>
       </div>
     </div>
+
+    <!-- ============ 6. 真实定投记录（服务端自动执行）============ -->
+    <div class="card">
+      <div class="card-title">
+        自动定投记录 · 真实执行效果
+        <span class="card-subtitle">每周一按估值分位自动写入 · 自 {{ autoFirstDate || '首个周一运行' }} 起累积</span>
+        <button class="refresh-btn" type="button" :disabled="loadingAuto" @click="loadAuto">{{ loadingAuto ? '加载中…' : '刷新' }}</button>
+      </div>
+
+      <div class="error-card" v-if="autoError">
+        <p>真实记录加载失败：{{ autoError }}</p>
+      </div>
+      <p class="val-loading" v-else-if="loadingAuto">真实记录加载中…</p>
+      <div v-else-if="autoRecords.length">
+        <!-- 组合汇总 -->
+        <div class="stat-grid" v-if="autoSummary.indices">
+          <div class="stat-cell">
+            <div class="stat-label">组合初始本金</div>
+            <div class="stat-value">{{ fmt(autoSummary.netInvested, 0) }} 元</div>
+            <div class="stat-sub">{{ autoSummary.indices }} 个指数 × {{ fmt(autoSummary.initCapital, 0) }} 元</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">组合现值（权益+现金）</div>
+            <div class="stat-value">{{ fmt(autoSummary.marketValue, 0) }} 元</div>
+            <div class="stat-sub">按最近一次交易价或实时价估算</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">组合累计收益</div>
+            <div class="stat-value" :class="autoSummary.totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(autoSummary.totalProfit, 0) }} 元</div>
+            <div class="stat-sub" :class="autoSummary.profitPct != null ? (autoSummary.profitPct >= 0 ? 'text-up' : 'text-down') : ''">
+              收益率 {{ autoSummary.profitPct != null ? fmt(autoSummary.profitPct * 100, 2) + '%' : '--' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 各指数真实记录 -->
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>指数</th>
+                <th class="num">定投次数</th>
+                <th class="num">累计份额</th>
+                <th class="num">初始本金</th>
+                <th class="num">组合现值</th>
+                <th class="num">累计收益</th>
+                <th class="num">收益率</th>
+                <th class="num">当前价</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="idx in DCA_INDICES" :key="idx.code" :class="{ 'row-active': idx.code === activeCode }" @click="activeCode = idx.code">
+                <td>{{ idx.name }}</td>
+                <template v-if="autoByCode[idx.code] && autoByCode[idx.code].records.length">
+                  <td class="num">{{ autoByCode[idx.code].weeks }}</td>
+                  <td class="num">{{ fmt(autoByCode[idx.code].shares, 4) }}</td>
+                  <td class="num">{{ fmt(autoByCode[idx.code].netInvested, 0) }}</td>
+                  <td class="num">{{ fmt(autoByCode[idx.code].marketValue, 0) }}</td>
+                  <td class="num" :class="autoByCode[idx.code].totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(autoByCode[idx.code].totalProfit, 0) }}</td>
+                  <td class="num" :class="autoByCode[idx.code].profitPct != null ? (autoByCode[idx.code].profitPct >= 0 ? 'text-up' : 'text-down') : ''">{{ autoByCode[idx.code].profitPct != null ? fmt(autoByCode[idx.code].profitPct * 100, 2) + '%' : '--' }}</td>
+                  <td class="num">{{ fmt(autoByCode[idx.code].price, 2) }}</td>
+                </template>
+                <template v-else>
+                  <td colspan="7" class="text-na">暂无记录</td>
+                </template>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 当前指数真实交易流水 -->
+        <div class="trades-block" v-if="activeAuto && activeAuto.records.length">
+          <div class="trades-title">{{ activeName }} · 真实交易流水（共 {{ activeAuto.records.length }} 笔）</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th class="zone-col">估值区间</th>
+                  <th>操作</th>
+                  <th class="num">金额</th>
+                  <th class="num">成交价</th>
+                  <th class="num">本期份额</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(t, i) in activeAuto.records.slice().reverse()" :key="i">
+                  <td>{{ t.trade_date }}</td>
+                  <td class="zone-col"><span class="tag" :class="zoneTagClass(ZONES.find(z => z.label === t.zone)?.key || t.zone)">{{ t.zone }}</span></td>
+                  <td><span class="op-tag" :class="Number(t.amount) >= 0 ? 'op-buy' : 'op-sell'">{{ Number(t.amount) >= 0 ? '买入' : '卖出' }}</span></td>
+                  <td class="num" :class="Number(t.amount) >= 0 ? 'cash-out' : 'cash-in'">{{ Number(t.amount) >= 0 ? '+' : '−' }}{{ fmt(Math.abs(Number(t.amount)), 0) }}</td>
+                  <td class="num">{{ fmt(t.close_price, 2) }}</td>
+                  <td class="num">{{ fmt(t.shares, 4) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <p class="empty-note" v-else>
+        暂无真实定投记录。系统将于每周一（北京时间 09:00）自动按当前估值分位执行并写入，首次运行后此处展示真实定投效果。
+      </p>
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchCsiPe, fetchDtipBacktest } from '../../utils/api'
+import { fetchCsiPe, fetchDtipBacktest, fetchDtipAutoRecords, fetchIndexCloses } from '../../utils/api'
 
 // ===== 定投目标指数 =====
 const DCA_INDICES = [
@@ -242,7 +342,8 @@ const ZONE_TAG = {
   deep_low: 'tag-green', low: 'tag-green', normal: 'tag-blue', high: 'tag-red', deep_high: 'tag-red',
 }
 
-const btWeeks = 52
+const btWeeks = 520
+const INIT_CAPITAL = 100000
 
 // ===== 状态 =====
 const activeCode = ref('000300')
@@ -254,6 +355,12 @@ const loadingEva = ref(false)
 const btData = ref(null)
 const loadingBt = ref(false)
 const btError = ref('')
+
+// ===== 真实定投记录（Part2）=====
+const autoRecords = ref([])
+const loadingAuto = ref(false)
+const autoError = ref('')
+const liveCloses = ref({})
 
 // ===== 工具 =====
 function fmt(v, digits = 2) {
@@ -304,6 +411,37 @@ async function loadBacktest() {
   }
 }
 
+async function loadAuto() {
+  loadingAuto.value = true
+  autoError.value = ''
+  liveCloses.value = {}
+  try {
+    const recs = await fetchDtipAutoRecords()
+    autoRecords.value = recs || []
+    // 拉取实时收盘价，用于真实记录市值估算（失败则用最近一次交易价）
+    const secids = DCA_INDICES
+      .filter(i => i.code !== '932000')
+      .map(i => (i.code.startsWith('932') ? '2.' : '1.') + i.code)
+    try {
+      const closes = await fetchIndexCloses(secids)
+      const byCode = {}
+      for (const [secid, v] of Object.entries(closes)) {
+        if (v && v.price > 0) {
+          const code = secid.split('.')[1]
+          byCode[code] = v.price
+        }
+      }
+      liveCloses.value = byCode
+    } catch (e) {
+      console.warn('[dtip] 实时收盘价获取失败:', e)
+    }
+  } catch (e) {
+    autoError.value = String(e && e.message || e)
+  } finally {
+    loadingAuto.value = false
+  }
+}
+
 // ===== 计算属性 =====
 const activeName = computed(() => (DCA_INDICES.find(i => i.code === activeCode.value) || {}).name || '')
 const curEva = computed(() => evaByCode.value[activeCode.value] || null)
@@ -328,9 +466,78 @@ const btByCode = computed(() => {
 })
 const activeBt = computed(() => btByCode.value[activeCode.value] || null)
 
+// 真实记录聚合：按「100k 初始本金资金池」口径逐指数重建 权益/现金/组合现值
+const autoByCode = computed(() => {
+  const map = {}
+  for (const idx of DCA_INDICES) {
+    map[idx.code] = { name: idx.name, records: [], shares: 0, deployed: 0, withdrawn: 0, latestClose: 0, latestDate: '' }
+  }
+  for (const r of autoRecords.value) {
+    const e = map[r.index_code]
+    if (!e) continue
+    e.records.push(r)
+    const amt = Number(r.amount) || 0
+    const sh = Number(r.shares) || 0
+    e.shares += sh
+    if (amt > 0) e.deployed += amt
+    if (amt < 0) e.withdrawn += -amt
+    if (!e.latestDate || r.trade_date > e.latestDate) {
+      e.latestClose = Number(r.close_price) || 0
+      e.latestDate = r.trade_date
+    }
+  }
+  for (const code in map) {
+    const e = map[code]
+    if (!e.records.length) continue
+    const live = liveCloses.value[code]
+    const price = (live != null && live > 0) ? live : e.latestClose
+    e.price = price
+    e.cash = INIT_CAPITAL - e.deployed + e.withdrawn
+    e.equity = e.shares * price
+    e.marketValue = e.equity + e.cash
+    e.netInvested = INIT_CAPITAL
+    e.totalProfit = e.marketValue - INIT_CAPITAL
+    e.profitPct = e.totalProfit / INIT_CAPITAL
+    e.weeks = e.records.length
+  }
+  return map
+})
+
+const autoOkCodes = computed(() => Object.keys(autoByCode.value).filter(c => autoByCode.value[c].records.length > 0))
+
+const autoSummary = computed(() => {
+  let marketValue = 0, shares = 0, weeks = 0
+  for (const c of autoOkCodes.value) {
+    const e = autoByCode.value[c]
+    marketValue += e.marketValue
+    shares += e.shares
+    weeks = Math.max(weeks, e.weeks)
+  }
+  const netInvested = INIT_CAPITAL * autoOkCodes.value.length
+  const totalProfit = marketValue - netInvested
+  return {
+    indices: autoOkCodes.value.length,
+    initCapital: INIT_CAPITAL,
+    netInvested,
+    marketValue,
+    shares,
+    totalProfit,
+    profitPct: netInvested > 0 ? totalProfit / netInvested : null,
+    weeks,
+  }
+})
+
+const activeAuto = computed(() => autoByCode.value[activeCode.value] || null)
+
+const autoFirstDate = computed(() => {
+  if (!autoRecords.value.length) return ''
+  return autoRecords.value.map(r => r.trade_date).sort()[0]
+})
+
 onMounted(() => {
   loadEva()
   loadBacktest()
+  loadAuto()
 })
 </script>
 
@@ -462,4 +669,14 @@ onMounted(() => {
 .cash-out { color: var(--color-up); }
 .cash-in { color: var(--color-down); }
 .empty-note { margin-top: 12px; padding: 16px; border: 1px dashed var(--border); color: var(--text-secondary); font-size: 14px; }
+
+/* 交易流水表格：估值区间列加宽，避免标签拥挤；时间倒序后最新交易置顶 */
+.trades-block .data-table th.zone-col,
+.trades-block .data-table td.zone-col {
+  min-width: 96px;
+}
+.trades-block .data-table .tag {
+  display: inline-block;
+  padding: 2px 10px;
+}
 </style>

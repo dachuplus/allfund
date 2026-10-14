@@ -359,6 +359,21 @@ export async function fetchDtipBacktest(codes, weeks = 52) {
 }
 
 /**
+ * 定投助手真实定投记录：读取服务端每周一自动写入的 public.dtip_auto_records
+ * （GitHub Actions 周一定时任务经估值分位+收盘价落库；写入走 mgmt API 绕过 RLS，
+ *  此处 anon 客户端经 SELECT 策略读取，无需鉴权）。
+ * 返回行：index_code, index_name, trade_date(date), pe, pe_pct, zone, amount(有符号), close_price, shares(有符号), created_at
+ */
+export async function fetchDtipAutoRecords() {
+  const { data, error } = await supabase
+    .from('dtip_auto_records')
+    .select('*')
+    .order('trade_date', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+/**
  * 定投助手成交价数据源：东财 push2 实时/收盘行情（指数）
  * （push2 支持 CORS 直连；注意中证2000(932000) 的 secid 市场段为 2，其余沪市指数为 1）
  *

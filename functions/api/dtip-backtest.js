@@ -24,6 +24,9 @@ const TENCENT_KLINE = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get'
 const SINA_KLINE = 'https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData'
 const TIMEOUT_MS = 11000
 
+// 10 年回测约需 2600+ 个交易日；留出余量，确保能取到最近 ~520 个周一
+const KLINE_COUNT = 3200
+
 // 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js 保持一致）
 const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
 
@@ -137,7 +140,7 @@ async function fetchCloseSina(code) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(`${SINA_KLINE}?symbol=${symbol}&scale=240&ma=no&datalen=2000`, {
+    const res = await fetch(`${SINA_KLINE}?symbol=${symbol}&scale=240&ma=no&datalen=${KLINE_COUNT}`, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
@@ -167,7 +170,7 @@ async function fetchCloseTencent(code) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(`${TENCENT_KLINE}?param=${symbol},day,,,1500,qfq`, {
+    const res = await fetch(`${TENCENT_KLINE}?param=${symbol},day,,,${KLINE_COUNT},qfq`, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
@@ -203,6 +206,13 @@ async function fetchClose(code) {
 }
 
 // ===== 回测核心（walk-forward）=====
+// 模型：以「初始本金 initCapital」为唯一外部资本，每周一按估值分位在 现金↔权益 间调仓：
+//   - 买入区：从现金池按 zone 金额买入（现金不足则满仓，不再买入）
+//   - 极度高估区：卖出 zone 金额对应的份额（**仅当实际持有时才卖；无持仓则跳过**，不能卖出没有的份额）
+// 期末组合现值 = 持仓市值(份额×最新价) + 剩余现金；收益率以初始本金为分母。
+// XIRR 仅含「期初本金流出」与「期末组合现值流入」两笔外部现金流（内部买卖为组合内调仓）。
+const INIT_CAPITAL = 100000
+
 function backtest(peResult, closeResult, weeks) {
   const peSeries = peResult.series
   const closeSeries = closeResult.series
@@ -220,7 +230,10 @@ function backtest(peResult, closeResult, weeks) {
   }
 
   const trades = []
-  let shares = 0, costBasis = 0, totalInvested = 0, totalWithdrawn = 0
+  let shares = 0, costBasis = 0
+  let cash = INIT_CAPITAL
+  let totalInvested = 0   // 累计从现金池投入权益
+  let totalWithdrawn = 0  // 累计从权益赎回至现金池
   for (const m of window) {
     const pePrefix = peSeries.filter(p => p.d <= m.d)
     if (pePrefix.length < 2) continue
@@ -234,38 +247,40 @@ function backtest(peResult, closeResult, weeks) {
     if (price <= 0) continue
 
     if (amount > 0) {
-      const addSh = amount / price
+      // 买入：从现金池支出，封顶可用现金（满仓后不再买入）
+      const buyAmt = Math.min(amount, cash)
+      if (buyAmt <= 0) continue
+      const addSh = buyAmt / price
       shares += addSh
-      costBasis += amount
-      totalInvested += amount
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount, price, sharesAdded: addSh, sharesAfter: shares, valueAfter: shares * price })
+      costBasis += buyAmt
+      cash -= buyAmt
+      totalInvested += buyAmt
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount: buyAmt, price, sharesAdded: addSh, sharesAfter: shares, valueAfter: shares * price + cash })
     } else {
+      // 卖出：赎回 zone 金额对应份额，封顶实际持仓市值；**无持仓则跳过**
       const sellAmt = -amount
-      const wantSh = sellAmt / price
-      const soldSh = Math.min(wantSh, shares)
+      const holdingsValue = shares * price
+      const execAmt = Math.min(sellAmt, holdingsValue)
+      if (execAmt <= 0) continue
+      const soldSh = execAmt / price
       const costOfSold = shares > 0 ? (soldSh / shares) * costBasis : 0
-      const proceeds = soldSh * price
+      cash += execAmt
       shares -= soldSh
       costBasis -= costOfSold
-      totalWithdrawn += proceeds
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', amount, price, sharesAdded: -soldSh, sharesAfter: shares, valueAfter: shares * price })
+      totalWithdrawn += execAmt
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, valueAfter: shares * price + cash })
     }
   }
 
   const lastClose = closeSeries[closeSeries.length - 1]
   const latestPrice = lastClose.close
-  const marketValue = shares * latestPrice
-  const netInvested = totalInvested - totalWithdrawn
-  const totalProfit = marketValue - netInvested
-  const profitPct = netInvested > 0 ? totalProfit / netInvested : (netInvested === 0 ? (totalProfit > 0 ? 1 : 0) : null)
+  const equity = shares * latestPrice
+  const portfolioValue = equity + cash
 
-  // XIRR
-  const flows = []
-  for (const t of trades) {
-    flows.push({ t: new Date(t.date + 'T00:00:00'), cf: -t.amount })
-  }
-  flows.push({ t: new Date(), cf: marketValue })
-  const irr = (trades.length >= 2) ? solveXirr(flows) : null
+  // XIRR：仅期初本金流出 + 期末组合现值流入（内部买卖非外部现金流）
+  const flows = [{ t: new Date(window[0].d + 'T00:00:00'), cf: -INIT_CAPITAL }]
+  flows.push({ t: new Date(), cf: portfolioValue })
+  const irr = solveXirr(flows)
 
   // 当前（最新交易日）估值区间与本周计划
   const lastPe = peSeries[peSeries.length - 1]
@@ -279,6 +294,7 @@ function backtest(peResult, closeResult, weeks) {
     name: peResult.name,
     weeksRequested: weeks,
     weeksActual: window.length,
+    initCapital: INIT_CAPITAL,
     startDate: window[0].d,
     endDate: window[window.length - 1].d,
     latestDate: lastClose.d,
@@ -291,12 +307,13 @@ function backtest(peResult, closeResult, weeks) {
     trades,
     totalInvested,
     totalWithdrawn,
-    netInvested,
+    netInvested: INIT_CAPITAL,
+    cash,
     shares,
-    latestPrice,
-    marketValue,
-    totalProfit,
-    profitPct,
+    equity,
+    marketValue: portfolioValue,
+    totalProfit: portfolioValue - INIT_CAPITAL,
+    profitPct: (portfolioValue - INIT_CAPITAL) / INIT_CAPITAL,
     irr,
     closeSource: closeResult.source,
   }
@@ -331,7 +348,7 @@ export async function onRequest(context) {
   }
 
   const okList = results.filter(r => r.ok)
-  // 组合汇总（等权累加：各指数独立账户）
+  // 组合汇总（等权累加：各指数独立 100k 资金池）
   let agg = null
   if (okList.length) {
     let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, shares = 0
@@ -341,10 +358,11 @@ export async function onRequest(context) {
       marketValue += r.marketValue
       shares += r.shares
     }
-    const netInvested = totalInvested - totalWithdrawn
+    const netInvested = INIT_CAPITAL * okList.length
     const totalProfit = marketValue - netInvested
     agg = {
       indices: okList.length,
+      initCapital: INIT_CAPITAL,
       totalInvested,
       totalWithdrawn,
       netInvested,
