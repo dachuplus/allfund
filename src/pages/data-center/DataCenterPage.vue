@@ -193,10 +193,16 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.47</strong></td>
-              <td>2026-10-04</td>
+              <td><strong>v4.0.48</strong></td>
+              <td>2026-10-14</td>
               <td><code>本次提交</code></td>
               <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td><strong>v4.0.47</strong></td>
+              <td>2026-10-04</td>
+              <td><code>未单独提交</code></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.32</td>
@@ -1647,6 +1653,7 @@
             <tr><td><code>date</code></td><td>string</td><td>数据日期</td></tr>
           </tbody>
         </table>
+        <p class="api-note">⚠️ <code>index_code</code> 带交易所前缀（如 <code>SH000300</code>），按裸6位代码匹配会全部 MISSING；全量 63 条 items 仅覆盖沪深300/中证500/中证1000 3/7 目标指数，宽基覆盖不全，估值分位场景以 csindex 为主源（见第九组）。</p>
       </div>
 
       <!-- macro-data -->
@@ -1791,6 +1798,89 @@
         <p class="api-note">⚠️ zcpz 页面需用<b>裸基金代码</b>（去掉 .OF）；gmbd/cyrjg 的 FundArchivesDatas 接口对带 .OF 后缀的代码兼容。三类数据按「接口拉取 → fund_scores_staging → fund_scores_test 验证 → fund_scores 生产」三级流水线入库，每日增量更新。</p>
       </div>
 
+      <!-- 指数估值数据源（定投助手） -->
+      <h2 class="api-group-title">九、指数估值数据源（定投助手 / 指数评分）</h2>
+      <div class="api-item">
+        <h3 class="api-name">16. csindex indexCsiDsPe — 中证指数官方 PE-TTM 日史（主用）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://www.csindex.com.cn/csindex-home/perf/indexCsiDsPe?indexCode={6位代码}</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（经同源边缘函数 <code>/api/csi-pe</code> 代取：服务端算好全史/5年/3年分位只回传摘要，<code>Cache-Control: public, max-age=1800</code>）</td></tr>
+          <tr><td class="meta-label">用途</td><td>定投助手估值区间判断、指数评分估值维度：官方滚动市盈率全日史 + 历史分位</td></tr>
+          <tr><td class="meta-label">可达性</td><td>EdgeOne Pages 海外边缘节点可直连（前端经同源 <code>/api/csi-pe</code> 消费，免跨域）；本地非云 IP 可达；<b>GitHub Actions 云 IP 被 WAF 403</b>，CI 内须走同源函数代取</td></tr>
+          <tr><td class="meta-label">覆盖</td><td>7/7 目标指数实测 200：000510 中证A500 / 000300 沪深300 / 000905 中证500 / 000906 中证800 / 000852 中证1000 / 932000 中证2000 / 000985 中证全指</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>functions/api/csi-pe.js</code>、<code>src/utils/api.js</code>（fetchCsiPe）、<code>src/components/signal/DtipPanel.vue</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段（data[]，官方字段名 peg 实为 PE-TTM）</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>tradeDate</code></td><td>string</td><td>交易日（YYYYMMDD）</td></tr>
+            <tr><td><code>indexName</code></td><td>string</td><td>指数名称</td></tr>
+            <tr><td><code>peg</code></td><td>float</td><td>滚动市盈率 PE-TTM（官方命名沿用 peg）</td></tr>
+          </tbody>
+        </table>
+        <p class="api-subtitle">/api/csi-pe 同源函数输出（每个指数）</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>pe</code></td><td>最新交易日 PE(TTM)</td></tr>
+            <tr><td><code>pct_all</code></td><td>最新 PE 全史分位（0-100）</td></tr>
+            <tr><td><code>pct_5y</code></td><td>近5年分位（约1210个交易日）</td></tr>
+            <tr><td><code>pct_3y</code></td><td>近3年分位（约726个交易日）</td></tr>
+            <tr><td><code>n</code> / <code>first</code> / <code>last</code></td><td>历史样本数 / 起止日期</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">17. push2 stock/get — 指数实时行情（东财）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://push2.eastmoney.com/api/qt/stock/get?secid={市场.代码}&amp;fields=f43,f57,f58,f86</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（CORS 已开放，前端可直连）</td></tr>
+          <tr><td class="meta-label">用途</td><td>指数实时点位/名称/时间戳（定投助手看板头部行情）</td></tr>
+          <tr><td class="meta-label">secid 规则</td><td>沪深指数 <code>1.XXXXXX</code>；<b>中证2000 为 <code>2.932000</code></b>（深市板块段）</td></tr>
+          <tr><td class="meta-label">覆盖</td><td>7/7 secid 实测 rc:0（1.000510 / 1.000300 / 1.000905 / 1.000906 / 1.000852 / 2.932000 / 1.000985）</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>src/utils/api.js</code>（fetchIndexCloses）、<code>src/components/signal/DtipPanel.vue</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段（data）</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>f43</code></td><td>最新点位（×100 整数）</td></tr>
+            <tr><td><code>f57</code></td><td>指数代码</td></tr>
+            <tr><td><code>f58</code></td><td>指数名称</td></tr>
+            <tr><td><code>f86</code></td><td>行情时间戳（Unix 秒）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">18. legulegu index-basic-pe — 乐咕乐股指数 PE（备选，已失效留档）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://legulegu.com/api/stock-data/index-basic-pe?token=MD5(当天日期)</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（token 为当天日期字符串的 MD5）</td></tr>
+          <tr><td class="meta-label">状态</td><td><b>2026-10-14 实测已失效</b>：接口 404、页面 404，路径已变更或下线，仅留档避免重复探测</td></tr>
+        </table>
+        <p class="api-note">⚠️ 乐咕乐股原为月频采样 + 有访问频率限制，恢复后可作 csindex 的第三方交叉验证源。</p>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">附：7 目标指数 × 数据源覆盖对比（2026-10-14 实测）</h3>
+        <table class="field-table">
+          <thead><tr><th>指数</th><th>csindex（经 /api/csi-pe）</th><th>push2 行情</th><th>danjuan（蛋卷）</th></tr></thead>
+          <tbody>
+            <tr><td>中证A500 000510</td><td>支持 PE-TTM 日史</td><td>支持 1.000510</td><td>无</td></tr>
+            <tr><td>沪深300 000300</td><td>支持 PE-TTM 日史</td><td>支持 1.000300</td><td>支持 SH000300</td></tr>
+            <tr><td>中证500 000905</td><td>支持 PE-TTM 日史</td><td>支持 1.000905</td><td>支持 SH000905</td></tr>
+            <tr><td>中证800 000906</td><td>支持 PE-TTM 日史</td><td>支持 1.000906</td><td>无</td></tr>
+            <tr><td>中证1000 000852</td><td>支持 PE-TTM 日史</td><td>支持 1.000852</td><td>支持 SH000852</td></tr>
+            <tr><td>中证2000 932000</td><td>支持 PE-TTM 日史</td><td>支持 2.932000</td><td>无</td></tr>
+            <tr><td>中证全指 000985</td><td>支持 PE-TTM 日史</td><td>支持 1.000985</td><td>无</td></tr>
+          </tbody>
+        </table>
+        <p class="api-note">⚠️ danjuan 的 <code>index_code</code> 带交易所前缀（<code>SH000300</code>/<code>SZ399393</code>/<code>CSIH30533</code>），按裸6位代码匹配会全部 MISSING；其 63 条 items 仅覆盖 3/7 目标指数（沪深300/中证500/中证1000）。</p>
+      </div>
+
       <!-- 接口汇总 -->
       <h2 class="api-group-title">接口汇总</h2>
       <table class="field-table summary-table">
@@ -1811,6 +1901,9 @@
           <tr><td>13</td><td>fundf10 (zcpz)</td><td>资产配置（股票/债券/现金占比）</td><td>GET</td></tr>
           <tr><td>14</td><td>fundf10 (gmbd)</td><td>规模变动（申购/赎回/净申购/期末份额/净资产/变动率）</td><td>GET</td></tr>
           <tr><td>15</td><td>fundf10 (cyrjg)</td><td>持有人结构（机构/个人/内部持有比例）</td><td>GET</td></tr>
+          <tr><td>16</td><td>csindex indexCsiDsPe（经 /api/csi-pe 边缘函数）</td><td>中证官方 PE-TTM 日史 + 全史/5年/3年分位（定投助手估值，7/7 覆盖）</td><td>GET</td></tr>
+          <tr><td>17</td><td>push2 stock/get（指数 secid）</td><td>指数实时行情（7 指数点位/名称，中证2000 为 2.932000）</td><td>GET</td></tr>
+          <tr><td>18</td><td>legulegu index-basic-pe</td><td>指数 PE 第三方交叉验证（备选，2026-10-14 实测已失效留档）</td><td>GET</td></tr>
         </tbody>
       </table>
     </div>
