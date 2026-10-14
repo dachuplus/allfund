@@ -252,3 +252,57 @@ export async function fetchStyleFactors(category) {
   if (error) throw error
   return data || []
 }
+
+// ========== 定投助手：中证官方 PE 历史分位 ==========
+
+/**
+ * 定投助手估值分位数据源：同源 EdgeOne 边缘函数 /api/csi-pe
+ * （函数内直连中证指数官网 csindex.com.cn 官方日史，服务端计算分位后只回传摘要；
+ *   本地非云 IP 直连官方可达，但 GitHub Actions 云 IP 曾被 WAF 拦，故走边缘函数代取）
+ *
+ * @param {string[]} codes 6 位指数代码，如 ['000300','932000']
+ * @returns {Promise<Array>} [{ code, name, date, pe, pct_all, pct_5y, pct_3y, n, first, last }]
+ *   pe=最新交易日 PE(TTM)；pct_* = 该 PE 在对应历史窗口中的百分位(0-100)；n=历史样本数
+ */
+export async function fetchCsiPe(codes) {
+  const list = (codes || []).filter(c => /^\d{6}$/.test(c))
+  if (!list.length) return []
+  const res = await fetch(`/api/csi-pe?codes=${list.join(',')}`, {
+    signal: AbortSignal.timeout(20000)
+  })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  const json = await res.json()
+  return (json && json.data) || []
+}
+
+/**
+ * 定投助手成交价数据源：东财 push2 实时/收盘行情（指数）
+ * （push2 支持 CORS 直连；注意中证2000(932000) 的 secid 市场段为 2，其余沪市指数为 1）
+ *
+ * @param {string[]} secids 东财 secid，如 ['1.000300','2.932000']
+ * @returns {Promise<Object>} { '1.000300': { price, ts, code, name } }
+ */
+export async function fetchIndexCloses(secids) {
+  const out = {}
+  await Promise.all((secids || []).map(async (secid) => {
+    try {
+      const res = await fetch(
+        `https://push2.eastmoney.com/api/qt/stock/get?secid=${encodeURIComponent(secid)}&fields=f43,f57,f58,f86`,
+        { signal: AbortSignal.timeout(8000) }
+      )
+      if (!res.ok) return
+      const json = await res.json()
+      const d = json && json.data
+      if (!d || !d.f43) return
+      out[secid] = {
+        price: d.f43 / 100,
+        code: d.f57 || '',
+        name: d.f58 || '',
+        ts: d.f86 || 0,
+      }
+    } catch (e) {
+      // 单个指数失败不影响其余
+    }
+  }))
+  return out
+}

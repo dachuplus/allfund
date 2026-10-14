@@ -239,6 +239,11 @@
     <div v-if="activeTab === 'valuation'">
       <ValuationPage />
     </div>
+
+    <!-- ==================== 8. 定投助手（估值分位定投 · 周度记录） ==================== -->
+    <div v-if="activeTab === 'dtip'">
+      <DtipPanel />
+    </div>
   </div>
 </template>
 
@@ -254,6 +259,7 @@ import { supabase } from '../../api/supabase'
 import HelpTip from '../../components/HelpTip.vue'
 import JqrIndicator from '../../components/JqrIndicator.vue'
 import ValuationPage from '../../pages/tools/ValuationPage.vue'
+import DtipPanel from '../../components/signal/DtipPanel.vue'
 
 // ===== Tab 结构 =====
 const tabs = [
@@ -262,6 +268,7 @@ const tabs = [
   { key: 'factor',      label: '风格因子' },
   { key: 'jqr',         label: '特色指标' },
   { key: 'valuation',   label: '行业估值' },
+  { key: 'dtip',        label: '定投助手' },
 ]
 // ===== 标签页持久化（Req6）：刷新后保留浏览位置 =====
 const ACTIVE_TAB_KEY = 'af_signal_active_tab'
