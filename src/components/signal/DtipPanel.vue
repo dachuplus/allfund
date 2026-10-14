@@ -178,28 +178,28 @@
           <div class="stat-value" :class="(stats.totalAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.totalAnn != null ? fmt(stats.totalAnn * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">持有 {{ stats.days }} 天（{{ fmt(stats.years, 2) }} 年）</div>
+          <div class="stat-sub">持有 {{ stats.days }} 天<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">时间加权收益（年化）</div>
           <div class="stat-value" :class="(stats.twrAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.twrAnn != null ? fmt(stats.twrAnn * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">剔除申赎时点影响 · 期间 {{ fmt(stats.twrTotal * 100, 2) }}%</div>
+          <div class="stat-sub">剔除申赎时点影响 · 期间 {{ fmt(stats.twrTotal * 100, 2) }}%<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">资金加权收益（年化）</div>
           <div class="stat-value" :class="(stats.mwrAnn ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.mwrAnn != null ? fmt(stats.mwrAnn * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">按资金占用时间加权</div>
+          <div class="stat-sub">按资金占用时间加权<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">IRR 收益（年化）</div>
           <div class="stat-value" :class="(stats.irr ?? 0) >= 0 ? 'text-up' : 'text-down'">
             {{ stats.irr != null ? fmt(stats.irr * 100, 2) + '%' : '--' }}
           </div>
-          <div class="stat-sub">现金流内部收益率（XIRR）</div>
+          <div class="stat-sub">现金流内部收益率（XIRR）<span v-if="stats.days < 90"> · 满 90 天展示年化</span></div>
         </div>
         <div class="stat-cell">
           <div class="stat-label">每周定投收益</div>
@@ -248,6 +248,9 @@ const ZONES = [
 ]
 
 const LS_KEY = 'af_dtip_records_v1'
+
+// 年化指标最少持有天数：短持有期年化会爆炸（如 14 天 +26% 年化后数值荒谬），满 90 天才展示
+const ANN_MIN_DAYS = 90
 
 // ===== 状态 =====
 const activeCode = ref('000300')
@@ -373,9 +376,9 @@ const stats = computed(() => {
   const last = recs[recs.length - 1]
   if (last.p > 0) twrFactor *= curPrice / last.p
   const twrTotal = twrFactor - 1
-  const twrAnn = Math.pow(twrFactor, 1 / years) - 1
+  const twrAnn = days >= ANN_MIN_DAYS ? Math.pow(twrFactor, 1 / years) - 1 : null
 
-  const totalAnn = totalReturn != null ? Math.pow(1 + totalReturn, 1 / years) - 1 : null
+  const totalAnn = totalReturn != null && days >= ANN_MIN_DAYS ? Math.pow(1 + totalReturn, 1 / years) - 1 : null
 
   // 资金加权（基金业协会式）：收益额 / 加权平均资产
   //   买入资金权重 = 停留时间占比；卖出资金权重 = 卖出前停留时间占比
@@ -387,12 +390,12 @@ const stats = computed(() => {
     avgAsset += r.a >= 0 ? r.a * wIn : r.a * wOut
   }
   const mwr = avgAsset > 0 ? totalProfit / avgAsset : null
-  const mwrAnn = mwr != null && mwr > -1 ? Math.pow(1 + mwr, 1 / years) - 1 : null
+  const mwrAnn = mwr != null && mwr > -1 && days >= ANN_MIN_DAYS ? Math.pow(1 + mwr, 1 / years) - 1 : null
 
   // IRR（XIRR）：投资者视角现金流（买入为负、卖出为正、末值为正）
   const flows = recs.map(r => ({ t: new Date(r.d + 'T00:00:00'), cf: -r.a }))
   flows.push({ t: now, cf: marketValue })
-  const irr = solveXirr(flows)
+  const irr = days >= ANN_MIN_DAYS ? solveXirr(flows) : null
 
   return {
     totalProfit, totalReturn, totalAnn, twrAnn, twrTotal, mwrAnn, irr, sumProfit,
@@ -409,6 +412,13 @@ function solveXirr(flows) {
   }, 0)
   let lo = -0.9999, hi = 10
   let fLo = npv(lo), fHi = npv(hi)
+  // 高收益场景（短期资金翻倍）IRR 可能远超 1000%，需自适应放大上界
+  let guard = 0
+  while (fLo * fHi > 0 && guard < 40) {
+    hi *= 10
+    fHi = npv(hi)
+    guard++
+  }
   if (!isFinite(fLo) || !isFinite(fHi) || fLo * fHi > 0) return null
   for (let i = 0; i < 80; i++) {
     const mid = (lo + hi) / 2
