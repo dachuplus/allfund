@@ -297,18 +297,23 @@ export async function onRequest(context) {
   if (codes.length > 12) codes = codes.slice(0, 12)
   const weeks = Math.min(520, Math.max(4, parseInt(url.searchParams.get('weeks') || '52', 10) || 52))
 
-  const results = await Promise.all(codes.map(async (code) => {
+  // 串行处理各指数：边缘函数对「并发出网连接数」有限额，
+  // 一次性 Promise.all 多指数（6+ 并发 fetch）会触发限额导致整体失败。
+  // 串行保证任意时刻最多 2 个并发 fetch（单指数内 PE+收盘并行），且单指数远低于函数超时。
+  const results = []
+  for (const code of codes) {
     const pe = await fetchPeSeries(code)
     if (!pe.ok) {
-      return { code, ok: false, reason: 'pe fetch failed', detail: pe }
+      results.push({ code, ok: false, reason: 'pe fetch failed', detail: pe })
+      continue
     }
     const close = await fetchClose(code)
     if (!close.ok) {
-      return { code, ok: false, name: pe.name, reason: 'close fetch failed', detail: close }
+      results.push({ code, ok: false, name: pe.name, reason: 'close fetch failed', detail: close })
+      continue
     }
-    const r = backtest({ ...pe, code }, close, weeks)
-    return { ...r, code }
-  }))
+    results.push({ ...backtest({ ...pe, code }, close, weeks), code })
+  }
 
   const okList = results.filter(r => r.ok)
   // 组合汇总（等权累加：各指数独立账户）

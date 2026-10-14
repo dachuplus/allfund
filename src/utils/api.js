@@ -286,15 +286,76 @@ export async function fetchCsiPe(codes) {
  *     zoneLast, amountLast, priceLast, shares, netInvested, marketValue, totalProfit, profitPct,
  *     irr, trades:[{date,zone,zoneKey,type,amount,price,sharesAdded,sharesAfter,valueAfter}] }
  */
+/**
+ * 定投助手回测。注意：边缘函数对「并发出网连接数」有限额，单次请求多个指数会触发限额导致整体失败，
+ * 因此这里改为「每个指数独立请求一次边缘函数」（单次只算一个指数，远低于函数超时且只占 1 个连接），
+ * 浏览器侧并行发起、各自带重试（规避边缘 PoP 瞬时争用），最后在客户端汇总成统一结构。
+ *
+ * @param {string[]} codes 6 位指数代码
+ * @param {number} weeks 回测周数
+ * @returns {Promise<Object>} { source, weeks, ok, total, summary, data:[{...}], ts }
+ */
 export async function fetchDtipBacktest(codes, weeks = 52) {
   const list = (codes || []).filter(c => /^\d{6}$/.test(c))
   if (!list.length) return { weeks, ok: 0, total: 0, summary: null, data: [] }
-  const qs = `codes=${list.join(',')}&weeks=${weeks}`
-  const res = await fetch(`/api/dtip-backtest?${qs}`, {
-    signal: AbortSignal.timeout(25000)
-  })
-  if (!res.ok) throw new Error('HTTP ' + res.status)
-  return await res.json()
+
+  const fetchOne = async (code, idx) => {
+    // 轻微错峰，避免 7 个请求同时打到边缘 PoP 造成出网争用
+    if (idx > 0) await new Promise(r => setTimeout(r, idx * 180))
+    let lastErr = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const qs = `codes=${code}&weeks=${weeks}`
+        const res = await fetch(`/api/dtip-backtest?${qs}`, { signal: AbortSignal.timeout(25000) })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const json = await res.json()
+        const r = json && json.data && json.data[0]
+        if (r && (r.ok || r.reason !== undefined)) return r
+        lastErr = new Error((r && r.reason) || 'empty')
+      } catch (e) {
+        lastErr = e
+      }
+      if (attempt < 2) await new Promise(r => setTimeout(r, 700 * (attempt + 1)))
+    }
+    return { code, ok: false, reason: lastErr ? String(lastErr.message || lastErr) : 'unknown' }
+  }
+
+  const data = await Promise.all(list.map((code, i) => fetchOne(code, i)))
+  const okList = data.filter(r => r.ok)
+
+  // 组合汇总（等权累加：各指数独立账户）
+  let summary = null
+  if (okList.length) {
+    let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, shares = 0
+    for (const r of okList) {
+      totalInvested += r.totalInvested
+      totalWithdrawn += r.totalWithdrawn
+      marketValue += r.marketValue
+      shares += r.shares
+    }
+    const netInvested = totalInvested - totalWithdrawn
+    const totalProfit = marketValue - netInvested
+    summary = {
+      indices: okList.length,
+      totalInvested,
+      totalWithdrawn,
+      netInvested,
+      shares,
+      marketValue,
+      totalProfit,
+      profitPct: netInvested > 0 ? totalProfit / netInvested : null,
+    }
+  }
+
+  return {
+    source: 'csindex.com.cn (PE) + tencent/sina (close)',
+    weeks,
+    ok: okList.length,
+    total: data.length,
+    summary,
+    data,
+    ts: new Date().toISOString(),
+  }
 }
 
 /**
