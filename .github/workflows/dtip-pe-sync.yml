@@ -1,0 +1,27 @@
+name: 定投助手PE历史夜间同步
+
+on:
+  schedule:
+    # 北京 02:00 = UTC 18:00（夜间，避开交易时段，每天全量补一次增量）
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [dtip-pe-sync]
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+  SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 同步 PE 历史到缓存表 dtip_pe_history
+        run: python scripts/dtip_pe_sync.py

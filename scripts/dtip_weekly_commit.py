@@ -84,7 +84,32 @@ def monday_of_this_week(now=None):
 
 # ============ 数据源 ============
 
-def fetch_csi_pe(codes):
+def fetch_pe_from_cache():
+    """从 dtip_pe_history 缓存表读取每个指数最新一行（pe/pct_all/name）。
+    返回 {code: {pe, pct_all, name}}；表不存在或异常时返回空字典（上层回退实时）。"""
+    sql = (
+        "SELECT index_code, pe, pct_all, name FROM ("
+        "  SELECT index_code, pe, pct_all, name,"
+        "         row_number() OVER (PARTITION BY index_code ORDER BY trade_date DESC) AS rn"
+        "  FROM public.dtip_pe_history"
+        ") t WHERE rn = 1;"
+    )
+    rows = pg(sql) or []
+    out = {}
+    for r in rows:
+        code = r.get('index_code')
+        pct = r.get('pct_all')
+        if code is None or pct is None:
+            continue
+        out[code] = {
+            'pe': r.get('pe'),
+            'pct_all': float(pct),
+            'name': r.get('name') or code,
+        }
+    return out
+
+
+def fetch_csi_pe_live(codes):
     """返回 {code: {pe, pct_all, name}}；失败的 code 不入字典。"""
     codes_arg = ','.join(c for c, _ in codes)
     url = f'{CSI_PE_URL}?codes={codes_arg}'
@@ -106,6 +131,25 @@ def fetch_csi_pe(codes):
             'pct_all': float(pct),
             'name': row.get('name') or dict(codes).get(code, code),
         }
+    return out
+
+
+def fetch_csi_pe(codes):
+    """优先读 dtip_pe_history 缓存（服务端 pg），缺失的 code 回退实时 /api/csi-pe。"""
+    out = {}
+    try:
+        cache = fetch_pe_from_cache()
+        for code, _ in codes:
+            if code in cache:
+                out[code] = cache[code]
+        print(f'  [csi-pe] 缓存命中 {len(out)}/{len(codes)} 指数')
+    except Exception as e:
+        print(f'  [csi-pe] 缓存读取失败，转实时: {e}')
+    if len(out) < len(codes):
+        missing = [c for c, _ in codes if c not in out]
+        print(f'  [csi-pe] 实时补齐 {len(missing)} 个缺失指数')
+        live = fetch_csi_pe_live([(c, n) for c, n in codes if c in missing])
+        out.update(live)
     return out
 
 

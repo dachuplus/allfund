@@ -30,6 +30,21 @@ const KLINE_COUNT = 3200
 // 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js 保持一致）
 const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
 
+// ===== 缓存层（方案 A）：优先读 dtip_pe_history 全量序列，csindex 实时仅兜底 =====
+// anon key 为 publishable（前端 bundle 已用），嵌于边缘函数无保密风险。
+const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
+const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
+
+/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行） */
+async function sbSelect(path) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}&apikey=${ANON_KEY}`
+  const res = await fetch(url, {
+    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
+  })
+  if (!res.ok) throw new Error('sb ' + res.status)
+  return res.json()
+}
+
 // 5 档估值区间 → 每周定投金额（与 DtipPanel.vue ZONES 一致）
 const ZONES = [
   { key: 'deep_low',  label: '极度低估', min: 0,      max: 10,       amount:  3000 },
@@ -105,7 +120,36 @@ function solveXirr(flows) {
 }
 
 // ===== 数据拉取 =====
-async function fetchPeSeries(code) {
+
+/** 缓存读：从 dtip_pe_history 分页拉全量 PE 序列（升序），命中返回 {ok, series:[{d,pe}], name, lastDate} */
+async function fetchPeSeriesCache(code) {
+  try {
+    const all = []
+    let offset = 0
+    const LIMIT = 1000
+    let name = ''
+    while (true) {
+      const page = await sbSelect(
+        `dtip_pe_history?select=trade_date,pe,name` +
+        `&index_code=eq.${code}&order=trade_date.asc&limit=${LIMIT}&offset=${offset}`
+      )
+      if (!Array.isArray(page) || !page.length) break
+      for (const r of page) {
+        if (r.name) name = r.name
+        all.push({ d: String(r.trade_date), pe: Number(r.pe) })
+      }
+      if (page.length < LIMIT) break
+      offset += LIMIT
+    }
+    if (!all.length) return { ok: false }
+    all.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+    return { ok: true, series: all, name, lastDate: all[all.length - 1].d }
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) }
+  }
+}
+
+async function fetchPeSeriesLive(code) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
@@ -131,6 +175,13 @@ async function fetchPeSeries(code) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** 优先读缓存全量序列，未命中或异常则回退 csindex 实时取数 */
+async function fetchPeSeries(code) {
+  const cached = await fetchPeSeriesCache(code)
+  if (cached.ok && cached.series.length) return cached
+  return fetchPeSeriesLive(code)
 }
 
 // 新浪 K 线：sh/sz 前缀
@@ -234,12 +285,27 @@ function backtest(peResult, closeResult, weeks) {
   let cash = INIT_CAPITAL
   let totalInvested = 0   // 累计从现金池投入权益
   let totalWithdrawn = 0  // 累计从权益赎回至现金池
+
+  // 预计算「每一个 PE 点相对其历史至今的百分位」一次（O(n log n)），
+  // 避免在 520 个周一循环里反复排序整段 PE 序列导致边缘函数超时。
+  const pctSeries = new Array(peSeries.length)
+  const running = []
+  for (let i = 0; i < peSeries.length; i++) {
+    const pe = peSeries[i].pe
+    let lo = 0, hi = running.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (running[mid] <= pe) lo = mid + 1
+      else hi = mid
+    }
+    running.splice(lo, 0, pe)
+    pctSeries[i] = Math.round((lo / running.length) * 10000) / 100
+  }
+
   for (const m of window) {
     const pePrefix = peSeries.filter(p => p.d <= m.d)
     if (pePrefix.length < 2) continue
-    const peAtM = pePrefix[pePrefix.length - 1].pe
-    const asc = pePrefix.map(p => p.pe).sort((a, b) => a - b)
-    const pct = percentile(asc, peAtM)
+    const pct = pctSeries[pePrefix.length - 1]
     const zone = zoneOf(pct)
     const amount = zone.amount
     if (!amount) continue

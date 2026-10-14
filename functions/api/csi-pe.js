@@ -22,6 +22,55 @@ const TIMEOUT_MS = 11000
 // 定投助手默认指数全集（国证3000 不存在，见交付说明；第 7 个以 000985 中证全指占位，可改）
 const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
 
+// ===== 缓存层（方案 A）：优先读 dtip_pe_history，csindex 实时仅兜底 =====
+// anon key 为 publishable（前端 bundle 已用），嵌于边缘函数无保密风险。
+const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
+const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
+
+/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行） */
+async function sbSelect(path) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}&apikey=${ANON_KEY}`
+  const res = await fetch(url, {
+    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
+  })
+  if (!res.ok) throw new Error('sb ' + res.status)
+  return res.json()
+}
+
+/** 从缓存表读最新一行 + 全史聚合（n/first/last），命中返回对象，未命中/异常返回 null */
+async function fetchOneCache(code) {
+  try {
+    const latest = await sbSelect(
+      `dtip_pe_history?select=pe,pct_all,pct_5y,pct_3y,name,trade_date` +
+      `&index_code=eq.${code}&order=trade_date.desc&limit=1`
+    )
+    if (!Array.isArray(latest) || !latest.length) return null
+    const row = latest[0]
+    const agg = await sbSelect(
+      `dtip_pe_history?select=count(),min(trade_date),max(trade_date)` +
+      `&index_code=eq.${code}`
+    )
+    const a = (Array.isArray(agg) && agg[0]) || {}
+    const n = a.count != null ? Number(a.count) : null
+    return {
+      code,
+      name: row.name || '',
+      ok: true,
+      date: row.trade_date,
+      pe: Number(row.pe),
+      pct_all: Number(row.pct_all),
+      pct_5y: Number(row.pct_5y),
+      pct_3y: Number(row.pct_3y),
+      n,
+      first: a.min || null,
+      last: a.max || null,
+      source: 'cache',
+    }
+  } catch (e) {
+    return null
+  }
+}
+
 /** 计算 value 在升序数组中的百分位（0-100，含自身） */
 function percentile(sortedAsc, value) {
   if (!sortedAsc.length || value == null) return null
@@ -35,7 +84,7 @@ function percentile(sortedAsc, value) {
   return Math.round((lo / sortedAsc.length) * 10000) / 100
 }
 
-async function fetchOne(code) {
+async function fetchOneLive(code) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
@@ -81,6 +130,13 @@ async function fetchOne(code) {
   }
 }
 
+/** 优先读缓存，未命中或异常则回退 csindex 实时取数 */
+async function fetchOne(code) {
+  const cached = await fetchOneCache(code)
+  if (cached && cached.ok && isFinite(cached.pe)) return cached
+  return fetchOneLive(code)
+}
+
 export async function onRequest(context) {
   const url = new URL(context.request.url)
   const raw = (url.searchParams.get('codes') || '').trim()
@@ -92,8 +148,9 @@ export async function onRequest(context) {
 
   const results = await Promise.all(codes.map(fetchOne))
   const okCount = results.filter(r => r.ok).length
+  const allCache = results.length > 0 && results.every(r => r.ok && r.source === 'cache')
   return new Response(JSON.stringify({
-    source: 'csindex.com.cn',
+    source: allCache ? 'dtip_pe_history (cached)' : 'csindex.com.cn',
     ok: okCount,
     total: results.length,
     data: results,
