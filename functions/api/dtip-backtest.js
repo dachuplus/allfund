@@ -143,7 +143,7 @@ async function fetchPeSeriesCache(code) {
     }
     if (!all.length) return { ok: false }
     all.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
-    return { ok: true, series: all, name, lastDate: all[all.length - 1].d }
+    return { ok: true, series: all, name, lastDate: all[all.length - 1].d, source: 'cache' }
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) }
   }
@@ -169,7 +169,7 @@ async function fetchPeSeriesLive(code) {
       .filter(r => r.d && r.pe && r.pe > 0)
       .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
     if (!series.length) return { ok: false, msg: 'no valid pe rows' }
-    return { ok: true, series, name: rows[rows.length - 1].indexName || '', lastDate: series[series.length - 1].d }
+    return { ok: true, series, name: rows[rows.length - 1].indexName || '', lastDate: series[series.length - 1].d, source: 'live' }
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) }
   } finally {
@@ -412,7 +412,7 @@ export async function onRequest(context) {
       results.push({ code, ok: false, name: pe.name, reason: 'close fetch failed', detail: close })
       continue
     }
-    results.push({ ...backtest({ ...pe, code }, close, weeks), code })
+    results.push({ ...backtest({ ...pe, code }, close, weeks), code, peSource: pe.source })
   }
 
   const okList = results.filter(r => r.ok)
