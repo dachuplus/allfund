@@ -41,7 +41,7 @@ DCA_INDICES = [
 ]
 
 PE_SYNC_URL = 'https://www.dachu.me/api/dtip-pe-sync'
-HTTP_TIMEOUT = 30
+HTTP_TIMEOUT = 120
 
 # 近 5 年 / 近 3 年 交易日窗口（约数，与 csi-pe.js tail(1210)/tail(726) 一致）
 WINDOW_5Y = 1210
