@@ -59,7 +59,7 @@ export async function onRequest() {
     const r = await fetchOne(code)
     if (r.ok) {
       okCount++
-      data.push({ code: r.code, name: r.name, series: r.series })
+      data.push({ code: r.code, name: r.name, ok: true, series: r.series })
     } else {
       data.push({ code, ok: false, detail: r })
     }

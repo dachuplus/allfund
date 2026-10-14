@@ -37,21 +37,36 @@ async function sbSelect(path) {
   return res.json()
 }
 
-/** 从缓存表读最新一行 + 全史聚合（n/first/last），命中返回对象，未命中/异常返回 null */
+/** 经 Supabase anon REST 读取缓存表行数。
+ *  注意：本实例禁用聚合函数（PGRST123: Use of aggregate functions is not allowed），
+ *  故不能用 select=count()。改用 Prefer: count=exact 响应头（Content-Range 末段的真实总数），
+ *  该机制不走 SELECT 聚合，可正常返回。 */
+async function sbCount(path) {
+  // 本实例禁用聚合函数与 count=exact 头（PGRST123），匿名 REST 无法取行数。
+  // n 为非关键展示字段，取不到时优雅返回 null（前端按「样本数未知」处理）。
+  return null
+}
+
+/** 从缓存表读最新一行 + 全史聚合（n/first/last），命中返回对象，未命中返回 {ok:false}，异常返回 {ok:false,cacheError} */
 async function fetchOneCache(code) {
   try {
     const latest = await sbSelect(
       `dtip_pe_history?select=pe,pct_all,pct_5y,pct_3y,name,trade_date` +
       `&index_code=eq.${code}&order=trade_date.desc&limit=1`
     )
-    if (!Array.isArray(latest) || !latest.length) return null
+    if (!Array.isArray(latest) || !latest.length) return { ok: false, cacheError: 'empty' }
     const row = latest[0]
-    const agg = await sbSelect(
-      `dtip_pe_history?select=count(),min(trade_date),max(trade_date)` +
-      `&index_code=eq.${code}`
-    )
-    const a = (Array.isArray(agg) && agg[0]) || {}
-    const n = a.count != null ? Number(a.count) : null
+    let first = null
+    let n = null
+    try {
+      const firstRow = await sbSelect(
+        `dtip_pe_history?select=trade_date&index_code=eq.${code}&order=trade_date.asc&limit=1`
+      )
+      if (Array.isArray(firstRow) && firstRow.length) first = firstRow[0].trade_date
+    } catch (e1) { /* 非致命 */ }
+    try {
+      n = await sbCount(`dtip_pe_history?index_code=eq.${code}`)
+    } catch (e2) { n = null }
     return {
       code,
       name: row.name || '',
@@ -62,12 +77,12 @@ async function fetchOneCache(code) {
       pct_5y: Number(row.pct_5y),
       pct_3y: Number(row.pct_3y),
       n,
-      first: a.min || null,
-      last: a.max || null,
+      first,
+      last: row.trade_date,
       source: 'cache',
     }
   } catch (e) {
-    return null
+    return { ok: false, cacheError: String(e && e.message || e) }
   }
 }
 
@@ -130,11 +145,13 @@ async function fetchOneLive(code) {
   }
 }
 
-/** 优先读缓存，未命中或异常则回退 csindex 实时取数 */
+/** 优先读缓存，未命中或异常则回退 csindex 实时取数（保留 cacheError 便于排查） */
 async function fetchOne(code) {
   const cached = await fetchOneCache(code)
   if (cached && cached.ok && isFinite(cached.pe)) return cached
-  return fetchOneLive(code)
+  const live = await fetchOneLive(code)
+  if (cached && cached.cacheError) live.cacheError = cached.cacheError
+  return live
 }
 
 export async function onRequest(context) {

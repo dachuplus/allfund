@@ -177,11 +177,13 @@ async function fetchPeSeriesLive(code) {
   }
 }
 
-/** 优先读缓存全量序列，未命中或异常则回退 csindex 实时取数 */
+/** 优先读缓存全量序列，未命中或异常则回退 csindex 实时取数（保留 cacheError 便于排查） */
 async function fetchPeSeries(code) {
   const cached = await fetchPeSeriesCache(code)
   if (cached.ok && cached.series.length) return cached
-  return fetchPeSeriesLive(code)
+  const live = await fetchPeSeriesLive(code)
+  if (!cached.ok && cached.error) live.cacheError = cached.error
+  return live
 }
 
 // 新浪 K 线：sh/sz 前缀
