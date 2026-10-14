@@ -234,6 +234,11 @@
         <p class="data-source">数据参考：公开网络 | 中国10年期国债收益率 {{ bondY10y }}%</p>
       </div>
     </div>
+
+    <!-- ==================== 7. 行业估值（原「选品 · 估值」tab 迁移至此，功能不变） ==================== -->
+    <div v-if="activeTab === 'valuation'">
+      <ValuationPage />
+    </div>
   </div>
 </template>
 
@@ -248,13 +253,15 @@ import { COLORS } from '../../utils/echarts-theme'
 import { supabase } from '../../api/supabase'
 import HelpTip from '../../components/HelpTip.vue'
 import JqrIndicator from '../../components/JqrIndicator.vue'
+import ValuationPage from '../../pages/tools/ValuationPage.vue'
 
 // ===== Tab 结构 =====
 const tabs = [
-  { key: 'macro',    label: '宏观策略' },
-  { key: 'asset',    label: '资产配置' },
-  { key: 'factor',   label: '风格因子' },
-  { key: 'jqr',      label: '特色指标' },
+  { key: 'macro',       label: '宏观策略' },
+  { key: 'asset',       label: '资产配置' },
+  { key: 'factor',      label: '风格因子' },
+  { key: 'jqr',         label: '特色指标' },
+  { key: 'valuation',   label: '行业估值' },
 ]
 // ===== 标签页持久化（Req6）：刷新后保留浏览位置 =====
 const ACTIVE_TAB_KEY = 'af_signal_active_tab'

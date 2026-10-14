@@ -2,7 +2,7 @@
   <div class="valuation-page">
     <!-- 标题 -->
     <div class="val-head">
-      <h2 class="val-title">估值</h2>
+      <h2 class="val-title">行业估值</h2>
       <div class="val-meta">
         <span v-if="dataDate">数据日期：{{ dataDate }}</span>
         <span class="val-sep">·</span>

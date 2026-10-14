@@ -18,11 +18,6 @@
         :class="{ 'selection-tab--active': route.name === 'tools-index' }"
       >指数</router-link>
       <router-link
-        to="/tools/valuation"
-        class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-valuation' }"
-      >估值</router-link>
-      <router-link
         to="/tools/fund-index"
         class="selection-tab"
         :class="{ 'selection-tab--active': route.name === 'tools-fund-index' }"

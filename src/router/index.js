@@ -73,17 +73,6 @@ const routes = [
         }
       },
       {
-        path: 'valuation',
-        name: 'tools-valuation',
-        component: () => import('../pages/tools/ValuationPage.vue'),
-        meta: {
-          tab: 'tools',
-          title: '选品 · 估值',
-          description: '估值工具：基于公开指数估值数据，按 PE / PB / 股息率 / ROE 及历史百分位对宽基、策略、行业主题指数做排行与筛选。',
-          keywords: '估值,指数估值,行业估值,PE百分位,估值排行'
-        }
-      },
-      {
         path: 'fund-index',
         name: 'tools-fund-index',
         component: () => import('../pages/portfolio/FundIndexPanel.vue'),
@@ -253,8 +242,12 @@ const routes = [
     redirect: '/signal?tab=factor'
   },
   {
+    path: '/tools/valuation',
+    redirect: '/signal?tab=valuation'
+  },
+  {
     path: '/tools/industry-rank',
-    redirect: '/tools/valuation'
+    redirect: '/signal?tab=valuation'
   },
   // SPA 兜底：未匹配的前端路由重定向到首页（配合 EdgeOne SPA fallback）
   {
