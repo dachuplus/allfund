@@ -195,7 +195,7 @@
             <tr>
               <td><strong>v4.0.49</strong></td>
               <td>2026-10-14</td>
-              <td><code>本次提交</code></td>
+              <td><code>fc8089a</code></td>
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
