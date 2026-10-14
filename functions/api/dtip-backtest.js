@@ -68,22 +68,37 @@ function zoneOf(pct) {
 function solveXirr(flows) {
   if (!flows || flows.length < 2) return null
   const t0 = flows.reduce((m, f) => (f.t < m ? f.t : m), flows[0].t)
-  const npv = (r) => flows.reduce((s, f) => {
-    const yrs = (f.t - t0) / (365 * 86400000)
-    return s + f.cf / Math.pow(1 + r, yrs)
-  }, 0)
-  let lo = -0.9999, hi = 10
-  let fLo = npv(lo), fHi = npv(hi)
-  let guard = 0
-  while (fLo * fHi > 0 && guard < 40) { hi *= 10; fHi = npv(hi); guard++ }
-  if (!isFinite(fLo) || !isFinite(fHi) || fLo * fHi > 0) return null
-  for (let i = 0; i < 80; i++) {
-    const mid = (lo + hi) / 2
-    const fMid = npv(mid)
-    if (Math.abs(fMid) < 1e-10) return mid
-    if (fLo * fMid <= 0) { hi = mid; fHi = fMid } else { lo = mid; fLo = fMid }
+  const npv = (r) => {
+    let s = 0
+    for (const f of flows) {
+      const yrs = (f.t - t0) / (365 * 86400000)
+      s += f.cf / Math.pow(1 + r, yrs)
+    }
+    return s
   }
-  return (lo + hi) / 2
+  // 扫描多个利率点，寻找 NPV 变号区间后再二分（比单一 [-0.9999,10] 括号更鲁棒，
+  // 避免 npv(10) 因浮点舍入约等于 0 导致括号失效返回 null 的情况）。
+  const pts = [-0.9999, -0.9, -0.5, -0.2, 0, 0.2, 0.5, 1, 2, 5, 10, 50]
+  let prevR = null, prevV = null
+  for (const r of pts) {
+    const v = npv(r)
+    if (prevV !== null && isFinite(prevV) && isFinite(v)) {
+      if (prevV === 0) return prevR
+      if (v === 0) return r
+      if ((prevV < 0 && v > 0) || (prevV > 0 && v < 0)) {
+        let lo = prevR, hi = r, fLo = prevV, fHi = v
+        for (let k = 0; k < 100; k++) {
+          const mid = (lo + hi) / 2
+          const fMid = npv(mid)
+          if (!isFinite(fMid) || Math.abs(fMid) < 1e-9) return mid
+          if (fLo * fMid <= 0) { hi = mid; fHi = fMid } else { lo = mid; fLo = fMid }
+        }
+        return (lo + hi) / 2
+      }
+    }
+    prevR = r; prevV = v
+  }
+  return null
 }
 
 // ===== 数据拉取 =====
