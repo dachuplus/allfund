@@ -11,10 +11,11 @@
  *
  * 数据源：
  *   - PE 全史：中证指数官网 csindex.com.cn（与 /api/csi-pe 同源，海外边缘节点可达）
- *   - 历史收盘：腾讯财经 K 线 web.ifzq.gtimg.cn（主，覆盖 6/7 指数且为最新数据）
- *              / 新浪财经 K 线（回退，沪市 5 大指数可用，但中证全指偏陈旧）
- *   注：东方财富 push2his 在 EdgeOne 海外节点被墙（返回空），已移除，避免 11s 级超时拖垮整批。
- *   中证2000(932000) 在免费可直连源均无历史行情，回测对其返回「暂不支持」并保留在估值看板。
+ *   - 历史收盘：腾讯财经 K 线 web.ifzq.gtimg.cn（主，覆盖沪深300/500/800/1000/A500/全指且为最新数据）
+ *              / 新浪财经 K 线（回退，沪市指数可用，但海外节点偏陈旧）
+ *              / 东方财富 push2his（兜底，仅当腾讯+新浪都取空时调用，如中证2000 932000 在腾讯/新浪免费源无日线
+ *                但东财 push2his(secid=2.932000) 有完整历史；实测 EdgeOne 海外节点可直连，须带 ut 参数+完整 fields）
+ *   中证2000(932000) 在腾讯/新浪免费源无历史行情，现已由东方财富 push2his 兜底，回测可用（PE 历史自 2023-06 起，故有效回测约 3 年）。
  *
  * 安全：仅允许 6 位数字指数代码；只读公开接口，无密钥。
  */
@@ -255,6 +256,44 @@ async function fetchCloseTencent(code) {
   }
 }
 
+// 东方财富 push2his 日线（回退源）：腾讯/新浪均缺失时兜底（如中证2000 932000
+// 在腾讯/新浪免费源无日线，但东财 push2his 有完整历史，secid=2.932000）。
+// 注意：必须带 ut 参数 + 完整 fields，否则返回空。
+const EM_KLINE = 'https://push2his.eastmoney.com/api/qt/stock/kline/get'
+const EM_UT = 'fa5fd1943c7b386f172d6893dbfba10b'
+async function fetchCloseEastmoney(code) {
+  // 中证2000(932xxx) 在东方财富属深交所市场，secid=2.xxxxxx；其余中证系列属 1.xxxxxx
+  const market = code.startsWith('932') ? '2' : '1'
+  const secid = `${market}.${code}`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const url = `${EM_KLINE}?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58&klt=101&fqt=1&lmt=${KLINE_COUNT}&end=20500101&ut=${EM_UT}`
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36' },
+    })
+    if (!res.ok) return { ok: false, http: res.status }
+    const json = await res.json()
+    const k = json && json.data
+    const klines = (k && k.klines) || []
+    if (!klines.length) return { ok: false, msg: 'empty' }
+    const series = klines
+      .map(r => {
+        const p = String(r).split(',')
+        return { d: String(p[0]).slice(0, 10), close: normNum(p[2]) }
+      })
+      .filter(r => r.d && r.close > 0)
+      .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+    if (!series.length) return { ok: false, msg: 'no valid close' }
+    return { ok: true, series, source: 'eastmoney', lastDate: series[series.length - 1].d }
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** 合并多源收盘价序列：按日期去重取并集，优先保留较早来源之外的较新数据。
  *  解决单源从某些边缘节点返回陈旧数据（如新浪海外节点止于 2023）导致回测流水截断的问题。 */
 function mergeCloseSeries(sources) {
@@ -279,11 +318,16 @@ async function fetchClose(code) {
     fetchCloseSina(code),
   ])
   const merged = mergeCloseSeries([tx, sina])
-  if (!merged.length) return tx.ok ? tx : (sina.ok ? sina : tx)
-  const txLast = tx.ok && tx.series.length ? tx.series[tx.series.length - 1].d : ''
-  const sinaLast = sina.ok && sina.series.length ? sina.series[sina.series.length - 1].d : ''
-  const primary = (sinaLast >= txLast) ? 'sina' : 'tencent'
-  return { ok: true, series: merged, source: `merged(${primary})`, lastDate: merged[merged.length - 1].d }
+  if (merged.length) {
+    const txLast = tx.ok && tx.series.length ? tx.series[tx.series.length - 1].d : ''
+    const sinaLast = sina.ok && sina.series.length ? sina.series[sina.series.length - 1].d : ''
+    const primary = (sinaLast >= txLast) ? 'sina' : 'tencent'
+    return { ok: true, series: merged, source: `merged(${primary})`, lastDate: merged[merged.length - 1].d }
+  }
+  // 腾讯/新浪都取不到（如中证2000 在免费源无日线）→ 回退东方财富 push2his
+  const em = await fetchCloseEastmoney(code)
+  if (em.ok) return em
+  return tx.ok ? tx : (sina.ok ? sina : tx)
 }
 
 // ===== 回测核心（walk-forward）=====
