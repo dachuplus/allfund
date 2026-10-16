@@ -8,8 +8,12 @@ fetch_index_raw.py — 【第1级】指数原始数据抓取 → index_scores_ra
 
 ⚠️ 数据源变更（2026-10-10）：原 csindex（中证官网）在云 CI IP 上被 WAF 403 拦截
 （首次请求即拦，本地非云 IP 才通），导致 index_scores 卡在 10/8 无法刷新。
-经实测，改用以下免费、云可达的数据源（用户已确认「用东财的数据接口」）：
-  1) 成分股列表：EastMoney datacenter-web RPT_INDEX_CONSTITUENT
+2026-10-16 再次确认：东财 datacenter-web RPT_INDEX_CONSTITUENT 同样在 GitHub Actions
+云 IP 上被 WAF 拦截。因此成分股抓取改走 EdgeOne 边缘函数 /api/em-constituents
+同源代取（EdgeOne 海外节点可直连东财），fetch_index_raw.py 经 www.dachu.me 消费。
+
+当前数据源（用户已确认「用东财的数据接口」）：
+  1) 成分股列表：东财 RPT_INDEX_CONSTITUENT，经 EdgeOne /api/em-constituents 代取
      （按 INDEX_CODE 裸6位精确锁定，沪深300→300条、中证白酒→17条；无 WEIGHT 列）
   2) 成分股权重：内部 stock_scores.mktcap 推导（市值加权，标准做法，免外部权重源）
   3) 指数级 PE：内部 stock_scores 汇总口径 Σmktcap / Σ(mktcap/pe_ttm)
@@ -20,8 +24,8 @@ fetch_index_raw.py — 【第1级】指数原始数据抓取 → index_scores_ra
      在同池内做横截面 PE 分位（用真实指数 PE），彻底去掉 csindex 依赖。
 
 限流/容错：
-  - EastMoney datacenter 免费云可达（stock 流水线已在云验证），但仍加 --interval 留余量。
-  - 每个指数：EastMoney 取成分（带分页）+ gtimg 取收盘。失败自动重试，整指数跳过不阻断。
+  - 成分股请求走 EdgeOne 边缘函数（可配 EM_CONSTITUENTS_API），失败回退本地直连东财。
+  - 每个指数：取成分（带分页）+ gtimg 取收盘。失败自动重试，整指数跳过不阻断。
   - 全部失败时写 /tmp/WAF_BLOCKED.flag，workflow 据此走护栏（保旧数据）。
 
 用法：
@@ -136,13 +140,29 @@ def get_json(url, timeout=20, retries=3):
     return None
 
 
-def fetch_em_cons(code):
-    """EastMoney 成分股列表。返回 (indcode, index_close, cons_list)。
+# 边缘函数优先：GitHub Actions 云 IP 被东财 datacenter-web WAF 拦截，
+# 走 EdgeOne 海外节点同源代取可绕过。本地非云 IP 仍可直接访问东财，作兜底。
+EM_CONSTITUENTS_API = os.environ.get('EM_CONSTITUENTS_API') or 'https://www.dachu.me/api/em-constituents'
 
-    indcode 形如 000300.SH / 399997.SZ（用于推导 gtimg 前缀）。
-    index_close = CM_CLOSE（每行一致，即指数收盘价）。
-    cons_list = [{code(裸6位), name}]。
+
+def fetch_em_cons_via_edge(code):
+    """经 EdgeOne 边缘函数 /api/em-constituents 代取东财成分股。
+
+    返回 {'indcode', 'close', 'cons'} 或 None（表示失败）。
     """
+    u = f'{EM_CONSTITUENTS_API}?index={code}'
+    d = get_json(u, timeout=25)
+    if not d or not d.get('ok'):
+        return None
+    return {
+        'indcode': d.get('indcode'),
+        'close': num(d.get('close')),
+        'cons': d.get('cons') or [],
+    }
+
+
+def fetch_em_cons_direct(code):
+    """直连东财 datacenter-web（本地非云 IP 可达，作边缘函数兜底）。"""
     all_rows, page, pages, indcode, index_close = [], 1, 1, None, None
     while page <= pages and page <= 60:
         u = ('https://datacenter-web.eastmoney.com/api/data/v1/get'
@@ -166,6 +186,14 @@ def fetch_em_cons(code):
         if sc:
             cons.append({'code': sc, 'name': (r.get('SECURITY_NAME_ABBR') or '').strip()})
     return {'indcode': indcode, 'close': index_close, 'cons': cons}
+
+
+def fetch_em_cons(code):
+    """EastMoney 成分股列表。优先走 EdgeOne 边缘函数（云 CI 免 WAF），失败回退直连。"""
+    r = fetch_em_cons_via_edge(code)
+    if r is not None:
+        return r
+    return fetch_em_cons_direct(code)
 
 
 def fetch_gtimg(code, indcode):

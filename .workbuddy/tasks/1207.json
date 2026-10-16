@@ -1,0 +1,1 @@
+{"task_id":"1207","subject":"东财指数成分走 EdgeOne 边缘函数代取","description":"1. 新建 functions/api/em-constituents.js 代取东财 datacenter-web RPT_INDEX_CONSTITUENT。2. 改造 scripts/fetch_index_raw.py fetch_em_cons 优先调 /api/em-constituents，失败回退直连。3. 新建 scripts/test_em_constituents.py 验证 7 个目标指数。4. 构建部署并验证。","status":"in_progress","activeForm":"东财指数成分走 EdgeOne 边缘函数代取"}
