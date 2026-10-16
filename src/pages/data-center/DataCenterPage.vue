@@ -152,7 +152,7 @@
         <div class="intro-row">
           <div class="intro-key">后端 / 数据服务</div>
           <div class="intro-val">
-            Supabase（PostgreSQL + PostgREST + 认证 + 存储 + Edge Functions）。数据 ETL 由 Python 脚本完成，经 GitHub Actions 每日 21:30（北京时间）自动运行：抓取东方财富 / 天天基金数据 → 计算评分 → 写入 Supabase。AI 选基接入 DeepSeek 与阿里百炼（豆包 / 智谱）大模型 API。
+            Supabase（PostgreSQL + PostgREST + 认证 + 存储 + Edge Functions）。数据 ETL 由 Python 脚本完成，经 GitHub Actions 每日 21:30（北京时间）自动运行：抓取公开网络数据 → 计算评分 → 写入 Supabase。AI 选基接入 DeepSeek 与阿里百炼（豆包 / 智谱）大模型 API。
           </div>
         </div>
         <div class="intro-row">
@@ -958,22 +958,25 @@
         仅主管理员 <strong>{{ adminEmail }}</strong> 可修改，其余授权账户仅可查看。
       </p>
       <div class="feature-flag-list">
-        <div class="feature-flag-row" v-for="f in toggleableFeatures" :key="f.key">
-          <div class="feature-flag-info">
-            <div class="feature-flag-label">{{ f.label }}</div>
-            <div class="feature-flag-desc">{{ f.desc }}</div>
+        <template v-for="group in featureGroups" :key="group.title">
+          <div class="feature-flag-group-title">{{ group.title }}</div>
+          <div class="feature-flag-row" v-for="f in group.items" :key="f.key">
+            <div class="feature-flag-info">
+              <div class="feature-flag-label">{{ f.label }}</div>
+              <div class="feature-flag-desc">{{ f.desc }}</div>
+            </div>
+            <label class="switch" :class="{ 'switch--disabled': !isSuperAdmin }">
+              <input
+                type="checkbox"
+                :checked="featureEnabled(f.key)"
+                :disabled="!isSuperAdmin || savingFlag === f.key"
+                @change="toggleFeature(f.key, $event.target.checked)"
+              />
+              <span class="switch__track"><span class="switch__thumb"></span></span>
+              <span class="switch__state">{{ featureEnabled(f.key) ? '开放' : '关闭' }}</span>
+            </label>
           </div>
-          <label class="switch" :class="{ 'switch--disabled': !isSuperAdmin }">
-            <input
-              type="checkbox"
-              :checked="featureEnabled(f.key)"
-              :disabled="!isSuperAdmin || savingFlag === f.key"
-              @change="toggleFeature(f.key, $event.target.checked)"
-            />
-            <span class="switch__track"><span class="switch__thumb"></span></span>
-            <span class="switch__state">{{ featureEnabled(f.key) ? '开放' : '关闭' }}</span>
-          </label>
-        </div>
+        </template>
       </div>
       <p v-if="!isSuperAdmin" class="feature-flag-readonly">
         当前账户 {{ user?.email }} 为授权管理员但非主管理员，功能开关为只读。如需调整请联系主管理员 {{ adminEmail }}。
@@ -1035,7 +1038,7 @@
 
       <!-- 第一步 -->
       <h2 class="method-step-title">第一步：原始数据采集</h2>
-      <p>评分系统使用两类原始数据，分别来自不同的天天基金 API：</p>
+      <p>评分系统使用两类原始数据，分别来自不同的公开网络 API：</p>
       <table class="field-table">
         <thead><tr><th>数据类别</th><th>数据来源</th><th>字段</th><th>说明</th></tr></thead>
         <tbody>
@@ -1043,7 +1046,7 @@
             <td><strong>阶段收益率</strong></td>
             <td><code>FundGuideapi</code></td>
             <td>r0w / r1m / r3m / r6m / r1y / r2y / r3y / r5y</td>
-            <td>天天基金直接返回的百分比收益率（如 12.35 表示 +12.35%），无需自行计算</td>
+            <td>公开网络直接返回的百分比收益率（如 12.35 表示 +12.35%），无需自行计算</td>
           </tr>
           <tr>
             <td><strong>风险指标</strong></td>
@@ -1055,7 +1058,7 @@
             <td><strong>风险指标补充</strong></td>
             <td><code>tsdata</code> (HTML 页面)</td>
             <td>sr1y~sr3y（夏普比率）<br>stddev1y~stddev3y（标准差）</td>
-            <td>天天基金预计算的风险指标，补充 pingzhongdata 未覆盖的基金（如部分可转债/二级债基），优先级低于 pingzhongdata</td>
+            <td>公开网络预计算的风险指标，补充 pingzhongdata 未覆盖的基金（如部分可转债/二级债基），优先级低于 pingzhongdata</td>
           </tr>
           <tr>
             <td><strong>货币基金收益率</strong></td>
@@ -1317,6 +1320,23 @@
     <div class="card" v-show="activeTab==='intro'">
       <div class="card-title">数据接口文档</div>
       <p class="section-desc">以下是 本站 使用的所有外部数据接口，所有接口均来源于公开数据平台。</p>
+
+      <h2 class="api-group-title">★ 优选数据接口速查（优先选用，状态实时更新）</h2>
+      <p class="section-desc">下列接口为各功能域的<strong>成熟 / 首选</strong>数据源，新功能开发应优先复用，避免重复踩坑。状态含义：✅ 成熟稳定 · ⚠️ 受限需代理 · ❌ 当前不稳定。</p>
+      <table class="field-table">
+        <thead><tr><th>功能域</th><th>优选接口</th><th>状态</th><th>说明 / 备注</th></tr></thead>
+        <tbody>
+          <tr><td>基金基础 / 净值 / 分类</td><td>天天基金 fund.eastmoney.com（rankhandler / FundGuideapi / pingzhongdata）</td><td>✅ 成熟</td><td>CI 落地 fund_scores，稳定；分类以 t0 / t1_tt 为权威，不可漂移</td></tr>
+          <tr><td>基金行情</td><td>东方财富 push2.eastmoney.com</td><td>✅ 成熟</td><td>CORS 直连，稳定</td></tr>
+          <tr><td>股票行情 / 财务</td><td>东方财富 push2 / push2his</td><td>✅ 成熟</td><td>CORS 直连，secid 7/7 可用</td></tr>
+          <tr><td>股票评分</td><td>stock_scores（落地表）</td><td>✅ 成熟</td><td>独立成长股公式，staging→promote 原子切换</td></tr>
+          <tr><td>指数行情 / 价格 / 涨跌</td><td>东方财富 push2</td><td>✅ 成熟</td><td>与股票一致，首选；腾讯 gtimg 同源兜底</td></tr>
+          <tr><td>指数估值 PE 历史</td><td>中证指数 csindex（经 /api/csi-pe 边缘函数）</td><td>⚠️ 受限→代理</td><td>云 CI / 前端不可直连（WAF 403），必须走海外边缘函数代取；7 目标指数全 200</td></tr>
+          <tr><td>指数成分股（五维评分原料）</td><td>东方财富 datacenter-web 成分接口</td><td>❌ 不稳定</td><td>云 CI IP 被 WAF / 不可达，是当前指数评分流水线卡点（停滞 trade_date=20261008）</td></tr>
+          <tr><td>指数估值补充</td><td>蛋卷 danjuan index_eva/dj</td><td>⚠️ 仅 3/7</td><td>沪深300 / 中证500 / 中证1000，不作主源；需 /api/danjuan-eva 代理</td></tr>
+          <tr><td>宏观 / 策略 / 风格因子</td><td>macro_history（落地表）</td><td>✅ 合理落地</td><td>被 SignalPage 图表、build_style_factors、fetch_jqr_indicators 共用，后端计算须落地，非浪费</td></tr>
+        </tbody>
+      </table>
 
       <!-- 天天基金 API -->
       <h2 class="api-group-title">一、天天基金 API</h2>
@@ -1670,18 +1690,18 @@
           <tr><td class="meta-label">方法</td><td>GET（服务端聚合多源，30 分钟缓存）</td></tr>
           <tr><td class="meta-label">用途</td><td>获取信号页 / 组合页所需的宏观基准（国债收益率、SHIBOR、M2、CPI、PMI、沪深300 估值）</td></tr>
           <tr><td class="meta-label">端点</td><td><code>https://{PROJECT_REF}.supabase.co/functions/v1/macro-data</code></td></tr>
-          <tr><td class="meta-label">数据来源</td><td>东方财富（国债/SHIBOR/货币供应/PMI/沪深300 PE）+ 蛋卷基金估值中心，免鉴权、CORS 已开放</td></tr>
+          <tr><td class="meta-label">数据来源</td><td>公开网络，免鉴权、CORS 已开放</td></tr>
         </table>
         <p class="api-subtitle">聚合字段</p>
         <table class="field-table">
           <thead><tr><th>指标</th><th>来源</th><th>字段</th></tr></thead>
           <tbody>
-            <tr><td>10Y 国债收益率</td><td>东方财富</td><td>bond.yield10y（小数）+ bond.spread（10Y-2Y 百分点）</td></tr>
-            <tr><td>SHIBOR 隔夜</td><td>东方财富</td><td>shibor.on（小数）</td></tr>
-            <tr><td>M2 同比</td><td>东方财富</td><td>m2.m2yoy（百分数）</td></tr>
-            <tr><td>CPI 同比</td><td>东方财富</td><td>cpi.cpi（小数）</td></tr>
-            <tr><td>PMI</td><td>东方财富</td><td>pmi.pmi</td></tr>
-            <tr><td>沪深300 估值</td><td>蛋卷基金估值中心</td><td>pe300.pe / pe300.pePercentile（百分数）+ pe300.pb</td></tr>
+            <tr><td>10Y 国债收益率</td><td>公开网络</td><td>bond.yield10y（小数）+ bond.spread（10Y-2Y 百分点）</td></tr>
+            <tr><td>SHIBOR 隔夜</td><td>公开网络</td><td>shibor.on（小数）</td></tr>
+            <tr><td>M2 同比</td><td>公开网络</td><td>m2.m2yoy（百分数）</td></tr>
+            <tr><td>CPI 同比</td><td>公开网络</td><td>cpi.cpi（小数）</td></tr>
+            <tr><td>PMI</td><td>公开网络</td><td>pmi.pmi</td></tr>
+            <tr><td>沪深300 估值</td><td>公开网络</td><td>pe300.pe / pe300.pePercentile（百分数）+ pe300.pb</td></tr>
           </tbody>
         </table>
       </div>
@@ -1922,7 +1942,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuth, FEATURES, ADMIN_EMAIL } from '../../composables/useAuth'
 import { confirm, toast } from '../../composables/useToast'
 import { usePermissionRequests } from '../../composables/usePermissionRequests'
-import { useFeatureFlags, TOGGLEABLE_FEATURES } from '../../composables/useFeatureFlags'
+import { useFeatureFlags, FEATURE_GROUPS } from '../../composables/useFeatureFlags'
 import { fetchPrivateFile, saveBlob } from '../../api/downloads'
 
 const { user, isLoggedIn, isOwner, showLogin, savePermissions, deletePermissions, blockUser } = useAuth()
@@ -1931,7 +1951,7 @@ const adminEmail = ADMIN_EMAIL
 
 // 功能开放控制：全局开关（仅主管理员 57502460@qq.com 可改）
 const { featureEnabled, setFeatureFlag, loadFeatureFlags } = useFeatureFlags()
-const toggleableFeatures = TOGGLEABLE_FEATURES
+const featureGroups = FEATURE_GROUPS
 const isSuperAdmin = computed(() => user.value?.email === adminEmail)
 const savingFlag = ref('')
 async function toggleFeature(key, open) {
@@ -3005,6 +3025,13 @@ watch(isOwner, (val) => {
 
 /* ===== 功能开放控制 ===== */
 .feature-flag-list { display: flex; flex-direction: column; margin-top: var(--space-md); }
+.feature-flag-group-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+  color: #1d70b8; text-transform: none;
+  margin: var(--space-lg) 0 2px; padding: 6px 10px;
+  background: #f3f2f1; border-left: 4px solid #1d70b8;
+}
+.feature-flag-group-title:first-child { margin-top: 0; }
 .feature-flag-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-md); padding: var(--space-md) 0;

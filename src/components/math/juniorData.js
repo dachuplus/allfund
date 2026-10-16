@@ -262,7 +262,7 @@ export const JUNIOR = [
       {
         title: '一次函数与图像',
         level: 1,
-        summary: 'y = kx + b，k 是斜率（增减性），b 是截距。图像是一��直线。',
+        summary: 'y = kx + b，k 是斜率（增减性），b 是截距。图像是一条直线。',
         points: [
           'k > 0 时 y 随 x 增大而增大；k < 0 时相反',
           'b > 0 交 y 轴正半轴；b < 0 交负半轴',

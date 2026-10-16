@@ -15,6 +15,7 @@ import { ref, computed } from 'vue'
 import { supabase, rewriteSupabaseUrl } from '../api/supabase'
 import { toast } from './useToast.js'
 import { upsertUserProfile, getMyPortfolios } from '../api/user-data'
+import { SUB_FEATURE_PARENTS } from './useFeatureFlags'
 
 // 会话最长有效期：1 周（用户要求从默认 30 天缩短）
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -78,13 +79,21 @@ export function useAuth() {
     !!user.value && !isAdmin.value && (permissions.value.enabled_features || []).length === 0
   )
 
-  /** 当前用户是否拥有某功能权限 */
+  /** 当前用户是否拥有某功能权限（含二级/三级子功能：沿父链向上匹配，
+   *  用户只要拥有一级功能即视为拥有其下所有子功能） */
   function hasFeature(key) {
     if (!user.value) return false
     if (user.value.email === ADMIN_EMAIL) return true
     if (permissions.value.is_admin) return true
     const f = permissions.value.enabled_features || []
-    return f.includes('all') || f.includes(key)
+    if (f.includes('all')) return true
+    // 子功能：若用户拥有其任一祖先功能，视为已授权（权限在一级粒度授予）
+    let k = key
+    while (k != null) {
+      if (f.includes(k)) return true
+      k = SUB_FEATURE_PARENTS[k] ?? null
+    }
+    return false
   }
 
   /** 初始化：App.vue 挂载时调用，恢复 session 并监听状态变更 */

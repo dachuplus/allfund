@@ -29,7 +29,7 @@
     <!-- Tab 导航 -->
     <div class="signal-tabs">
       <div
-        v-for="tab in tabs" :key="tab.key"
+        v-for="tab in visibleTabs" :key="tab.key"
         class="signal-tab"
         :class="{ active: activeTab === tab.key }"
         @click="activeTab = tab.key"
@@ -109,7 +109,7 @@
       <!-- 子Tab -->
       <div class="sub-tabs">
         <div
-          v-for="st in factorSubTabs" :key="st.key"
+          v-for="st in visibleFactorSubTabs" :key="st.key"
           class="sub-tab" :class="{ active: factorSub === st.key }"
           @click="switchFactorSub(st.key)"
         >{{ st.label }}</div>
@@ -256,6 +256,7 @@ import { calcAllExpectedReturns, calcEnhancedRiskParityWeights, calcMarketSharpe
 import { fetchMacroData, fetchConfig, fetchFactorScores, fetchStyleFactors } from '../../utils/api'
 import { COLORS } from '../../utils/echarts-theme'
 import { supabase } from '../../api/supabase'
+import { useFeatureFlags } from '../../composables/useFeatureFlags'
 import HelpTip from '../../components/HelpTip.vue'
 import JqrIndicator from '../../components/JqrIndicator.vue'
 import ValuationPage from '../../pages/tools/ValuationPage.vue'
@@ -263,13 +264,16 @@ import DtipPanel from '../../components/signal/DtipPanel.vue'
 
 // ===== Tab 结构 =====
 const tabs = [
-  { key: 'macro',       label: '宏观策略' },
-  { key: 'asset',       label: '资产配置' },
-  { key: 'factor',      label: '风格因子' },
-  { key: 'jqr',         label: '特色指标' },
-  { key: 'valuation',   label: '行业估值' },
-  { key: 'dtip',        label: '定投助手' },
+  { key: 'macro',       label: '宏观策略', feature: 'signal-macro' },
+  { key: 'asset',       label: '资产配置', feature: 'signal-asset' },
+  { key: 'factor',      label: '风格因子', feature: 'signal-factor' },
+  { key: 'jqr',         label: '特色指标', feature: 'signal-jqr' },
+  { key: 'valuation',   label: '行业估值', feature: 'signal-valuation' },
+  { key: 'dtip',        label: '定投助手', feature: 'signal-dtip' },
 ]
+// 按功能开关（含父级 signal）过滤可见的二级 tab
+const { featureEnabled } = useFeatureFlags()
+const visibleTabs = computed(() => tabs.filter(t => featureEnabled(t.feature)))
 // ===== 标签页持久化（Req6）：刷新后保留浏览位置 =====
 const ACTIVE_TAB_KEY = 'af_signal_active_tab'
 const activeTab = ref((() => {
@@ -326,11 +330,11 @@ const weightList = ref([])
 // ===== Macro indicators =====
 const macroList = ref([
   { key: 'cn10y',  label: '中国10Y国债', value: '--', date: '', help: '中国10年期国债收益率\n含义：以中国10年期国债到期收益率为代表的无风险利率，是股债性价比与风险平价计算的核心输入。收益率越低，市场流动性越宽松、股票相对越便宜。\n数据来源：公开网络。\n更新时间：每个交易日收盘后更新（与页面顶部"数据截止"一致，每日 21:30 同步）。' },
-  { key: 'us10y',  label: '美国10Y国债', value: '--', date: '', help: '美国10年期国债收益率\n含义：全球资产定价的锚，影响跨境流动性与风险偏好。越高越偏紧，对新兴市场与权益估值压制越大。\n数据来源：FRED（美国联邦储备经济数据库，DGS10）。\n更新时间：美债交易日，T+1 同步。' },
+  { key: 'us10y',  label: '美国10Y国债', value: '--', date: '', help: '美国10年期国债收益率\n含义：全球资产定价的锚，影响跨境流动性与风险偏好。越高越偏紧，对新兴市场与权益估值压制越大。\n数据来源：公开网络。\n更新时间：美债交易日，T+1 同步。' },
   { key: 'shibor', label: 'Shibor隔夜', value: '--', date: '', help: 'Shibor 隔夜利率\n含义：上海银行间同业拆放利率（隔夜），反映短端资金面松紧，是无风险利率 Rf 的近似。\n数据来源：公开网络。\n更新时间：每个交易日 11:00 左右公布，每日同步。' },
   { key: 'cpi',    label: 'CPI同比', value: '--', date: '', help: 'CPI 同比\n含义：居民消费价格同比涨幅，衡量通胀水平。通胀上行通常伴随货币政策收紧预期。\n数据来源：公开网络。\n更新时间：每月 9-10 日左右公布上月数据。' },
   { key: 'm2',     label: 'M2同比', value: '--', date: '', help: 'M2 同比\n含义：广义货币供应量同比增速，反映货币投放与流动性总量。增速上行通常预示流动性宽松。\n数据来源：公开网络。\n更新时间：每月 10-15 日公布上月数据。' },
-  { key: 'ppi',    label: 'PPI同比', value: '--', date: '', help: 'PPI 同比\n含义：工业生产者出厂价格同比涨幅，衡量工业品通缩/通胀，领先于企业盈利。\n数据来源：公开网络（东方财富宏观经济数据）。\n更新时间：每月 9-10 日左右公布上月数据。' },
+  { key: 'ppi',    label: 'PPI同比', value: '--', date: '', help: 'PPI 同比\n含义：工业生产者出厂价格同比涨幅，衡量工业品通缩/通胀，领先于企业盈利。\n数据来源：公开网络。\n更新时间：每月 9-10 日左右公布上月数据。' },
   { key: 'pmi',    label: 'PMI(制造业)', value: '--', date: '', help: '制造业采购经理指数(PMI)\n含义：荣枯线 50，>50 扩张、<50 收缩，是衡量制造业景气度的先行指标。\n数据来源：公开网络。\n更新时间：每月末/月初公布当月数据。' },
   { key: 'spread', label: '10Y-2Y利差', value: '--', date: '', help: '中国10Y-2Y 国债期限利差\n含义：长端减短端利率。利差走阔=经济预期改善；倒挂(为负)通常预示衰退预期。\n数据来源：公开网络。\n更新时间：每个交易日收盘后更新。' }
 ])
@@ -366,11 +370,24 @@ const fedIndices = ref([
 
 // ===== 风格因子 =====
 const factorSubTabs = [
-  { key: 'stock', label: '股票风格' },
-  { key: 'bond', label: '债券风格' },
-  { key: 'commodity', label: '大宗商品' }
+  { key: 'stock', label: '股票风格', feature: 'factor-stock' },
+  { key: 'bond', label: '债券风格', feature: 'factor-bond' },
+  { key: 'commodity', label: '大宗商品', feature: 'factor-commodity' }
 ]
+// 按功能开关（含父级 signal-factor / signal）过滤可见的三级 tab
+const visibleFactorSubTabs = computed(() => factorSubTabs.filter(t => featureEnabled(t.feature)))
 const factorSub = ref('stock')
+// 子功能关闭后，若当前选中项不再可见，回退到第一个可见项（避免停留在被关掉的 tab）
+watch(visibleTabs, (list) => {
+  if (list.length && !list.some(t => t.key === activeTab.value)) {
+    activeTab.value = list[0].key
+  }
+})
+watch(visibleFactorSubTabs, (list) => {
+  if (list.length && !list.some(t => t.key === factorSub.value)) {
+    factorSub.value = list[0].key
+  }
+})
 const factorFactors = ref([])
 const bondSignals = ref([])
 const commodityItems = ref([])
@@ -1155,7 +1172,7 @@ watch(activeTab, () => redrawCurrentCharts())
 onMounted(() => {
   const route = useRoute()
   const tabFromQuery = route.query.tab
-  if (tabFromQuery && tabs.some(t => t.key === tabFromQuery)) {
+  if (tabFromQuery && visibleTabs.value.some(t => t.key === tabFromQuery)) {
     activeTab.value = tabFromQuery
   }
   loadAll()

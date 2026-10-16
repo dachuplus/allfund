@@ -56,6 +56,7 @@ const routes = [
         component: () => import('../pages/tools/StockPage.vue'),
         meta: {
           tab: 'tools',
+          feature: 'tools-stock',
           title: '选品 · 股票',
           description: '股票选品：股票筛选、排序与对比工具（开发中）。',
           keywords: '股票选品,股票筛选'
@@ -67,6 +68,7 @@ const routes = [
         component: () => import('../pages/tools/IndexPage.vue'),
         meta: {
           tab: 'tools',
+          feature: 'tools-index',
           title: '选品 · 指数',
           description: '指数选品：按成长、估值、市值流动性、质量、股东回报五个维度对指数做横截面评分与排序，支持规模风格、行业、固收分类查看。',
           keywords: '指数选品,指数评分,指数筛选'
@@ -78,6 +80,7 @@ const routes = [
         component: () => import('../pages/portfolio/FundIndexPanel.vue'),
         meta: {
           tab: 'tools',
+          feature: 'tools-fund-index',
           title: '选品 · 基金指数',
           description: '基金指数：按一级/二级分类聚合的靠谱指数分类指数，以及沪深公开基金指数产品的实时行情与历史走势。',
           keywords: '基金指数,分类指数,基金指数行情'
@@ -89,6 +92,7 @@ const routes = [
         component: () => import('../pages/tougu/TouguPage.vue'),
         meta: {
           tab: 'tools',
+          feature: 'tools-tougu',
           title: '选品 · 投顾产品',
           description: '公开披露高收益、稳健、养老三类投顾产品的近3月、近1年收益与最大回撤等历史数据，供客观查阅。',
           keywords: '投顾产品,公开信息,稳健理财,养老储蓄'

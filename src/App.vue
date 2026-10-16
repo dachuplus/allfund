@@ -17,9 +17,10 @@
       </div>
     </div>
 
-    <!-- 未登录：全屏登录墙（公开内容/回调路由除外，放行以渲染应用）；
-         login-wall 功能开关关闭时，所有人可直接浏览（不弹墙） -->
-    <LoginDialog v-else-if="!authLoading && !isLoggedIn && !isPublicContentRoute && featureEnabled('login-wall')" :wall="true" @logged-in="onLoggedIn" />
+    <!-- 登录墙：未登录 + 非公开路由 +（登录墙已开启 或 开关尚未加载完=状态未知）时直接显示；
+         后台并行跑 init()/loadFeatureFlags() 验证，登录成功即进入首页，失败（未登录）则保持墙。
+         不再显示「正在验证登录状态」中间页，避免「验证页→墙」的两段式闪烁。 -->
+    <LoginDialog v-else-if="!isLoggedIn && !isPublicContentRoute && (featureEnabled('login-wall') || !flagsLoaded)" :wall="true" @logged-in="onLoggedIn" />
 
     <!-- 已登录但权限申请被驳回：驳回提示（优先于陌生人提示） -->
     <div v-else-if="!authLoading && isLoggedIn && permissionsReady && rejected" class="stranger-screen">
@@ -154,24 +155,23 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import LoginDialog from './components/LoginDialog.vue'
 import PermissionRequestDialog from './components/PermissionRequestDialog.vue'
 import { useAuth, FEATURES } from './composables/useAuth'
-import { useFeatureFlags } from './composables/useFeatureFlags'
+import { useFeatureFlags, TOGGLEABLE_FEATURES } from './composables/useFeatureFlags'
 import { supabase } from './api/supabase'
 
 const route   = useRoute()
 const router  = useRouter()
 const { user, isLoggedIn, isAdmin, isOwner, isStranger, blocked, rejected, permissionsReady, loading: authLoading, hasFeature, displayName, init, signOut, showLoginDialog, showLogin, hideLogin, checkRejected } = useAuth()
 const showLoginDialogValue = showLoginDialog  // 模板中用于 v-if 控制弹窗显隐
-const { featureEnabled, loadFeatureFlags } = useFeatureFlags()
+const { featureEnabled, loadFeatureFlags, loaded: flagsLoaded } = useFeatureFlags()
 
 /* 公开内容路由（微信回调等）：未登录也可访问，登录墙对其放行。
  * 注意：当 login-wall 权限墙开启时，仅 meta.public 的回调路由放行，
  *       博客（content）路由不再视为公开——必须登录才能看。 */
 const isPublicContentRoute = computed(() => {
-  // 兜底：路由尚未解析完成（首屏第一帧）时，先视为公开路由，
-  // 避免 route.meta 为空导致 isPublicContentRoute 误判为 false、登录墙闪现一帧。
-  if (!route.matched || route.matched.length === 0) return true
   // 回调类路由（微信扫码、OAuth 等）始终放行，否则无法完成登录流程
   if (route.meta?.public) return true
+  // 开关尚未加载完（状态未知）：先按「非公开」处理，让登录墙兜底，避免误放行内容造成「内容→墙」闪烁
+  if (!flagsLoaded.value) return false
   // 权限墙关闭时：博客作为公开内容放行；权限墙开启时：博客也需登录
   if (route.meta?.feature === 'content' && featureEnabled('content') && !featureEnabled('login-wall')) return true
   return false
@@ -184,8 +184,8 @@ function onResize() {
 }
 onMounted(async () => {
   window.addEventListener('resize', onResize)
+  loadFeatureFlags()  // 优先并行加载功能开放开关（含 login-wall），与 init 同步进行，缩短闪烁窗口
   await init()        // 初始化全局 auth（恢复 session 后再上报，确保能拿到登录邮箱）
-  loadFeatureFlags()  // 加载功能开放开关（失败回退默认，不阻塞页面）
   logVisitor()        // 上报本次访问（IP / 邮箱 / 地区 / 页面）
   loadVisitorCount()  // 拉取累计访客数（写入 visitor_logs 的总条数）
 })
@@ -340,7 +340,7 @@ const routeAllowed = computed(() => {
 const currentFeatureLabel = computed(() => {
   if (route.meta?.ownerOnly) return '管理/编辑'
   const feat = route.meta?.feature
-  const f = FEATURES.find(x => x.key === feat)
+  const f = FEATURES.find(x => x.key === feat) || TOGGLEABLE_FEATURES.find(x => x.key === feat)
   return f ? f.label : ''
 })
 
@@ -612,6 +612,8 @@ const currentFeatureLabel = computed(() => {
   background: #1d70b8;
   padding: var(--space-md);
 }
+
+/* ========== 陌生人 / 无功能权限卡片 ========== */
 .stranger-card {
   background: #ffffff;
   border: 1px solid #b1b4b6; border-top: 6px solid #1d70b8;

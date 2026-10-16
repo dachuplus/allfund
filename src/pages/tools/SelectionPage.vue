@@ -1,32 +1,14 @@
 <template>
   <div class="page-selection">
-    <!-- 二级 tab：基金 / 股票 / 指数 -->
+    <!-- 二级 tab：基金 / 股票 / 指数（按功能开关过滤显示） -->
     <nav class="selection-tabs" aria-label="选品分类">
       <router-link
-        to="/tools/fund"
+        v-for="t in visibleToolTabs"
+        :key="t.name"
+        :to="t.to"
         class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-fund' }"
-      >基金</router-link>
-      <router-link
-        to="/tools/stock"
-        class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-stock' }"
-      >股票</router-link>
-      <router-link
-        to="/tools/index"
-        class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-index' }"
-      >指数</router-link>
-      <router-link
-        to="/tools/fund-index"
-        class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-fund-index' }"
-      >基金指数</router-link>
-      <router-link
-        to="/tools/tougu"
-        class="selection-tab"
-        :class="{ 'selection-tab--active': route.name === 'tools-tougu' }"
-      >投顾产品</router-link>
+        :class="{ 'selection-tab--active': route.name === t.name }"
+      >{{ t.label }}</router-link>
     </nav>
 
     <router-view v-slot="{ Component }">
@@ -38,9 +20,22 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useFeatureFlags } from '../../composables/useFeatureFlags'
 
 const route = useRoute()
+const { featureEnabled } = useFeatureFlags()
+
+// 选品二级 tab：由功能开关（含父级 fund-rank）控制显隐
+const toolTabs = [
+  { to: '/tools/fund',       name: 'tools-fund',       label: '基金',     feature: 'fund-rank' },
+  { to: '/tools/stock',      name: 'tools-stock',      label: '股票',     feature: 'tools-stock' },
+  { to: '/tools/index',      name: 'tools-index',      label: '指数',     feature: 'tools-index' },
+  { to: '/tools/fund-index', name: 'tools-fund-index', label: '基金指数', feature: 'tools-fund-index' },
+  { to: '/tools/tougu',      name: 'tools-tougu',      label: '投顾产品', feature: 'tools-tougu' },
+]
+const visibleToolTabs = computed(() => toolTabs.filter(t => featureEnabled(t.feature)))
 </script>
 
 <style scoped>

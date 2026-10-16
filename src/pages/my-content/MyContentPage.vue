@@ -5,7 +5,7 @@
     <div class="cp-tabs">
       <div class="cp-tab-list">
         <div
-          v-for="c in categories"
+          v-for="c in visibleCategories"
           :key="c.key"
           class="cp-tab"
           :class="{ active: category === c.key }"
@@ -14,16 +14,26 @@
       </div>
     </div>
 
+    <!-- 诊断：当没有任何二级分类可见时显示当前登录/权限状态 -->
+    <div v-if="!visibleCategories.length" class="cp-empty cp-diagnostic">
+      <p>当前登录账号：{{ user?.email || '未登录' }}</p>
+      <p>管理员邮箱：{{ ADMIN_EMAIL }}</p>
+      <p>是否匹配管理员邮箱：{{ isAdminEmail ? '是' : '否' }}</p>
+      <p>isOwner：{{ isOwner ? '是' : '否' }}</p>
+      <p>权限加载完成：{{ permissionsReady ? '是' : '否' }}</p>
+      <p v-if="!user"><button class="cp-retry-btn" @click="showLogin">登录</button></p>
+    </div>
+
     <!-- 游戏二级 Tab：扫雷 / 2048 / 方块世界 / 平台冒险 / 推箱子 / 连线消除 / 六角消除 -->
     <div v-if="category === 'game'" class="cp-games">
       <GamesPanel />
     </div>
 
-    <!-- 奥数二级 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队 -->
+    <!-- 奥数二级 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队 / 奥精 / 质数 / 乘法口诀 / 进位制 -->
     <div v-else-if="category === 'math'">
       <div class="cp-subtabs">
         <div
-          v-for="t in mathTabs"
+          v-for="t in visibleMathTabs"
           :key="t.key"
           class="cp-subtab"
           :class="{ active: mathTab === t.key }"
@@ -43,6 +53,15 @@
           >{{ g.label }}</div>
         </div>
         <Grade5Panel :grade="gradeTab" :inst="mathTab" />
+      </div>
+      <!-- 进位制：任意进制数值转换 + 多进制混合算式计算器 -->
+      <div v-else-if="mathTab === 'base'">
+        <h2 class="cp-tool-title">进位制转换</h2>
+        <BaseConverterTool />
+        <div class="cp-subblock">
+          <h3 class="cp-subblock-title">进位制计算器（算式求值）</h3>
+          <BaseCalculatorTool />
+        </div>
       </div>
       <!-- 质数：判定方法 + 试除过程计算器 + 质数表 + 年代指数表 + 陷阱数 -->
       <PrimePanel v-else-if="mathTab === 'prime'" />
@@ -73,7 +92,7 @@
     <div v-else-if="category === 'food'">
       <div class="cp-subtabs">
         <div
-          v-for="t in foodTabs"
+          v-for="t in visibleFoodTabs"
           :key="t.key"
           class="cp-subtab"
           :class="{ active: foodTab === t.key }"
@@ -110,14 +129,22 @@
       />
     </div>
 
-    <!-- 工具二级 Tab：进位制转换 + 个人工具 -->
-    <div v-else-if="category === 'tool'" class="cp-tool">
-      <h2 class="cp-tool-title">进位制转换</h2>
-      <BaseConverterTool />
-      <div class="cp-subblock">
-        <h3 class="cp-subblock-title">进位制计算器（算式求值）</h3>
-        <BaseCalculatorTool />
+    <!-- 英文二级 Tab：Unlock / Reading Explorer / 乐读 / 新概念 四套课程体系 -->
+    <div v-else-if="category === 'eng'">
+      <div class="cp-subtabs">
+        <div
+          v-for="t in visibleEngTabs"
+          :key="t.key"
+          class="cp-subtab"
+          :class="{ active: engTab === t.key }"
+          @click="engTab = t.key"
+        >{{ t.label }}</div>
       </div>
+      <EngPanel :inst="engTab" />
+    </div>
+
+    <!-- 工具二级 Tab：个人工具（原进位制转换已迁移至「奥数 · 进位制」） -->
+    <div v-else-if="category === 'tool'" class="cp-tool">
       <div class="cp-subblock">
         <h3 class="cp-subblock-title">个人工具</h3>
         <MediaTools />
@@ -180,9 +207,10 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuth } from '../../composables/useAuth'
+import { useAuth, ADMIN_EMAIL } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
 import Grade5Panel from '../../components/math/Grade5Panel.vue'
+import EngPanel from '../../components/english/EngPanel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import YuwenPanel from '../../components/math/YuwenPanel.vue'
 import PrimePanel from '../../components/math/PrimePanel.vue'
@@ -198,6 +226,7 @@ import { SH_RESTAURANTS_EXTRA } from '../../data/shRestaurantsExtra.js'
 import { MUST_EAT_SHANGHAI, MUST_EAT_SOURCES } from '../../data/mustEatShanghai.js'
 import { listArticles, deleteArticle, setArticlePinned, NETWORK_SLOW_MSG, isNetworkError, toErrorMessage } from '../../api/articles'
 import { confirm, toast } from '../../composables/useToast'
+import { useFeatureFlags } from '../../composables/useFeatureFlags'
 
 /**
  * 中国大厨榜：原始 100 家（品牌级精选）+ 扩展集（公开榜单可溯源门店，编辑综合评分）。
@@ -211,11 +240,14 @@ const CHEF_BOARD = [...SH_RESTAURANTS, ...SH_RESTAURANTS_EXTRA]
  */
 const foodTab = ref('chef')
 const foodTabs = computed(() => [
-  { key: 'chef', label: '大厨榜-上海', count: `${CHEF_BOARD.length} 家` },
-  { key: 'musteat', label: '必吃榜-上海', count: '2017-2025' },
+  { key: 'chef', label: '大厨榜-上海', count: `${CHEF_BOARD.length} 家`, feature: 'food-chef' },
+  { key: 'musteat', label: '必吃榜-上海', count: '2017-2025', feature: 'food-musteat' },
 ])
+const { isOwner, user, permissionsReady, showLogin } = useAuth()
+const isAdminEmail = computed(() => user.value?.email === ADMIN_EMAIL)
+// 按功能开关（含父级 content-food / content）过滤可见的美食三级 tab；管理员始终可见
+const visibleFoodTabs = computed(() => (isAdminEmail.value || isOwner.value) ? foodTabs.value : foodTabs.value.filter(t => featureEnabled(t.feature)))
 
-const { isOwner, user } = useAuth()
 const route = useRoute()
 const articles = ref([])
 const loading = ref(false)
@@ -227,14 +259,18 @@ const view = ref('published')
 // 二级分类导航：博客 / 影视 / 美食 / 奥数 / 游戏 / 工具（默认「博客」）
 const category = ref('blog')
 const categories = [
-  { key: 'blog', label: '博客' },
-  { key: 'film', label: '影视' },
-  { key: 'food', label: '美食' },
-  { key: 'math', label: '奥数' },
-  { key: 'yuwen', label: '语文' },
-  { key: 'game', label: '游戏' },
-  { key: 'tool', label: '工具' },
+  { key: 'blog', label: '博客', feature: 'content-blog' },
+  { key: 'film', label: '影视', feature: 'content-film' },
+  { key: 'food', label: '美食', feature: 'content-food' },
+  { key: 'math', label: '奥数', feature: 'content-math' },
+  { key: 'yuwen', label: '语文', feature: 'content-yuwen' },
+  { key: 'game', label: '游戏', feature: 'content-game' },
+  { key: 'eng', label: '英文', feature: 'content-eng' },
+  { key: 'tool', label: '工具', feature: 'content-tool' },
 ]
+const { featureEnabled } = useFeatureFlags()
+// 按功能开关（含父级 content）过滤可见的二级分类；管理员不受全局开关限制，始终可见
+const visibleCategories = computed(() => (isAdminEmail.value || isOwner.value) ? categories : categories.filter(c => featureEnabled(c.feature)))
 /** 分类 key → 中文标签（缺省回退「博客」） */
 function catLabel(c) {
   const m = categories.find((x) => x.key === c)
@@ -246,16 +282,46 @@ function catLabel(c) {
 // 蘑菇 / 学而思MC-club / 乐读集训队 为小学奥数培训机构，各自按「自身真实课程体系」
 // 独立梳理知识点（不共用、不复用高思导引内容），仅页面结构（年级×三档）一致。
 const mathTabs = [
-  { key: 'gaosi', label: '高斯' },
-  { key: 'junior', label: '初联' },
-  { key: 'mogu', label: '蘑菇' },
-  { key: 'mc', label: '学而思MC-club' },
-  { key: 'ledu', label: '乐读集训队' },
-  { key: 'aojing', label: '奥精' },
-  { key: 'prime', label: '质数' },
-  { key: 'mul', label: '乘法口诀' },
+  { key: 'gaosi', label: '高斯', feature: 'math-gaosi' },
+  { key: 'junior', label: '初联', feature: 'math-junior' },
+  { key: 'mogu', label: '蘑菇', feature: 'math-mogu' },
+  { key: 'mc', label: '学而思MC-club', feature: 'math-mc' },
+  { key: 'ledu', label: '乐读集训队', feature: 'math-ledu' },
+  { key: 'aojing', label: '奥精', feature: 'math-aojing' },
+  { key: 'prime', label: '质数', feature: 'math-prime' },
+  { key: 'mul', label: '乘法口诀', feature: 'math-mul' },
+  { key: 'base', label: '进位制', feature: 'math-base' },
 ]
+// 按功能开关（含父级 content-math / content）过滤可见的奥数机构 tab；管理员始终可见
+const visibleMathTabs = computed(() => (isAdminEmail.value || isOwner.value) ? mathTabs : mathTabs.filter(t => featureEnabled(t.feature)))
 const mathTab = ref('gaosi')
+
+// 英文下辖课程 Tab：Unlock / Reading Explorer / 乐读 / 新概念
+const engTabs = [
+  { key: 'unlock', label: 'Unlock', feature: 'eng-unlock' },
+  { key: 're', label: 'Reading Explorer', feature: 'eng-re' },
+  { key: 'ledu', label: '乐读', feature: 'eng-ledu' },
+  { key: 'nce', label: '新概念', feature: 'eng-nce' },
+]
+// 按功能开关（含父级 content-eng / content）过滤可见的英文课程 tab；管理员始终可见
+const visibleEngTabs = computed(() => (isAdminEmail.value || isOwner.value) ? engTabs : engTabs.filter(t => featureEnabled(t.feature)))
+const engTab = ref('unlock')
+
+// 子功能关闭后，若当前选中项不再可见，回退到第一个可见项（避免停留在被关掉的 tab）。
+// ⚠️ 必须放在所有 visible* computed 之后：watch() 立即用 isRef 读取 source 变量，
+// 若写在 const 声明之前会触发 TDZ ReferenceError，导致整个组件 setup 崩溃、页面只显示外壳。
+watch(visibleCategories, (list) => {
+  if (list.length && !list.some(c => c.key === category.value)) category.value = list[0].key
+})
+watch(visibleMathTabs, (list) => {
+  if (list.length && !list.some(t => t.key === mathTab.value)) mathTab.value = list[0].key
+})
+watch(visibleFoodTabs, (list) => {
+  if (list.length && !list.some(t => t.key === foodTab.value)) foodTab.value = list[0].key
+})
+watch(visibleEngTabs, (list) => {
+  if (list.length && !list.some(t => t.key === engTab.value)) engTab.value = list[0].key
+})
 
 // 各机构课程框架说明（依据公开资料整理，仅作背景介绍，不含评级/推荐）
 const instMeta = {
@@ -265,8 +331,9 @@ const instMeta = {
   mc: '学而思 MC-club（Mathink Club）：以 AMC/UKMT/SASMO 国际竞赛导向的四季螺旋体系，按自身真实大纲独立组织各年级知识点与例题。',
   ledu: '乐读集训队：原学而思培优线上化教研体系（校优 / A+ / S 三档），按自身模块化专题独立组织各年级知识点与例题。',
   aojing: '《新编奥数精讲与测试》（熊斌、冯志刚 主编，上海科技教育出版社）：按出版社公开目录整理，四年级 20 讲、五年级 20 讲、六年级 22 讲（该套书无三年级分册），每讲沿用原书「知识要点 / 典例精讲 / 水平测试 A·B·C 卷」三栏目。',
-  prime: '质数：奥数数论的第一道关口。含试除到 √n 的快速判定方法、可展示全过程���质数验证计算器、0–1000 质数表、1900–2999 年代指数质数表，以及考试常见陷阱数清单。',
+  prime: '质数：奥数数论的第一道关口。含试除到 √n 的快速判定方法、可展示全过程的质数验证计算器、0–1000 质数表、1900–2999 年代指数质数表，以及考试常见陷阱数清单。',
   mul: '乘法口诀表：先列 8 条常用乘法巧算技巧（乘 11、尾 5 平方、头同尾合十、尾同头合十、接近整十整百、十几乘十几、乘 5/25/125、平方差），再给出 1×1 到 99×99 的完整乘法表，支持按被乘数定位行、查任意乘积并高亮所在格。',
+  base: '进位制：任意进制（2/8/10/16 等）之间的数值转换工具，并支持多进制混合算式求值的进位制计算器（如 0x1A + 0b101）。',
 }
 const instDesc = computed(() => instMeta[mathTab.value] || '')
 
@@ -306,12 +373,13 @@ function setCategory(c) {
 }
 
 // 可管理内容：仅管理员可写/编辑/删除
-const canManageContent = computed(() => isOwner.value)
+const canManageContent = computed(() => isAdminEmail.value || isOwner.value)
 
 async function load() {
-  // 奥数 / 语文 / 游戏 / 工具 Tab 不需要拉取文章列表
+  // 奥数 / 语文 / 游戏 / 工具 / 英文 Tab 不需要拉取文章列表
   if (category.value === 'math' || category.value === 'yuwen'
-      || category.value === 'game' || category.value === 'tool') {
+      || category.value === 'game' || category.value === 'tool'
+      || category.value === 'eng') {
     articles.value = []
     loadError.value = ''
     loading.value = false

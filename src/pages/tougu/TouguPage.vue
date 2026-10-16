@@ -17,7 +17,7 @@
         <span class="tg-refresh" role="button" tabindex="0"
               @click="loadData" @keydown.enter="loadData">{{ loading ? '加载中…' : '刷新' }}</span>
       </p>
-      <p class="tg-source">数据来源：天天基金投顾管家公开信息。仅供参考，不构成投资建议。</p>
+      <p class="tg-source">数据来源：公开网络。仅供参考，不构成投资建议。</p>
     </header>
 
     <!-- 控制条：分类 / 搜索 / 排序 -->
@@ -169,7 +169,7 @@
           <div class="tg-panel__body">
             <div class="tg-block">
               <span class="tg-block__label">数据来源</span>
-              <p class="tg-block__text">天天基金投顾管家公开信息（涵盖全市场投顾组合产品）。</p>
+              <p class="tg-block__text">公开网络（涵盖全市场投顾组合产品）。</p>
             </div>
             <div class="tg-block">
               <span class="tg-block__label">分类规则</span>
@@ -183,7 +183,7 @@
             </div>
             <div class="tg-block">
               <span class="tg-block__label">点击跳转</span>
-              <p class="tg-block__text">点击产品名称或「查看产品页」，跳转到该产品在天天基金的对应页面；若该平台未提供公开详情页，则跳转东方财富站内按产品名检索的结果页。</p>
+              <p class="tg-block__text">点击产品名称或「查看产品页」，跳转产品公开详情页；若缺失公开详情页，则按产品名检索结果页。</p>
             </div>
             <div class="tg-block">
               <span class="tg-block__label">更新频率</span>

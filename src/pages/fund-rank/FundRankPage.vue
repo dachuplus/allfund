@@ -1,5 +1,17 @@
 <template>
   <div class="page-fund-rank">
+    <!-- 页面说明行：页面功能 / 数据来源 / 截止时间 / 覆盖范围（gov.uk 风格，与股票选品页一致） -->
+    <div class="frk-summary">
+      <h2 class="frk-summary-title">基金评分 · 靠谱指数</h2>
+      <div class="frk-summary-meta">
+        <span>数据来源：公开网络</span>
+        <span class="frk-summary-sep">·</span>
+        <span v-if="summaryDate">截止时间：{{ summaryDate }}</span>
+        <span v-if="meta.total_count" class="frk-summary-sep">·</span>
+        <span v-if="meta.total_count">覆盖 {{ meta.total_count }} 只开放式基金（含 QDII）</span>
+      </div>
+    </div>
+
     <!-- 功能切换 Tab：评分（默认）/ 热门，两者并列 -->
     <div class="fund-view-tabs">
       <button type="button" class="fund-view-tab" :class="{ active: activeTab === 'score' }" @click="activeTab = 'score'">评分</button>
@@ -504,7 +516,7 @@
             <div class="detail-section" v-if="hasReturns(detailFund)">
               <div class="section-title-row">
                 <span class="detail-section-title">阶段收益率</span>
-                <span class="section-source">天天基金{{ detailFund.date ? ' · 截至' + detailFund.date : '' }}</span>
+                <span class="section-source">公开网络{{ detailFund.date ? ' · 截至' + detailFund.date : '' }}</span>
               </div>
               <div class="returns-grid">
                 <div class="return-col" v-if="detailFund.r0w != null">
@@ -769,6 +781,13 @@ function onResize() { isMobile.value = window.innerWidth < 641 }
 const funds = ref([])
 const meta = ref({})
 const metaLoading = ref(false)
+// 摘要行展示用的截止时间：优先净值日期 nav_date，截断到「日」（兼容时间戳）
+const summaryDate = computed(() => {
+  const d = meta.value?.nav_date || meta.value?.updateTime || ''
+  if (!d) return ''
+  const s = String(d)
+  return s.length > 10 ? s.slice(0, 10) : s
+})
 
 // 分类筛选
 const filterT0 = ref('')
@@ -1444,6 +1463,31 @@ onUnmounted(() => {
 
 /* 选品-基金 视图切换 Tab（评分/热门），gov.uk 风格：无圆角/阴影，激活态蓝色下划线 */
 .fund-view-tabs { display: flex; align-items: stretch; background: #ffffff; border-bottom: 1px solid var(--border); padding: 0 16px; }
+/* 页面说明行：标题 + 数据来源 / 截止时间 / 覆盖范围（与股票选品页一致，gov.uk 风格） */
+.frk-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 16px 8px;
+}
+.frk-summary-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #0b0c0c);
+  margin: 0;
+}
+.frk-summary-meta {
+  font-size: 13px;
+  color: var(--text-secondary, #505a5f);
+}
+.frk-summary-sep {
+  color: var(--text-muted, #b1b4b6);
+  margin: 0 4px;
+}
+@media (max-width: 640px) {
+  .frk-summary-title { font-size: 20px; }
+}
 .fund-view-tab { appearance: none; -webkit-appearance: none; background: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 18px; font-size: 16px; line-height: 1.4; color: var(--text-secondary); cursor: pointer; font-family: inherit; }
 .fund-view-tab:hover { color: var(--text-primary); }
 .fund-view-tab.active { color: #1d70b8; border-bottom-color: #1d70b8; font-weight: 700; }

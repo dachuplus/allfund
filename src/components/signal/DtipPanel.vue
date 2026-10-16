@@ -4,7 +4,7 @@
     <div class="card">
       <div class="card-title">定投助手<span class="card-subtitle">估值分位策略定投 · 周度自动执行</span></div>
       <p class="card-desc">
-        系统依据指数 PE（TTM）相对其发布以来全部历史的百分位，在每周一自动判定估值区间并执行定投：估值分位越低，定投金额越高；分位越高，定投金额越低；分位进入极高区间时自动卖出。估值分位口径取自中证指数有限公司官方数据，历史成交价取自公开行情。
+        系统依据指数 PE（TTM）相对其发布以来全部历史的百分位，在每周一自动判定估值区间并执行定投：估值分位越低，定投金额越高；分位越高，定投金额越低；分位进入极高区间时自动卖出。估值分位口径与历史成交价均取自公开网络。
       </p>
       <div class="table-wrap">
         <table class="data-table rule-table">
@@ -26,19 +26,19 @@
           </tbody>
         </table>
       </div>
-      <p class="data-source">数据来源：中证指数有限公司（官方 PE / 历史分位）· 新浪财经 / 东方财富（历史行情）。回测为策略历史模拟演示，非真实交易，不构成投资建议。</p>
+      <p class="data-source">数据来源：公开网络。回测为策略历史模拟演示，非真实交易，不构成投资建议。</p>
     </div>
 
     <!-- ============ 2. 指数估值看板（实时）============ -->
     <div class="card">
       <div class="card-title">
         指数估值分位
-        <span class="card-subtitle">中证指数官方 PE · 每30分钟更新</span>
+        <span class="card-subtitle">公开网络官方 PE · 每30分钟更新</span>
         <button class="refresh-btn" type="button" :disabled="loadingEva" @click="loadEva">{{ loadingEva ? '加载中…' : '刷新' }}</button>
       </div>
       <div class="error-card" v-if="evaError">
         <p>估值数据加载失败：{{ evaError }}</p>
-        <p class="err-hint">提示：/api/csi-pe 为 EdgeOne 边缘函数，建议在线上环境查看；本地调试可直连中证指数官网核对。</p>
+        <p class="err-hint">提示：/api/csi-pe 为 EdgeOne 边缘函数，建议在线上环境查看；本地调试可直连公开网络数据源核对。</p>
       </div>
       <p class="val-loading" v-else-if="loadingEva">估值数据加载中…</p>
       <div class="table-wrap" v-else>
