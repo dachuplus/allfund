@@ -184,6 +184,7 @@
                   <th class="num">成交价</th>
                   <th class="num">本期份额</th>
                   <th class="num">累计份额</th>
+                  <th class="num">剩余本金</th>
                   <th class="num">组合现值</th>
                 </tr>
               </thead>
@@ -191,11 +192,15 @@
                 <tr v-for="(t, i) in activeBt.trades.slice().reverse()" :key="i">
                   <td>{{ t.date }}</td>
                   <td class="zone-col"><span class="tag" :class="zoneTagClass(t.zoneKey)">{{ t.zone }}</span></td>
-                  <td><span class="op-tag" :class="t.type === 'buy' ? 'op-buy' : 'op-sell'">{{ t.type === 'buy' ? '买入' : '卖出' }}</span></td>
+                  <td>
+                    <span v-if="t.type === 'skip'" class="op-tag op-skip">{{ t.skipReason === 'capital_exhausted' ? '本金耗尽·跳过' : '无持仓·跳过' }}</span>
+                    <span v-else class="op-tag" :class="t.type === 'buy' ? 'op-buy' : 'op-sell'">{{ t.type === 'buy' ? '买入' : '卖出' }}</span>
+                  </td>
                   <td class="num" :class="t.amount >= 0 ? 'cash-out' : 'cash-in'">{{ t.amount >= 0 ? '+' : '−' }}{{ fmt(Math.abs(t.amount), 0) }}</td>
                   <td class="num">{{ fmt(t.price, 2) }}</td>
                   <td class="num">{{ fmt(t.sharesAdded, 4) }}</td>
                   <td class="num">{{ fmt(t.sharesAfter, 4) }}</td>
+                  <td class="num" :class="{ 'cash-zero': t.type === 'skip' && t.skipReason === 'capital_exhausted' }">{{ fmt(t.cashAfter, 0) }}</td>
                   <td class="num">{{ fmt(t.valueAfter, 0) }}</td>
                 </tr>
               </tbody>
@@ -665,6 +670,8 @@ onMounted(() => {
 }
 .op-buy { color: var(--brand); border-color: var(--brand); }
 .op-sell { color: var(--color-up); border-color: var(--color-up); }
+.op-skip { color: var(--text-secondary); border-color: var(--border); background: #f4f4f4; }
+.cash-zero { color: var(--color-up); font-weight: 700; }
 /* 现金流出（买入，钱出去）= 红；现金流入（卖出，钱回来）= 绿 */
 .cash-out { color: var(--color-up); }
 .cash-in { color: var(--color-down); }

@@ -26,6 +26,9 @@ const TIMEOUT_MS = 11000
 
 // 10 年回测约需 2600+ 个交易日；留出余量，确保能取到最近 ~520 个周一
 const KLINE_COUNT = 3200
+// 腾讯 K 线 datalen 超过 2000 会返回异常结构（数组而非对象，param error），故腾讯单独限 2000。
+// 2000 日线 ≈ 7.7 年，叠加新浪（更长历史）按日期合并取并集后可覆盖 10 年窗口。
+const TENCENT_MAX = 2000
 
 // 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js 保持一致）
 const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
@@ -223,7 +226,7 @@ async function fetchCloseTencent(code) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(`${TENCENT_KLINE}?param=${symbol},day,,,${KLINE_COUNT},qfq`, {
+    const res = await fetch(`${TENCENT_KLINE}?param=${symbol},day,,,${TENCENT_MAX},qfq`, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
@@ -232,7 +235,11 @@ async function fetchCloseTencent(code) {
     })
     if (!res.ok) return { ok: false, http: res.status }
     const json = await res.json()
-    const node = (json && json.data && json.data[symbol]) || {}
+    // 防御：datalen 过大时腾讯返回的是数组 / 错误对象而非标准结构
+    if (!json || typeof json !== 'object' || Array.isArray(json) || !json.data || !json.data[symbol]) {
+      return { ok: false, msg: 'tencent bad structure' }
+    }
+    const node = json.data[symbol] || {}
     const rows = node.qfqday || node.day || []
     if (!Array.isArray(rows) || !rows.length) return { ok: false, msg: 'empty' }
     const series = rows
@@ -248,14 +255,35 @@ async function fetchCloseTencent(code) {
   }
 }
 
+/** 合并多源收盘价序列：按日期去重取并集，优先保留较早来源之外的较新数据。
+ *  解决单源从某些边缘节点返回陈旧数据（如新浪海外节点止于 2023）导致回测流水截断的问题。 */
+function mergeCloseSeries(sources) {
+  const map = new Map()
+  for (const src of sources) {
+    if (!src || !src.ok || !Array.isArray(src.series)) continue
+    for (const r of src.series) {
+      if (!r || !r.d || !(r.close > 0)) continue
+      if (!map.has(r.d)) map.set(r.d, { d: r.d, close: r.close })
+    }
+  }
+  const arr = Array.from(map.values())
+  arr.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+  return arr
+}
+
 async function fetchClose(code) {
-  // 主源：腾讯财经 K 线（覆盖 6/7 指数，且为最新数据；中证2000 无历史 → 回退）
-  const tx = await fetchCloseTencent(code)
-  if (tx.ok) return tx
-  // 回退：新浪（沪市 5 大指数可用，但中证全指偏陈旧；仅作主源失败兜底）
-  const sina = await fetchCloseSina(code)
-  if (sina.ok) return sina
-  return tx.ok ? tx : sina
+  // 并发取腾讯（限 2000，当前数据）+ 新浪（更长历史），合并取并集。
+  // 任一路从特定 IP 返回陈旧/失败时，另一路补齐，回测即可覆盖至最新。
+  const [tx, sina] = await Promise.all([
+    fetchCloseTencent(code),
+    fetchCloseSina(code),
+  ])
+  const merged = mergeCloseSeries([tx, sina])
+  if (!merged.length) return tx.ok ? tx : (sina.ok ? sina : tx)
+  const txLast = tx.ok && tx.series.length ? tx.series[tx.series.length - 1].d : ''
+  const sinaLast = sina.ok && sina.series.length ? sina.series[sina.series.length - 1].d : ''
+  const primary = (sinaLast >= txLast) ? 'sina' : 'tencent'
+  return { ok: true, series: merged, source: `merged(${primary})`, lastDate: merged[merged.length - 1].d }
 }
 
 // ===== 回测核心（walk-forward）=====
@@ -317,26 +345,34 @@ function backtest(peResult, closeResult, weeks) {
     if (amount > 0) {
       // 买入：从现金池支出，封顶可用现金（满仓后不再买入）
       const buyAmt = Math.min(amount, cash)
-      if (buyAmt <= 0) continue
+      if (buyAmt <= 0) {
+        // 现金耗尽：估值信号仍在，但无法再买入；记录「跳过」行，便于流水清晰展示「本金耗尽」状态
+        trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'capital_exhausted', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+        continue
+      }
       const addSh = buyAmt / price
       shares += addSh
       costBasis += buyAmt
       cash -= buyAmt
       totalInvested += buyAmt
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount: buyAmt, price, sharesAdded: addSh, sharesAfter: shares, valueAfter: shares * price + cash })
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount: buyAmt, price, sharesAdded: addSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     } else {
       // 卖出：赎回 zone 金额对应份额，封顶实际持仓市值；**无持仓则跳过**
       const sellAmt = -amount
       const holdingsValue = shares * price
       const execAmt = Math.min(sellAmt, holdingsValue)
-      if (execAmt <= 0) continue
+      if (execAmt <= 0) {
+        // 无持仓可卖：估值信号为卖出，但无可卖份额；记录「跳过」行
+        trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'no_holding', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+        continue
+      }
       const soldSh = execAmt / price
       const costOfSold = shares > 0 ? (soldSh / shares) * costBasis : 0
       cash += execAmt
       shares -= soldSh
       costBasis -= costOfSold
       totalWithdrawn += execAmt
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, valueAfter: shares * price + cash })
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     }
   }
 
