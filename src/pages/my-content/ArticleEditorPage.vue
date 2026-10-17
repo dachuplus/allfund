@@ -68,6 +68,44 @@
               <button class="ed-tool" type="button" title="右对齐" @click="applyAlign('right')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg></button>
               <button class="ed-tool" type="button" title="两端对齐" @click="applyAlign('justify')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
             </div>
+            <div class="ed-tool-group">
+              <span class="ed-tool-label">字号</span>
+              <select class="ed-select" @change="applyFontSize($event.target.value); $event.target.value=''">
+                <option value="">默认</option>
+                <option value="14px">14</option>
+                <option value="15px">15</option>
+                <option value="16px">16</option>
+                <option value="17px">17</option>
+                <option value="18px">18</option>
+                <option value="20px">20</option>
+                <option value="22px">22</option>
+                <option value="24px">24</option>
+              </select>
+            </div>
+            <div class="ed-tool-group">
+              <span class="ed-tool-label">行间距</span>
+              <select class="ed-select" @change="applyLineHeight($event.target.value); $event.target.value=''">
+                <option value="">默认</option>
+                <option value="1.2">1.2</option>
+                <option value="1.4">1.4</option>
+                <option value="1.6">1.6</option>
+                <option value="1.75">1.75</option>
+                <option value="1.8">1.8</option>
+                <option value="2.0">2.0</option>
+              </select>
+            </div>
+            <div class="ed-tool-group">
+              <span class="ed-tool-label">段后距</span>
+              <select class="ed-select" @change="applyParaSpacing($event.target.value); $event.target.value=''">
+                <option value="">默认</option>
+                <option value="12px">12</option>
+                <option value="16px">16</option>
+                <option value="20px">20</option>
+                <option value="24px">24</option>
+                <option value="28px">28</option>
+                <option value="32px">32</option>
+              </select>
+            </div>
             <div class="ed-tool-group ed-tool-group--mode">
               <button class="ed-tool ed-tool--mode" type="button" :class="{active: !previewMode}" @click="previewMode=false">编辑</button>
               <button class="ed-tool ed-tool--mode" type="button" :class="{active: previewMode}" @click="previewMode=true">预览</button>
@@ -425,6 +463,81 @@ function onPaste(e) {
   })
 }
 
+// —— 字号 / 行间距 / 段后距（仿公众号编辑器）——
+function parseStyleStr(str) {
+  const obj = {}
+  String(str || '').split(';').forEach((d) => {
+    const i = d.indexOf(':')
+    if (i === -1) return
+    const k = d.slice(0, i).trim().toLowerCase()
+    const v = d.slice(i + 1).trim().toLowerCase()
+    if (k && v) obj[k] = v
+  })
+  return obj
+}
+function styleObjToStr(obj) {
+  return Object.keys(obj).map((k) => k + ':' + obj[k]).join(';')
+}
+
+/**
+ * 把光标所在行（或选区扩展到的整行范围）用 :::style 块包裹，并合并/删除指定样式属性。
+ * 若该范围已是 :::style 块，则就地合并，避免嵌套。
+ */
+function applyBlockStyle(prop, value) {
+  const ta = textarea.value
+  if (!ta) return
+  const val = form.value.content
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const lineStart = val.lastIndexOf('\n', start - 1) + 1
+  let lineEnd = val.indexOf('\n', end)
+  if (lineEnd === -1) lineEnd = val.length
+  const before = val.substring(0, lineStart)
+  let block = val.substring(lineStart, lineEnd)
+  const after = val.substring(lineEnd)
+  let lines = block.split('\n')
+  let existing = ''
+  if (lines[0].trim().startsWith(':::style')) {
+    existing = lines[0].replace(/^:::\s*style\s*/, '').trim()
+    if (lines[lines.length - 1].trim() === ':::') lines.pop()
+    lines = lines.slice(1)
+    block = lines.join('\n')
+  }
+  const styles = parseStyleStr(existing)
+  if (value) styles[prop] = value
+  else delete styles[prop]
+  const newStyle = styleObjToStr(styles)
+  const snippet = newStyle ? ':::style ' + newStyle + '\n' + block + '\n:::' : block
+  const prefix = before && !before.endsWith('\n') ? '\n' : ''
+  const suffix = after && !after.startsWith('\n') ? '\n' : ''
+  form.value.content = before + prefix + snippet + suffix + after
+  const caret = start + prefix.length
+  nextTick(() => {
+    ta.focus()
+    ta.selectionStart = ta.selectionEnd = caret
+  })
+}
+
+/** 字号：有选区 → 行内 [[fs:..]]；无选区 → 块级 :::style font-size */
+function applyFontSize(size) {
+  const ta = textarea.value
+  if (!ta) return
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  if (start !== end) {
+    const val = form.value.content
+    const selected = val.substring(start, end)
+    const wrap = '[[fs:' + size + ']]' + selected + '[[/fs]]'
+    form.value.content = val.substring(0, start) + wrap + val.substring(end)
+    const caret = start + wrap.length
+    nextTick(() => { ta.focus(); ta.selectionStart = ta.selectionEnd = caret })
+  } else {
+    applyBlockStyle('font-size', size)
+  }
+}
+function applyLineHeight(lh) { applyBlockStyle('line-height', lh) }
+function applyParaSpacing(mb) { applyBlockStyle('margin-bottom', mb) }
+
 async function onSave(targetStatus) {
   complianceHits.value = []
   errorMsg.value = ''
@@ -704,6 +817,19 @@ onMounted(load)
   color: var(--text-secondary);
   font-weight: 700;
 }
+.ed-select {
+  border: 1px solid #b1b4b6;
+  background: #f3f2f1;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 6px;
+  height: 32px;
+  cursor: pointer;
+  border-radius: 0;
+}
+.ed-select:hover { background: #e8e8e8; }
+.ed-select:focus { outline: 3px solid #ffdd00; border-color: #1d70b8; }
 .ed-tool {
   background: #f3f2f1;
   border: 1px solid #b1b4b6;

@@ -49,6 +49,33 @@ export function sanitizeUrl(url) {
   return '#'
 }
 
+/**
+ * 仅允许白名单内的 CSS 属性，且值严格匹配安全模式，杜绝 XSS（expression() / url() / javascript: 等）。
+ * 支持：font-size / line-height / margin-top / margin-bottom（数值+px/em/rem）、
+ * font-weight（100–900 / bold / normal）、text-align。
+ */
+const STYLE_RULES = {
+  'font-size': /^(\d{1,3})(px|em|rem)$/,
+  'line-height': /^(normal|\d{1,2}(\.\d+)?)$/,
+  'margin-top': /^(\d{1,3})(px|em|rem)$/,
+  'margin-bottom': /^(\d{1,3})(px|em|rem)$/,
+  'font-weight': /^(\d{3}|bold|normal)$/,
+  'text-align': /^(left|center|right|justify)$/,
+}
+export function sanitizeStyle(styleStr) {
+  const decls = String(styleStr || '').split(';')
+  const out = []
+  for (const d of decls) {
+    const idx = d.indexOf(':')
+    if (idx === -1) continue
+    const prop = d.slice(0, idx).trim().toLowerCase()
+    const val = d.slice(idx + 1).trim().toLowerCase()
+    const rule = STYLE_RULES[prop]
+    if (rule && rule.test(val)) out.push(prop + ':' + val)
+  }
+  return out.join(';')
+}
+
 /** 行内渲染（输入已为转义后文本） */
 function renderInline(text) {
   // 1) 保护行内代码，避免其中内容被二次格式化
@@ -70,16 +97,22 @@ function renderInline(text) {
   s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>')
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>')
   s = s.replace(/(^|[^a-zA-Z0-9_])_([^_]+)_/g, '$1<em>$2</em>')
+  // 4.5) 行内字号 [[fs:18px]]文字[[/fs]]（仅白名单字号，防注入）
+  s = s.replace(/\[\[fs:(\d{1,3})(px|em|rem)\]\]([\s\S]*?)\[\[\/fs\]\]/g, (m, num, unit, text) => {
+    const safe = sanitizeStyle('font-size:' + num + unit)
+    if (!safe) return m
+    return '<span style="' + safe + '">' + text + '</span>'
+  })
   // 5) 还原行内代码
   s = s.replace(/\u0000CODE(\d+)\u0000/g, (m, i) => '<code>' + codes[Number(i)] + '</code>')
   return s
 }
 
 /**
- * 渲染对齐容器内的内容（保留段落/列表/标题等块级结构）。
+ * 渲染块级容器内的内容（对齐 / 自定义样式容器共用，保留段落/列表/标题等块级结构）。
  * 输入为已 escapeHtml 的行数组（由 renderMarkdown 转入），不再二次转义。
  */
-function renderAlignContent(lines) {
+function renderBlockContent(lines) {
   // 注意：lines 已经由 renderMarkdown 统一 escapeHtml 过，此处不可再转义
   let html = ''
   let para = []
@@ -87,7 +120,9 @@ function renderAlignContent(lines) {
 
   function flushPara() {
     if (para.length) {
-      html += '<p>' + renderInline(para.join(' ')) + '</p>'
+      // 单行换行（编辑器里按回车）渲染为 <br> 软换行，与公众号 mdToWechatHtml 行为一致；
+      // 空行仍作为段落分隔（下方循环已处理）。
+      html += '<p>' + renderInline(para.join('<br>')) + '</p>'
       para = []
     }
   }
@@ -160,10 +195,14 @@ export function renderMarkdown(md) {
   let para = []
   let inAlign = null // 'left' | 'center' | 'right' | 'justify'
   let alignBuf = []
+  let inStyle = null // 自定义样式容器的 sanitize 后 style 串
+  let styleBuf = []
 
   function flushPara() {
     if (para.length) {
-      html += '<p>' + renderInline(para.join(' ')) + '</p>'
+      // 单行换行（编辑器里按回车）渲染为 <br> 软换行，与公众号 mdToWechatHtml 行为一致；
+      // 空行仍作为段落分隔（下方循环已处理）。
+      html += '<p>' + renderInline(para.join('<br>')) + '</p>'
       para = []
     }
   }
@@ -195,6 +234,31 @@ export function renderMarkdown(md) {
       continue
     }
 
+    // 自定义样式容器 :::style font-size:17px;line-height:1.6;margin-bottom:24px ... :::
+    // 仅接受 sanitizeStyle 白名单内的属性，杜绝 CSS 注入。
+    const styleOpen = line.match(/^:::\s*style\s+(.+?)\s*$/)
+    if (styleOpen) {
+      flushPara()
+      closeList()
+      const safe = sanitizeStyle(styleOpen[1])
+      if (safe) {
+        inStyle = safe
+        styleBuf = []
+        continue
+      }
+      // 非法 style 直接当普通段落处理（落空）
+    }
+    if (inStyle) {
+      if (/^:::\s*$/.test(line)) {
+        html += '<div style="' + inStyle + '">' + renderBlockContent(styleBuf) + '</div>'
+        inStyle = null
+        styleBuf = []
+      } else {
+        styleBuf.push(line)
+      }
+      continue
+    }
+
     // 对齐容器 :::left / :::center / :::right / :::justify ... :::（白名单，仅四类，防 XSS）
     const alignOpen = line.match(/^:::\s*(left|center|right|justify)\s*$/)
     if (alignOpen) {
@@ -207,7 +271,7 @@ export function renderMarkdown(md) {
     if (inAlign) {
       if (/^:::\s*$/.test(line)) {
         // 对齐容器内：保留段落/列表等结构，不拍平
-        html += '<div class="align-' + inAlign + '">' + renderAlignContent(alignBuf) + '</div>'
+        html += '<div class="align-' + inAlign + '">' + renderBlockContent(alignBuf) + '</div>'
         inAlign = null
         alignBuf = []
       } else {
@@ -282,7 +346,11 @@ export function renderMarkdown(md) {
   flushPara()
   closeList()
   if (inAlign) {
-    html += '<div class="align-' + inAlign + '">' + renderAlignContent(alignBuf) + '</div>'
+    html += '<div class="align-' + inAlign + '">' + renderBlockContent(alignBuf) + '</div>'
+  }
+  if (inStyle) {
+    // 末尾未闭合的样式容器：按已收集的 style 渲染（兜底，避免内容丢失）
+    html += '<div style="' + inStyle + '">' + renderBlockContent(styleBuf) + '</div>'
   }
   if (inCode) {
     html += '<pre><code>' + codeBuf.join('\n') + '</code></pre>'

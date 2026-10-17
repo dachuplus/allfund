@@ -41,9 +41,61 @@ async function detectEgressIP() {
 /**
  * 将 Markdown 正文转为微信公众号支持的 HTML（简化版）。
  */
+/** 公众号侧 CSS 白名单（与站内 markdown.js 的 sanitizeStyle 保持一致，防注入） */
+function sanitizeStyleWx(styleStr) {
+  const rules = {
+    'font-size': /^(\d{1,3})(px|em|rem)$/,
+    'line-height': /^(normal|\d{1,2}(\.\d+)?)$/,
+    'margin-top': /^(\d{1,3})(px|em|rem)$/,
+    'margin-bottom': /^(\d{1,3})(px|em|rem)$/,
+    'font-weight': /^(\d{3}|bold|normal)$/,
+    'text-align': /^(left|center|right|justify)$/,
+  }
+  const out = []
+  for (const d of String(styleStr || '').split(';')) {
+    const i = d.indexOf(':')
+    if (i === -1) continue
+    const p = d.slice(0, i).trim().toLowerCase()
+    const v = d.slice(i + 1).trim().toLowerCase()
+    if (rules[p] && rules[p].test(v)) out.push(p + ':' + v)
+  }
+  return out.join(';')
+}
+
+/** 容器内行内渲染（粗体/斜体/链接/图片/行内代码，换行 → <br>），用于 :::style / :::align 内部 */
+function wxInline(text) {
+  return escapeHtml(text)
+    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:2px 4px;border-radius:3px;font-size:14px;">$1</code>')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1d70b8;text-decoration:none;">$1</a>')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;display:block;" />')
+}
+
 function markdownToWechatHtml(md) {
   if (!md) return ''
-  let html = md
+  // —— 先抽出块级容器，避免被下方线性管线误伤 ——
+  let preprocessed = md
+    // 自定义样式容器 :::style font-size:17px;line-height:1.6;margin-bottom:24px ... :::
+    .replace(/:::style\s+([^\n]+)\n([\s\S]*?)\n:::/g, (m, style, inner) => {
+      const safe = sanitizeStyleWx(style)
+      if (!safe) return ''
+      const innerHtml = wxInline(inner).replace(/\n/g, '<br />')
+      return '\n\n<div style="' + safe + '">' + innerHtml + '</div>\n\n'
+    })
+    // 对齐容器 :::left / :::center / :::right / :::justify ... :::（顺手修复不同步）
+    .replace(/:::(left|center|right|justify)\n([\s\S]*?)\n:::/g, (m, align, inner) => {
+      const innerHtml = wxInline(inner).replace(/\n/g, '<br />')
+      return '\n\n<div style="text-align:' + align + '">' + innerHtml + '</div>\n\n'
+    })
+    // 行内字号 [[fs:18px]]文字[[/fs]]
+    .replace(/\[\[fs:(\d{1,3})(px|em|rem)\]\]([\s\S]*?)\[\[\/fs\]\]/g, (m, num, unit, text) => {
+      const safe = sanitizeStyleWx('font-size:' + num + unit)
+      return safe ? '<span style="' + safe + '">' + text + '</span>' : m
+    })
+
+  let html = preprocessed
     .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
       '<pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;font-size:14px;line-height:1.6;"><code>' + escapeHtml(code.trim()) + '</code></pre>'
     )

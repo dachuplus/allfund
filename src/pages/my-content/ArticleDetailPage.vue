@@ -24,6 +24,7 @@
           <span class="dp-cat">{{ catLabel(article.category) }}</span>
           <span v-if="article.published_at">· {{ formatDateTime(article.published_at) }}</span>
           <span>· {{ article.views || 0 }} 浏览</span>
+          <span v-if="isOwner" class="dp-edit-wrap">· <button class="dp-edit" @click="router.push('/content/editor/' + article.id)">编辑</button></span>
         </div>
         <div v-if="article.cover_image" class="dp-cover">
           <img :src="article.cover_image" :alt="article.title" />
@@ -45,9 +46,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { getArticle, getAuthor, incrementViews, listArticles, NETWORK_SLOW_MSG, isNetworkError } from '../../api/articles'
 import { renderMarkdown } from '../../utils/markdown'
 import { toast } from '../../composables/useToast.js'
+import { useAuth } from '../../composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
+const { isOwner } = useAuth()
 const article = ref(null)
 const author = ref(null)
 const loading = ref(false)
@@ -234,8 +237,21 @@ watch(() => route.params.id, (newId) => {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: var(--space-md);
 }
+.dp-edit-wrap { display: inline-flex; align-items: center; }
+.dp-edit {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #1d70b8;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dp-edit:hover { color: #003078; }
 .dp-cat {
   background: #1d70b8;
   color: #fff;
