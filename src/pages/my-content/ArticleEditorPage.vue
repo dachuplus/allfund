@@ -398,8 +398,14 @@ function onPaste(e) {
   if (!text || !text.includes('\n')) return
   // 已经是用 ``` 包裹的代码块则保持原样
   if (/^```[\s\S]*```$/.test(text.trim())) return
-  // 启发式：含典型代码特征才自动包成代码块（避免误伤多行正文散文）
-  const looksLikeCode = /[;{}]|^\s*(#include|import|from\s|def\s|class\s|function|public|private|protected|void|int\s|const\s|let\s|var\s|return|if\s|for\s|while\s|#!|<!--|<\?php|package\s|using\s|select\s|from\s)/m.test(text)
+  // 启发式：避免把含分号的正文散文误判为代码。
+  // 判定为「像代码」需满足：行首出现典型关键字，或存在花括号/行尾分号/::/->/赋值/函数调用式写法，
+  // 且至少 2 行呈现代码特征（单处分号的正文不会被误伤）。
+  const kwRe = /^\s*(#include|import\s|from\s|def\s|class\s|function|public|private|protected|void|int\s|const\s|let\s|var\s|return|if\s|for\s|while\s|#!|<!--|<\?php|package\s|using\s|select\s|from\s)/m
+  const codeLineRe = /[{}]|;\s*$|::|-->>|=\s*\S|^[A-Za-z_][A-Za-z0-9_]*\s*\(/
+  const lines = text.split('\n').filter((l) => l.trim())
+  const codeLikeLines = lines.filter((l) => codeLineRe.test(l)).length
+  const looksLikeCode = kwRe.test(text) || codeLikeLines >= 2
   if (!looksLikeCode) return
   e.preventDefault()
   const start = ta.selectionStart
