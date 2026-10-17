@@ -59,6 +59,7 @@
               <button class="ed-tool" type="button" title="无序列表" @click="applyLinePrefix('- ')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></button>
               <button class="ed-tool" type="button" title="有序列表" @click="applyLinePrefix('1. ')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="3" y="7.5" font-size="8" fill="currentColor" stroke="none">1</text><text x="3" y="13.5" font-size="8" fill="currentColor" stroke="none">2</text><text x="3" y="19.5" font-size="8" fill="currentColor" stroke="none">3</text></svg></button>
               <button class="ed-tool" type="button" title="分割线" @click="applyBlock('---')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
+              <button class="ed-tool" type="button" title="代码块" @click="applyCodeBlock"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></button>
             </div>
             <div class="ed-tool-group">
               <span class="ed-tool-label">对齐</span>
@@ -76,7 +77,8 @@
 
           <div class="ed-editor-wrap">
             <textarea v-show="!previewMode" ref="textarea" v-model="form.content" class="ed-textarea"
-              placeholder="支持 Markdown：# 标题、**粗体**、*斜体*、`代码`、> 引用、- 列表、[链接](url)、![图片](url)；悬停图标查看功能。"></textarea>
+              placeholder="支持 Markdown：# 标题、**粗体**、*斜体*、行内 `代码`、代码块用 ``` 包裹、> 引用、- 列表、[链接](url)、![图片](url)。粘贴多行代码会自动识别为代码块；悬停图标查看功能。"
+              @paste="onPaste"></textarea>
             <div v-show="previewMode" class="ed-preview" v-html="renderedPreview"></div>
           </div>
           <p class="ed-hint">提示：选中文字后点工具栏图标可快速加粗 / 加链接 / 对齐；两端对齐适用于全文或大段文字。</p>
@@ -356,6 +358,61 @@ function applyAlign(align) {
   const snippet = prefix + block + suffix
   form.value.content = before + snippet + after
   const caret = start + prefix.length + (':::' + align + '\n').length
+  nextTick(() => {
+    ta.focus()
+    ta.selectionStart = ta.selectionEnd = caret
+  })
+}
+
+/** 代码块：将选区（或占位文字）用 ``` 围栏包裹 */
+function applyCodeBlock() {
+  const ta = textarea.value
+  if (!ta) return
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const val = form.value.content
+  const selected = val.substring(start, end) || '在此粘贴代码'
+  const block = '```\n' + selected + '\n```'
+  const before = val.substring(0, start)
+  const after = val.substring(end)
+  const prefix = before && !before.endsWith('\n') ? '\n' : ''
+  const suffix = after && !after.startsWith('\n') ? '\n' : ''
+  const snippet = prefix + block + suffix
+  form.value.content = before + snippet + after
+  const caret = start + prefix.length + ('```\n').length
+  nextTick(() => {
+    ta.focus()
+    ta.selectionStart = ta.selectionEnd = caret
+  })
+}
+
+/**
+ * 粘贴时自动识别多行代码：若粘贴内容含换行、且未被 ``` 围栏包裹、
+ * 且看起来像代码（含常见语法特征），则自动包成代码块，避免丢失格式。
+ */
+function onPaste(e) {
+  const ta = textarea.value
+  if (!ta) return
+  const cd = e.clipboardData || (window.clipboardData)
+  const text = cd ? cd.getData('text') : ''
+  if (!text || !text.includes('\n')) return
+  // 已经是用 ``` 包裹的代码块则保持原样
+  if (/^```[\s\S]*```$/.test(text.trim())) return
+  // 启发式：含典型代码特征才自动包成代码块（避免误伤多行正文散文）
+  const looksLikeCode = /[;{}]|^\s*(#include|import|from\s|def\s|class\s|function|public|private|protected|void|int\s|const\s|let\s|var\s|return|if\s|for\s|while\s|#!|<!--|<\?php|package\s|using\s|select\s|from\s)/m.test(text)
+  if (!looksLikeCode) return
+  e.preventDefault()
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const val = form.value.content
+  const block = '```\n' + text.replace(/\n+$/, '') + '\n```'
+  const before = val.substring(0, start)
+  const after = val.substring(end)
+  const prefix = before && !before.endsWith('\n') ? '\n' : ''
+  const suffix = after && !after.startsWith('\n') ? '\n' : ''
+  const snippet = prefix + block + suffix
+  form.value.content = before + snippet + after
+  const caret = start + snippet.length
   nextTick(() => {
     ta.focus()
     ta.selectionStart = ta.selectionEnd = caret
@@ -797,8 +854,9 @@ onMounted(load)
   padding: 12px 14px;
   overflow-x: auto;
   margin: 0 0 12px;
+  white-space: pre;
 }
-.ed-preview :deep(pre code) { background: transparent; color: #fff; padding: 0; }
+.ed-preview :deep(pre code) { background: transparent; color: #fff; padding: 0; white-space: pre; }
 .ed-preview :deep(img) { max-width: 100%; display: block; margin: 12px 0; }
 .ed-preview :deep(hr) { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .ed-preview :deep(.align-left) { text-align: left; }

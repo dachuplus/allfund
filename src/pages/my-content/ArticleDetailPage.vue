@@ -290,11 +290,13 @@ watch(() => route.params.id, (newId) => {
   padding: 12px 14px;
   overflow-x: auto;
   margin: 0 0 var(--space-md);
+  white-space: pre;
 }
 .dp-content :deep(pre code) {
   background: transparent;
   color: #fff;
   padding: 0;
+  white-space: pre;
 }
 .dp-content :deep(img) {
   max-width: 100%;
