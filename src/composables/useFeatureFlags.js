@@ -49,6 +49,7 @@ const DEFAULT_FLAGS = {
   'content-game': true,
   'content-tool': true,
   'content-eng': true,
+  'content-xinao': true,
   // 娱乐 · 奥数 · 三级
   'math-gaosi': true,
   'math-junior': true,
@@ -67,6 +68,8 @@ const DEFAULT_FLAGS = {
   // 娱乐 · 美食 · 三级
   'food-chef': true,
   'food-musteat': true,
+  // 娱乐 · 信奥 · 三级
+  'xinao-ascii': true,
 }
 
 /**
@@ -101,6 +104,7 @@ export const SUB_FEATURE_PARENTS = {
   'content-game': 'content',
   'content-tool': 'content',
   'content-eng': 'content',
+  'content-xinao': 'content',
   // 娱乐 · 奥数 · 三级
   'math-gaosi': 'content-math',
   'math-junior': 'content-math',
@@ -119,6 +123,8 @@ export const SUB_FEATURE_PARENTS = {
   // 娱乐 · 美食 · 三级
   'food-chef': 'content-food',
   'food-musteat': 'content-food',
+  // 娱乐 · 信奥 · 三级
+  'xinao-ascii': 'content-xinao',
 }
 
 // 可在面板中切换的功能清单（按网站结构分组：一级 → 二级 → 三级）。
@@ -174,6 +180,7 @@ export const FEATURE_GROUPS = [
       { key: 'content-math', label: '奥数', desc: '娱乐下的奥数（含三级：各机构）' },
       { key: 'content-yuwen', label: '语文', desc: '娱乐下的语文内容' },
       { key: 'content-tool', label: '工具', desc: '娱乐下的工具内容' },
+      { key: 'content-xinao', label: '信奥', desc: '娱乐下的信奥（信息学奥赛）内容（含三级：ASCII码表）' },
     ],
   },
   {
@@ -204,6 +211,12 @@ export const FEATURE_GROUPS = [
     items: [
       { key: 'food-chef', label: '大厨榜-上海', desc: '美食下的大厨榜-上海' },
       { key: 'food-musteat', label: '必吃榜-上海', desc: '美食下的必吃榜-上海' },
+    ],
+  },
+  {
+    title: '娱乐 · 信奥 · 三级 Tab',
+    items: [
+      { key: 'xinao-ascii', label: 'ASCII码表', desc: '信奥下的 ASCII 码表查询工具' },
     ],
   },
 ]

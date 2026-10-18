@@ -143,6 +143,20 @@
       <EngPanel :inst="engTab" />
     </div>
 
+    <!-- 信奥二级 Tab：下辖 ASCII码表 三级 Tab -->
+    <div v-else-if="category === 'xinao'">
+      <div class="cp-subtabs">
+        <div
+          v-for="t in visibleXinaoTabs"
+          :key="t.key"
+          class="cp-subtab"
+          :class="{ active: xinaoTab === t.key }"
+          @click="xinaoTab = t.key"
+        >{{ t.label }}</div>
+      </div>
+      <AsciiTable v-if="xinaoTab === 'ascii'" />
+    </div>
+
     <!-- 工具二级 Tab：个人工具（原进位制转换已迁移至「奥数 · 进位制」） -->
     <div v-else-if="category === 'tool'" class="cp-tool">
       <div class="cp-subblock">
@@ -220,6 +234,7 @@ import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import BaseCalculatorTool from '../../components/tools/BaseCalculatorTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
 import MustEatBoard from '../../components/rank/MustEatBoard.vue'
+import AsciiTable from '../../components/xinao/AsciiTable.vue'
 import { FILM_RANK, FILM_DIMS } from '../../data/filmRank.js'
 import { SH_RESTAURANTS, CHEF_DIMS } from '../../data/shRestaurants.js'
 import { SH_RESTAURANTS_EXTRA } from '../../data/shRestaurantsExtra.js'
@@ -266,6 +281,7 @@ const categories = [
   { key: 'math', label: '奥数', feature: 'content-math' },
   { key: 'yuwen', label: '语文', feature: 'content-yuwen' },
   { key: 'eng', label: '英文', feature: 'content-eng' },
+  { key: 'xinao', label: '信奥', feature: 'content-xinao' },
   { key: 'tool', label: '工具', feature: 'content-tool' },
 ]
 const { featureEnabled } = useFeatureFlags()
@@ -307,6 +323,14 @@ const engTabs = [
 const visibleEngTabs = computed(() => (isAdminEmail.value || isOwner.value) ? engTabs : engTabs.filter(t => featureEnabled(t.feature)))
 const engTab = ref('unlock')
 
+// 信奥下辖 Tab：ASCII码表
+const xinaoTabs = [
+  { key: 'ascii', label: 'ASCII码表', feature: 'xinao-ascii' },
+]
+// 按功能开关（含父级 content-xinao / content）过滤可见的信奥三级 tab；管理员始终可见
+const visibleXinaoTabs = computed(() => (isAdminEmail.value || isOwner.value) ? xinaoTabs : xinaoTabs.filter(t => featureEnabled(t.feature)))
+const xinaoTab = ref('ascii')
+
 // 子功能关闭后，若当前选中项不再可见，回退到第一个可见项（避免停留在被关掉的 tab）。
 // ⚠️ 必须放在所有 visible* computed 之后：watch() 立即用 isRef 读取 source 变量，
 // 若写在 const 声明之前会触发 TDZ ReferenceError，导致整个组件 setup 崩溃、页面只显示外壳。
@@ -321,6 +345,9 @@ watch(visibleFoodTabs, (list) => {
 })
 watch(visibleEngTabs, (list) => {
   if (list.length && !list.some(t => t.key === engTab.value)) engTab.value = list[0].key
+})
+watch(visibleXinaoTabs, (list) => {
+  if (list.length && !list.some(t => t.key === xinaoTab.value)) xinaoTab.value = list[0].key
 })
 
 // 各机构课程框架说明（依据公开资料整理，仅作背景介绍，不含评级/推荐）
@@ -376,10 +403,10 @@ function setCategory(c) {
 const canManageContent = computed(() => isAdminEmail.value || isOwner.value)
 
 async function load() {
-  // 奥数 / 语文 / 游戏 / 工具 / 英文 Tab 不需要拉取文章列表
+  // 奥数 / 语文 / 游戏 / 工具 / 英文 / 信奥 Tab 不需要拉取文章列表
   if (category.value === 'math' || category.value === 'yuwen'
       || category.value === 'game' || category.value === 'tool'
-      || category.value === 'eng') {
+      || category.value === 'eng' || category.value === 'xinao') {
     articles.value = []
     loadError.value = ''
     loading.value = false
