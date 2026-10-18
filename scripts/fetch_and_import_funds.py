@@ -44,6 +44,13 @@ FT_MAP = {
 }
 FT_LIST = list(FT_MAP.keys())
 
+# 整类抓取重试（根治上游瞬时空响应：某大类首页返回空 datas 致 staging 该大类=0、
+# promote 校验 80% 阈值整批拒绝、流水线直接挂掉。历史已发生多次：8/19 股票型、10/17 混合型）。
+# 首页即空或中页空且未达声明总数 → 判为上游瞬时抽风，整类指数退避重试最多 FT_MAX_RETRY 次；
+# 重试耗尽仍空 → 整类返回 0（交由 promote 守卫兜底，不再静默吞掉）。
+FT_MAX_RETRY = 3
+FT_RETRY_BASE_DELAY = 15  # 秒，指数退避基数（attempt×BASE）
+
 # ── 加载聚源分类映射 ────────────────────────────────────────────────
 HSPJ_MAP = {}
 HSPJ_NAMES = {}  # basename → [t0, t1]，用于份额基金匹配
@@ -185,8 +192,13 @@ def _curl_json(url, tries=3, delay=5, timeout=20):
     return None
 
 
-def fetch_funds(ft):
-    """从天天基金拉取指定分类的全部基金（用 curl 避免被限速）"""
+def fetch_funds(ft, attempt=1):
+    """从天天基金拉取指定分类的全部基金（用 curl 避免被限速）。
+
+    健壮性：若上游瞬时抽风（HTTP 200 + 空 datas，非网络错误）导致某大类首页/中页返回空，
+    则整类指数退避重试最多 FT_MAX_RETRY 次；仍失败才返回空列表（交由 promote 守卫兜底），
+    避免静默吞掉整类数据致使 staging 该大类=0、promote 校验整批拒绝、流水线挂掉。
+    """
     all_funds = []
     for pi in range(1, 5):
         url = (
@@ -201,6 +213,17 @@ def fetch_funds(ft):
                 break
             items = data.get('datas', [])
             total_count = int(data.get('datacount', 0))
+            # ── 空响应兜底（根治上游瞬时抽风致某大类=0、promote 整批拒绝）──
+            # 首页即空、或中页空且尚未达声明总数，均判为上游瞬时故障，整类指数
+            # 退避重试最多 FT_MAX_RETRY 次；重试耗尽仍空则整类返回 0（交 promote 守卫兜底）。
+            if not items and attempt < FT_MAX_RETRY and (pi == 1 or (total_count and len(all_funds) < total_count)):
+                delay = FT_RETRY_BASE_DELAY * attempt
+                print(f'  ⚠ {FT_MAP[ft]}({ft}) 第{pi}页空响应(疑似上游抽风)，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
+                time.sleep(delay)
+                return fetch_funds(ft, attempt + 1)
+            if not items and pi == 1:
+                print(f'  {FT_MAP[ft]}({ft}) 重试{FT_MAX_RETRY}次仍空，返回空列表(交由 promote 守卫处理)')
+                return []
             for item in items:
                 f = item.split(',')
                 if len(f) < 13:

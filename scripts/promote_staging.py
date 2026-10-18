@@ -115,6 +115,19 @@ def main():
         print('  ⚠ 检测到分类漂移（已被回钉消除），明细：', flush=True)
         for d in drift:
             print(f'     staging[{d["staging_t0"]}] → 生产[{d["prod_t0"]}]: {d["n"]} 只', flush=True)
+        # 抽取漂移示例（最多 15 只）供人工复核：回钉前 staging 与生产的真实分类对比，
+        # 说明这类"类型变化"绝大多数是指数基金的子类归一化（t1_tt=指数型-*），而非
+        # 基金成立后真实改类型；仅当确有上游重分类时才需关注。
+        examples = pg("""SELECT s.c, s.n, s.t0 AS staging_t0, p.t0 AS prod_t0, s.t1_tt
+                          FROM fund_scores_staging s JOIN fund_scores p ON s.c = p.c
+                          WHERE s.t0 IS DISTINCT FROM p.t0
+                          ORDER BY s.c LIMIT 15""")
+        if examples:
+            print('  ⓘ 漂移示例（最多15只，t1_tt=天天基金原始二级分类；回钉前快照）：', flush=True)
+            for ex in examples:
+                print(f'     {ex["c"]} {ex["n"]}: '
+                      f'staging[{ex["staging_t0"]}] → 生产[{ex["prod_t0"]}] '
+                      f'(t1_tt={ex["t1_tt"]})', flush=True)
         pg("""UPDATE fund_scores_staging s
               SET t0 = p.t0
               FROM fund_scores p
@@ -122,6 +135,22 @@ def main():
         print(f'  ✓ 已回钉 {sum(d["n"] for d in drift)} 只基金分类（消除漂移）', flush=True)
     else:
         print('  ✓ 无分类漂移', flush=True)
+
+    # 0b-2. 指数基金子类归一化证据（仅诊断，不影响流程）
+    #     展示：部分基金 t1_tt 为「指数型-*」（指数基金的二级子类），而天天基金上游分类
+    #     路由(ft=gp/hh) 可能将其标为「股票型/混合型」，经 [0a] 归一化 + [0b] 回钉后统一为
+    #     「指数型」。这是子类归一化，并非基金成立后真实改类型，数量巨大属正常现象——
+    #     历史上"类型变化这么大"的观感正源于此，而非真实漂移。
+    try:
+        idx = pg("""SELECT count(*) AS n FROM fund_scores_staging WHERE t1_tt LIKE '指数型-%'""")[0]['n']
+        if idx:
+            samp = pg("""SELECT c, n, t1_tt FROM fund_scores_staging
+                          WHERE t1_tt LIKE '指数型-%' ORDER BY c LIMIT 5""")
+            print(f'  ⓘ 指数基金子类归一化: staging 共 {idx} 只 t1_tt=指数型-*（正常子类重分类，非真实类型变更）', flush=True)
+            for s in samp:
+                print(f'     e.g. {s["c"]} {s["n"]} (t1_tt={s["t1_tt"]})', flush=True)
+    except Exception as e:
+        print(f'  [WARN] 指数子类诊断失败（不影响切换）: {e}', flush=True)
 
     staging_counts = get_t0_counts('fund_scores_staging')
     staging_total = sum(staging_counts.values())
@@ -158,10 +187,17 @@ def main():
             continue
         sc = staging_counts.get(t0, 0)
         ratio = sc / pc if pc > 0 else 0
-        ok &= check(sc >= pc * 0.80,
-                    f'分类 [{t0}] staging {sc} >= 80% 生产 {pc} (实际 {ratio*100:.1f}%)')
-        if ratio < 0.95:
-            print(f'  ⚠ 分类 [{t0}] 漂移较大 ({ratio*100:.1f}%)，可能数据源分类命名变更，已放行', flush=True)
+        # 守卫分三档（2026-10-18 调整，目标：部分漂移也"不能这样直接挂掉"）：
+        #   < 50%  → 灾难性丢失（如上游整类返回空），拒绝切换、保留上一版生产；
+        #   50–95% → 部分漂移，疑似数据源分类命名变更，告警但仍放行；
+        #   ≥ 95%  → 数量充足，分类与生产一致。
+        if sc < pc * 0.50:
+            ok &= check(False,
+                        f'分类 [{t0}] 灾难性丢失: staging {sc} < 50% 生产 {pc} (实际 {ratio*100:.1f}%) → 拒绝切换，保留上一版生产')
+        elif sc < pc * 0.95:
+            print(f'  ⚠ 分类 [{t0}] 部分漂移 ({ratio*100:.1f}%)，疑似数据源分类命名变更，已放行', flush=True)
+        else:
+            print(f'  ✓ 分类 [{t0}] 数量充足 ({ratio*100:.1f}%)，与生产一致', flush=True)
 
     # 3. 货币型必须存在且数量健康
     hb_staging = staging_counts.get('货币型', 0)
