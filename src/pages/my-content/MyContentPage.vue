@@ -1,6 +1,6 @@
 <template>
   <div class="content-page">
-    <!-- 二级分类导航：博客 / 影视 / 美食 / 游戏 / 奥数 / 语文 / 英文 / 工具。
+    <!-- 二级分类导航：博客 / 影视 / 美食 / 工具 / 游戏 / 奥数 / 语文 / 英文 / 信奥。
          博客区「已发布 / 我的全部（含草稿）/ 写文章」三个子 tab 见下方 cp-viewswitch -->
     <div class="cp-tabs">
       <div class="cp-tab-list">
@@ -271,18 +271,18 @@ const slowHint = ref(false)  // 加载超过 5s 时给出"网络较慢"提示
 let slowTimer = null
 const view = ref('published')
 
-// 二级分类导航：博客 / 影视 / 美食 / 游戏 / 奥数 / 语文 / 英文 / 工具（默认「博客」）
+// 二级分类导航：博客 / 影视 / 美食 / 工具 / 游戏 / 奥数 / 语文 / 英文 / 信奥（默认「博客」）
 const category = ref('blog')
 const categories = [
   { key: 'blog', label: '博客', feature: 'content-blog' },
   { key: 'film', label: '影视', feature: 'content-film' },
   { key: 'food', label: '美食', feature: 'content-food' },
+  { key: 'tool', label: '工具', feature: 'content-tool' },
   { key: 'game', label: '游戏', feature: 'content-game' },
   { key: 'math', label: '奥数', feature: 'content-math' },
   { key: 'yuwen', label: '语文', feature: 'content-yuwen' },
   { key: 'eng', label: '英文', feature: 'content-eng' },
   { key: 'xinao', label: '信奥', feature: 'content-xinao' },
-  { key: 'tool', label: '工具', feature: 'content-tool' },
 ]
 const { featureEnabled } = useFeatureFlags()
 // 按功能开关（含父级 content）过滤可见的二级分类；管理员不受全局开关限制，始终可见
