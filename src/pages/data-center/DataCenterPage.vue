@@ -1334,8 +1334,9 @@
           <tr><td>指数估值 PE 历史</td><td>中证指数 csindex（经 /api/csi-pe 边缘函数）</td><td>⚠️ 受限→代理</td><td>云 CI / 前端不可直连（WAF 403），必须走海外边缘函数代取；7 目标指数全 200</td></tr>
           <tr><td>指数成分股（五维评分原料）</td><td>东方财富 datacenter-web 成分接口</td><td>❌ 不稳定</td><td>云 CI IP 被 WAF / 不可达，是当前指数评分流水线卡点（停滞 trade_date=20261008）</td></tr>
           <tr><td>指数估值补充</td><td>蛋卷 danjuan index_eva/dj</td><td>⚠️ 仅 3/7</td><td>沪深300 / 中证500 / 中证1000，不作主源；需 /api/danjuan-eva 代理</td></tr>
-          <tr><td>宏观 / 策略 / 风格因子</td><td>macro_history（落地表）</td><td>✅ 合理落地</td><td>被 SignalPage 图表、build_style_factors、fetch_jqr_indicators 共用，后端计算须落地，非浪费</td></tr>
-        </tbody>
+            <tr><td>宏观 / 策略 / 风格因子</td><td>macro_history（落地表）</td><td>✅ 合理落地</td><td>被 SignalPage 图表、build_style_factors、fetch_jqr_indicators 共用，后端计算须落地，非浪费</td></tr>
+            <tr><td>QDII 全量名单</td><td>天天基金 fundcode_search.js（主列表）+ pingzhongdata（逐只）</td><td>✅ 成熟</td><td>东财批量排行对 QDII 取数被砍，QDII 名单改由 fundcode_search.js 主列表取（约 742 只），逐只 pingzhongdata 取净值/收益</td></tr>
+          </tbody>
       </table>
 
       <!-- 天天基金 API -->
@@ -1474,12 +1475,17 @@
           <tr><td class="meta-label">方法</td><td>GET</td></tr>
           <tr><td class="meta-label">用途</td><td>获取单只基金的历史净值趋势、累计净值、资产配置、基金经理信息、风险指标等</td></tr>
         </table>
-        <p class="api-subtitle">返回的 JS 变量</p>
+        <p class="api-subtitle">返回的 JS 变量（实测可解析字段，2026-10-19 校验）</p>
         <table class="field-table">
-          <thead><tr><th>变量名</th><th>内容</th><th>说明</th></tr></thead>
+          <thead><tr><th>变量名</th><th>类型</th><th>说明</th></tr></thead>
           <tbody>
-            <tr><td><code>Data_netWorthTrend</code></td><td>列表</td><td>每日净值趋势 [{x:date, y:netWorth, equityReturn, unitMoney}]</td></tr>
-            <tr><td><code>Data_ACWorthTrend</code></td><td>列表</td><td>每日累计净值 [{x:date, y:[date,acWorth]}]</td></tr>
+            <tr><td><code>var fS_name</code></td><td>string</td><td>基金名称（如「华夏成长混合」）</td></tr>
+            <tr><td><code>var syl_1y</code></td><td>string</td><td>近1月收益率(%)</td></tr>
+            <tr><td><code>var syl_3y</code></td><td>string</td><td>近3月收益率(%)</td></tr>
+            <tr><td><code>var syl_6y</code></td><td>string</td><td>近6月收益率(%)</td></tr>
+            <tr><td><code>var syl_1n</code></td><td>string</td><td>近1年收益率(%)</td></tr>
+            <tr><td><code>Data_netWorthTrend</code></td><td>列表</td><td>每日单位净值 [{x:ts, y:nav, equityReturn, unitMoney}]（ts 毫秒时间戳）</td></tr>
+            <tr><td><code>Data_ACWorthTrend</code></td><td>列表</td><td>累计复权净值全历史 <b>[[ts, val], ...]</b>（二维数组，ts 毫秒时间戳、val 累计复权净值；<b>非对象数组</b>）</td></tr>
             <tr><td><code>Data_assetAllocation</code></td><td>列表</td><td>资产配置（净资产 = gpsz）</td></tr>
             <tr><td><code>Data_currentFundManager</code></td><td>列表</td><td>基金经理信息（姓名、任职日期）</td></tr>
             <tr><td><code>Data_buySedemption</code></td><td>列表</td><td>申购赎回状态</td></tr>
@@ -1487,11 +1493,10 @@
             <tr><td><code>Data_sevenDaysYearIncome</code></td><td>列表</td><td>七日年化（货币基金专用）</td></tr>
             <tr><td><code>Data_fluctuationScale</code></td><td>JSON</td><td>最大回撤（近1年/2年/3年/5年 dd1y/dd2y/dd3y/dd5y，负数%）</td></tr>
             <tr><td><code>Data_sharpeRatio</code></td><td>JSON</td><td>夏普比率（近1年/2年/3年/5年 sr1y/sr2y/sr3y/sr5y）</td></tr>
-            <tr><td><code>Data_fundYear</code></td><td>JSON</td><td>年度收益率</td></tr>
-            <tr><td><code>Data_quarter</code></td><td>JSON</td><td>季度涨跌幅</td></tr>
           </tbody>
         </table>
-        <p class="api-note">⚠️ pingzhongdata 的最大回撤值（dd1y/dd2y等）是负数百分比（如 -15.23 表示最大回撤 15.23%），夏普比率（sr1y/sr2y等）是原始数值。</p>
+        <p class="api-note">⚠️ 实测（2026-10-19，以 118001 / 027766 / 008751 等验证）：该接口<b>不返回</b> <code>Data_fundYear</code>（年度收益率）与 <code>Data_quarter</code>（季度涨跌幅）——许多旧文档误列此二项，实际响应里不存在。可用的高频收益字段为 <code>syl_1y/syl_3y/syl_6y/syl_1n</code>（近1月/近3月/近6月/近1年）；更长周期（近2年/3年/5年/年初至今）须由 <code>Data_ACWorthTrend</code> 累计复权净值全历史<b>反算</b>：<code>(最新val / N天前val − 1) × 100</code>（2年=730天、3年=1095天、5年=1825天、YTD=年初至今）。</p>
+        <p class="api-note">📌 <strong>QDII 全量取数（2026-10-19 起）</strong>：东财批量排行接口(FundGuideapi/rankhandler)对 QDII 取数范围被砍（现仅吐约 115 只，生产历史 399 只、主列表全量 742 只），导致 staging QDII 严重不足。现改为：先以 <code>fundcode_search.js</code> 全量主列表取 QDII 代码+类型（见第十组第 19 项），再对每只走 <code>pingzhongdata</code> 取净值/收益，覆盖不丢、口径统一。故本站 QDII 数据<b>全部且唯一</b>来自 pingzhongdata，不再混合 FundGuideapi。</p>
       </div>
 
       <!-- F10 页面 -->
@@ -1907,6 +1912,143 @@
         <p class="api-note">⚠️ danjuan 的 <code>index_code</code> 带交易所前缀（<code>SH000300</code>/<code>SZ399393</code>/<code>CSIH30533</code>），按裸6位代码匹配会全部 MISSING；其 63 条 items 仅覆盖 3/7 目标指数（沪深300/中证500/中证1000）。</p>
       </div>
 
+      <!-- 十、全量主列表 & 其他数据接口 -->
+      <h2 class="api-group-title">十、全量基金主列表 & 其他数据接口</h2>
+
+      <div class="api-item">
+        <h3 class="api-name">19. fundcode_search.js — 全量基金主列表（QDII 名单来源）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://fund.eastmoney.com/js/fundcode_search.js</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（返回 <code>var r = [[...]]</code> JS 数组，约 2.8 万只全市场基金）</td></tr>
+          <tr><td class="meta-label">用途</td><td>东财批量排行接口对 QDII 取数被砍后，本站 <b>QDII 名单以此为准</b>（主列表全量 742 只 QDII）</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>scripts/fetch_and_import_funds.py</code>（fetch_qdii_master_codes）</td></tr>
+        </table>
+        <p class="api-subtitle">返回结构（每行一条基金，正则取 5 字段）</p>
+        <table class="field-table">
+          <thead><tr><th>索引</th><th>字段</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>r[i][0]</td><td>基金代码</td><td>6 位数字（如 118001）</td></tr>
+            <tr><td>r[i][1]</td><td>基金名称</td><td>完整名称</td></tr>
+            <tr><td>r[i][2]</td><td>拼音简写</td><td>名称简拼</td></tr>
+            <tr><td>r[i][3]</td><td>基金类型</td><td>分类标签，如 <code>QDII-股票型</code> / <code>指数型-海外股票</code> / <code>QDII-债券型</code>；本站据此过滤出全部 QDII（含「海外」「全球」关键词）</td></tr>
+            <tr><td>r[i][4]</td><td>拼音简写2</td><td>备用简拼</td></tr>
+          </tbody>
+        </table>
+        <p class="api-note">⚠️ 该列表含已清盘/未成立基金（约 3% 在 pingzhongdata 取数时返回空，已自动跳过），故实际落库 QDII 约 739 只。</p>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">20. GetBKListByBKTypeNew — 行业/概念标签清单（ZTJJ）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://api.fund.eastmoney.com/ZTJJ/GetBKListByBKTypeNew?callback=?</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（JSONP，需 callback 参数）</td></tr>
+          <tr><td class="meta-label">用途</td><td>获取全部行业(一级/二级)/概念板块清单，用于构建 <code>fund_tags</code> 标签表与热门基金「主题」分组</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>scripts/sync_fund_tags_full.py</code> / <code>scripts/fetch_tag_funds_v2.py</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段（Data 对象）</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>Data.hy1</code> / <code>Data.hy2</code></td><td>行业一级 / 二级板块数组</td></tr>
+            <tr><td><code>Data.gn</code></td><td>概念板块数组</td></tr>
+            <tr><td>（每项）<code>INDEXCODE</code></td><td>板块指数代码（如 BK000092）</td></tr>
+            <tr><td>（每项）<code>INDEXNAME</code></td><td>板块名称（如「中药」「航天装备」）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">21. WJLC/GSRankList — 投顾产品列表</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://api.fund.eastmoney.com/WJLC/GSRankList?tzqx=0&cplx=0&pageIndex=1&pageSize=200</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET（Referer: https://fund.eastmoney.com/tg/）</td></tr>
+          <tr><td class="meta-label">用途</td><td>天天基金「投顾管家」公开产品列表，写入 <code>tougu_products</code> 表</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>scripts/fetch_tougu_products.py</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>ErrCode</code></td><td>0 表示接口存活</td></tr>
+            <tr><td><code>TotalCount</code></td><td>产品总数</td></tr>
+            <tr><td><code>Data[]</code></td><td>产品数组（名称/类型/收益等，字段随版本浮动，脚本做容错取数）</td></tr>
+          </tbody>
+        </table>
+        <p class="api-note">⚠️ 2026-10-11 实测：接口存活（ErrCode=0）但 <code>TotalCount=0</code>、<code>Data=[]</code>，东财已收回公开投顾列表。脚本设「宁空不假」护栏：抓到 0 条时保留上一次入库数据、不覆盖。平台恢复后无需改代码即可自动生效。</p>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">22. push2his kline — 基金指数历史日线（东财）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={市场.代码}&amp;fields1=f1&amp;fields2=f51,f53&amp;klt=101&amp;fqt=0&amp;beg=0&amp;end=20500101</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">用途</td><td>抓取「基金指数」（上证基金指数 1.000011 / 国证基金 0.399379 / 深证ETF 0.399306）历史日线收盘，写入 <code>fund_indices</code> 表</td></tr>
+          <tr><td class="meta-label">secid 规则</td><td>沪市 <code>1.xxxxxx</code> / 深市 <code>0.xxxxxx</code></td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>scripts/fetch_fund_indices_em.py</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段（data.klines[]，每行逗号分隔）</p>
+        <table class="field-table">
+          <thead><tr><th>位置</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>f51</td><td>日期（YYYY-MM-DD）</td></tr>
+            <tr><td>f53</td><td>收盘价</td></tr>
+          </tbody>
+        </table>
+        <p class="api-note">注：<code>fields2=f51,f53</code> 即只取日期+收盘；完整 kline 行还含开盘/最高/最低/成交量。深证基金指数(399305) 2017 起停更，东财不再返回，已从清单移除。</p>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">23. 历史 K 线（回测用）— 新浪 / 腾讯财经</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">新浪 URL</td><td><code>https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol={sh/sz代码}&amp;scale=240&amp;ma=no&amp;datalen=800</code></td></tr>
+          <tr><td class="meta-label">腾讯 URL</td><td><code>https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={sh代码},day,,,800,qfq</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">用途</td><td>定投回测（dtip）获取指数历史收盘价；腾讯为主源、新浪补更长历史，二者合并去重取并集；中证2000(932xxx) 在免费源无日线时回退东财 push2his</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>functions/api/dtip-backtest.js</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段</p>
+        <table class="field-table">
+          <thead><tr><th>源</th><th>结构</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>新浪</td><td>JSON 数组 <code>[[date, open, high, low, close, volume], ...]</code></td><td>index 0=日期, 4=收盘</td></tr>
+            <tr><td>腾讯</td><td><code>data[sym].day</code> = <code>[[date, open, close, high, low, vol], ...]</code></td><td>index 0=日期, 2=收盘</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">24. datacenter-web RPT_INDEX_CONSTITUENT — 指数成分股</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_INDEX_CONSTITUENT&columns=ALL&filter=(INDEX_CODE="000300")&pageSize=1000</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">用途</td><td>获取指数成分股清单（代码+名称），用于指数评分五维流水线的「成分股样本」</td></tr>
+          <tr><td class="meta-label">可达性</td><td><b>GitHub Actions 云 IP 被东财 WAF 拦截</b>；改由边缘函数 <code>/api/em-constituents</code>（EdgeOne 海外节点）同源代取</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>functions/api/em-constituents.js</code> / <code>scripts/fetch_index_raw.py</code></td></tr>
+        </table>
+        <p class="api-subtitle">返回字段（result.data[] 每行）</p>
+        <table class="field-table">
+          <thead><tr><th>字段</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>INDEX_CODE</code></td><td>指数 6 位代码</td></tr>
+            <tr><td><code>INDCODE</code></td><td>带交易所后缀代码（如 000300.SH）</td></tr>
+            <tr><td><code>CM_CLOSE</code></td><td>指数收盘价</td></tr>
+            <tr><td><code>SECURITY_CODE</code></td><td>成分股代码（裸 6 位）</td></tr>
+            <tr><td><code>SECURITY_NAME_ABBR</code></td><td>成分股简称</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="api-item">
+        <h3 class="api-name">25. windindices — 万得基金指数（备选）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://www.windindices.com/indicesWebsite/api</code>（端点：/indexinfo /indexreturn /IndexAnnualYield /indexValuation）</td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">用途</td><td>万得基金指数（885001~885013 等）元数据与市场/历年表现，写入 <code>fund_indices</code> 表（与东财 push2his 双源）</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>scripts/fetch_fund_indices.py</code></td></tr>
+        </table>
+        <p class="api-note">⚠️ 万得公共 API 对「逐指数」数据为会话态钉死：未携带浏览器会话时固定返回默认指数（万得全A），无头环境难取明细，故本站 <code>fund_indices</code> 主用东财 push2his（第 22 项），Wind 为元数据兜底。</p>
+      </div>
+
       <!-- 接口汇总 -->
       <h2 class="api-group-title">接口汇总</h2>
       <table class="field-table summary-table">
@@ -1930,6 +2072,13 @@
           <tr><td>16</td><td>csindex indexCsiDsPe（经 /api/csi-pe 边缘函数）</td><td>中证官方 PE-TTM 日史 + 全史/5年/3年分位（定投助手估值，7/7 覆盖）</td><td>GET</td></tr>
           <tr><td>17</td><td>push2 stock/get（指数 secid）</td><td>指数实时行情（7 指数点位/名称，中证2000 为 2.932000）</td><td>GET</td></tr>
           <tr><td>18</td><td>legulegu index-basic-pe</td><td>指数 PE 第三方交叉验证（备选，2026-10-14 实测已失效留档）</td><td>GET</td></tr>
+          <tr><td>19</td><td>fundcode_search.js</td><td>全量基金主列表（QDII 名单唯一来源，约 742 只 QDII）</td><td>GET</td></tr>
+          <tr><td>20</td><td>GetBKListByBKTypeNew (ZTJJ)</td><td>行业/概念标签清单（fund_tags）</td><td>GET(JSONP)</td></tr>
+          <tr><td>21</td><td>WJLC/GSRankList</td><td>投顾产品列表（tougu_products，东财已收回公开列表）</td><td>GET</td></tr>
+          <tr><td>22</td><td>push2his kline</td><td>基金指数历史日线（fund_indices）</td><td>GET</td></tr>
+          <tr><td>23</td><td>新浪 / 腾讯 K线</td><td>指数历史收盘（定投回测 dtip）</td><td>GET</td></tr>
+          <tr><td>24</td><td>datacenter-web RPT_INDEX_CONSTITUENT</td><td>指数成分股（经 /api/em-constituents 代理）</td><td>GET</td></tr>
+          <tr><td>25</td><td>windindices</td><td>万得基金指数（fund_indices 元数据兜底）</td><td>GET</td></tr>
         </tbody>
       </table>
     </div>

@@ -14,7 +14,10 @@ import time
 import math
 import sys
 import os
+import re
 import argparse
+import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ===== 配置（从环境变量读取，GitHub Actions 通过 Secrets 注入）=====
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://tqhtegazxykkqfcpejky.supabase.co')
@@ -464,6 +467,164 @@ def _esc_null(v):
         return 'NULL'
 
 
+# ── QDII 专用：主列表取名单 + pingzhongdata 逐只取指标 ─────────────────────────
+# 东财批量排行接口(FundGuideapi/rankhandler) 对 QDII 取数范围被砍（现仅吐 115 只，
+# 生产历史 399 只、主列表全量 742 只），导致 staging QDII 严重不足、promote 守卫误拒。
+# 改用：主列表 fundcode_search.js 取全部 QDII 代码+类型 → 逐只 pingzhongdata 取净值/收益，
+# 覆盖不丢、口径统一（不再混合 FundGuideapi）。
+MASTER_QDII_URL = 'https://fund.eastmoney.com/js/fundcode_search.js'
+PINGZHONG_URL = 'https://fund.eastmoney.com/pingzhongdata/{code}.js'
+
+def fetch_qdii_master_codes():
+    """从东财全量基金主列表取 QDII 名单（含指数型-海外股票等子类）。"""
+    try:
+        r = subprocess.run(
+            ['curl', '-s', '--max-time', '30', '-H',
+             'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', MASTER_QDII_URL],
+            capture_output=True, text=True, timeout=40)
+        txt = r.stdout
+        m = re.search(r'var r\s*=\s*(\[.*\]);', txt, re.S)
+        if not m:
+            print('  ⚠ 主列表解析失败，QDII 名单为空')
+            return []
+        rows = re.findall(r'\["([0-9]{6})","([^"]*)","([^"]*)","([^"]*)","([^"]*)"\]', m.group(1))
+        out = []
+        for code, py, py2, t, py3 in rows:
+            if t.startswith('QDII') or t == '指数型-海外股票' or '海外' in t or '全球' in t:
+                out.append((code, t))
+        return out
+    except Exception as e:
+        print(f'  ⚠ 主列表拉取异常: {e}')
+        return []
+
+def _qdii_fund_name(raw):
+    m = re.search(r'var fS_name\s*=\s*"([^"]*)"', raw)
+    return m.group(1) if m else ''
+
+def _qdii_syl(raw, name):
+    m = re.search(r'var ' + name + r'\s*=\s*"([^"]*)"', raw)
+    return m.group(1) if m else ''
+
+def _parse_pingzhong_qdii(code, t1_tt, raw):
+    """解析单只 pingzhongdata，返回与 fetch_funds 同结构的 fund dict。"""
+    r1m = _return_float(_qdii_syl(raw, 'syl_1y'))   # 近1月
+    r3m = _return_float(_qdii_syl(raw, 'syl_3y'))   # 近3月
+    r6m = _return_float(_qdii_syl(raw, 'syl_6y'))   # 近6月
+    r1y = _return_float(_qdii_syl(raw, 'syl_1n'))   # 近1年
+    # 其余周期由累计复权净值历史反算（口径统一）
+    r0w = r2y = r3y = r5y = ytd = nav = daily_change = None
+    date_str = ''
+    m = re.search(r'var Data_ACWorthTrend\s*=\s*(\[\[.*?\]\]);', raw, re.S)
+    if m:
+        try:
+            ac = json.loads(m.group(1))
+            ac = [p for p in ac if len(p) == 2 and p[1] not in (None, '', 0)]
+            ac.sort(key=lambda x: x[0])
+            if ac:
+                last_ts, last_val = ac[-1]
+                def ret_over_days(days):
+                    target = last_ts - int(days * 86400000)
+                    prev = None
+                    for p in ac:
+                        if p[0] <= target:
+                            prev = p
+                        else:
+                            break
+                    return (last_val / prev[1] - 1) * 100 if prev and prev[1] else None
+                r0w = ret_over_days(7)
+                r2y = ret_over_days(730)
+                r3y = ret_over_days(1095)
+                r5y = ret_over_days(1825)
+                yr = datetime.datetime.now().year
+                ystart = int(datetime.datetime(yr, 1, 1).timestamp() * 1000)
+                yprev = None
+                for p in ac:
+                    if p[0] >= ystart:
+                        break
+                    yprev = p
+                ytd = (last_val / yprev[1] - 1) * 100 if yprev and yprev[1] else None
+                nav = last_val
+                date_str = datetime.datetime.fromtimestamp(last_ts / 1000).strftime('%Y-%m-%d')
+        except Exception:
+            pass
+    # 日涨跌（单位净值序列，格式为 [{x:ts,y:val},...]）
+    m2 = re.search(r'var Data_netWorthTrend\s*=\s*(\[.*?\]);', raw, re.S)
+    if m2:
+        try:
+            nw = json.loads(m2.group(1))
+            nw = [p for p in nw if isinstance(p, dict) and p.get('y') not in (None, '', 0)]
+            if len(nw) >= 2:
+                a, b = nw[-2], nw[-1]
+                if a['y']:
+                    daily_change = (b['y'] / a['y'] - 1) * 100
+            if not date_str and nw:
+                date_str = datetime.datetime.fromtimestamp(nw[-1]['x'] / 1000).strftime('%Y-%m-%d')
+            if nav is None and nw:
+                nav = nw[-1]['y']
+        except Exception:
+            pass
+    return {
+        'c': code + '.OF',
+        'n': _qdii_fund_name(raw),
+        't0': 'QDII',
+        't1': t1_tt,
+        't1_tt': t1_tt,
+        't2': t1_tt,
+        't6': '',
+        'a': 0,
+        'hp': 0,
+        'sg': None,
+        'daily_change': daily_change,
+        'ytd': ytd,
+        'r0w': r0w,
+        'r1m': r1m,
+        'r3m': r3m,
+        'r6m': r6m,
+        'r1y': r1y,
+        'r2y': r2y,
+        'r3y': r3y,
+        'r5y': r5y,
+        'nav': nav if nav else None,
+        'date': date_str,
+    }
+
+def parse_pingzhong_qdii(code, t1_tt):
+    url = PINGZHONG_URL.format(code=code)
+    for _ in range(2):
+        try:
+            r = subprocess.run(['curl', '-s', '--max-time', '25',
+                '-H', 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+                '-H', 'Referer: https://fund.eastmoney.com/', url],
+                capture_output=True, text=True, timeout=30)
+            if r.stdout and 'fS_name' in r.stdout:
+                return _parse_pingzhong_qdii(code, t1_tt, r.stdout)
+        except Exception:
+            pass
+        time.sleep(1)
+    return None
+
+def fetch_qdii_full():
+    """QDII 全量：主列表取名单(742) + pingzhongdata 逐只取指标（统一口径）。"""
+    codes = fetch_qdii_master_codes()
+    if not codes:
+        print('  ⚠ QDII 主列表为空，回退到 FundGuideapi')
+        return fetch_funds('qdii')
+    print(f'  主列表 QDII 名单: {len(codes)} 只，逐只 pingzhongdata 取指标...', flush=True)
+    results = []
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futs = {ex.submit(parse_pingzhong_qdii, code, t): code for code, t in codes}
+        done = 0
+        for f in as_completed(futs):
+            res = f.result()
+            if res:
+                results.append(res)
+            done += 1
+            if done % 100 == 0:
+                print(f'    已处理 {done}/{len(codes)}', flush=True)
+    print(f'  pingzhongdata 成功解析: {len(results)} 只')
+    return results
+
+
 def main():
     print('=' * 60)
     print('fund_scores 全量抓取 + Supabase 导入')
@@ -476,7 +637,10 @@ def main():
     print('\n[1] 拉取天天基金全量数据...')
     all_funds = []
     for ft in FT_LIST:
-        funds = fetch_funds(ft)
+        if ft == 'qdii':
+            funds = fetch_qdii_full()
+        else:
+            funds = fetch_funds(ft)
         all_funds.extend(funds)
         time.sleep(0.5)
 
