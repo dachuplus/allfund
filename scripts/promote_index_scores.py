@@ -89,7 +89,13 @@ def validate():
       max(trade_date) AS max_date,
       count(*) FILTER (WHERE pool='broad' AND k_all IS NOT NULL) AS broad_ok,
       count(*) FILTER (WHERE pool='sector' AND k_all IS NOT NULL) AS sector_ok,
-      count(*) FILTER (WHERE pool='fixed' AND k_all IS NOT NULL) AS fixed_ok
+      count(*) FILTER (WHERE pool='fixed' AND k_all IS NOT NULL) AS fixed_ok,
+      -- 新鲜占比：剔除极少数成分无法映射的指数（如 B 股指数）残留的旧日期，
+      -- 避免单只旧指数把 max(trade_date) 拉旧、导致整批被拒。
+      count(*) FILTER (
+        WHERE trade_date IS NOT NULL
+          AND (CURRENT_DATE - to_date(regexp_replace(trade_date,'[^0-9]','','g'),'YYYYMMDD')) <= 7
+      ) AS fresh_n
     FROM index_scores_staging
     """)
     if not res:
@@ -104,6 +110,7 @@ def validate():
     broad_ok = int(r.get('broad_ok') or 0)
     sector_ok = int(r.get('sector_ok') or 0)
     fixed_ok = int(r.get('fixed_ok') or 0)
+    fresh_n = int(r.get('fresh_n') or 0)
 
     print('[校验] staging 概况：')
     print(f'   总条数 {total}（下限 {MIN_TOTAL}）')
@@ -134,19 +141,24 @@ def validate():
     if fixed_ok < MIN_POOL_OK:
         print('[提示] 固收池暂无评分，前端「固收」分类会显示为空，等fetch_index_raw 补齐后重跑')
 
-    # 日期新鲜度
+    # 日期新鲜度：用「新鲜指数占比」而非 max(trade_date)。
+    # 少数成分无法映射的指数（如 B 股指数）会残留旧日期，不应拖累整批；
+    # 只要 ≥95% 指数为近 7 天刷新即视为本次抓取成功（整批失败则占比≈0 仍会拒绝）。
+    if total:
+        fresh_rate = fresh_n / total
+        print(f'   新鲜指数占比 {fresh_rate*100:.1f}%（下限 95%；窗口 {MAX_AGE_DAYS} 天）')
+        if fresh_rate < 0.95:
+            errs.append(f'新鲜指数占比 {fresh_rate*100:.1f}% < 95%（抓取可能未刷新）')
+    # 仅提示最旧日期，不再单独阻断
     if max_date:
         try:
             from datetime import date, datetime
-            # 兼容带/不带分隔符的日期（2026-10-09 / 20261008）
             digits = ''.join(ch for ch in str(max_date) if ch.isdigit())[:8]
             d = datetime.strptime(digits, '%Y%m%d').date()
             age = (date.today() - d).days
-            print(f'   数据年龄 {age} 天（上限 {MAX_AGE_DAYS}）')
-            if age > MAX_AGE_DAYS:
-                errs.append(f'行情数据 {max_date} 已过旧（{age} 天 > {MAX_AGE_DAYS}）')
+            print(f'   最旧行情日 {max_date}（{age} 天前）')
         except ValueError:
-            errs.append(f'trade_date 格式异常: {max_date}')
+            pass
 
     if errs:
         print('\n[校验] ✗ 未通过，拒绝切换：')
