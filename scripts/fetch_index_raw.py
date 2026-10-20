@@ -83,12 +83,25 @@ CREATE POLICY auth_read_index_scores_raw ON index_scores_raw
 
 
 def pg(sql, timeout=300):
+    # ⚠️ 载荷写临时文件、用 curl -d @file 读取，彻底绕开命令行参数长度上限
+    # （ARG_MAX）。实测 中证1000（1000成分）/ 中证流通（5144成分）的 cons_json
+    # 经 -d 直接传参会触发 OSError: [Errno 7] Argument list too long 导致整脚本崩溃。
+    import tempfile as _tf
     payload = json.dumps({'query': sql})
-    r = subprocess.run(
-        ['curl', '-s', '--max-time', str(timeout), '-X', 'POST', MGMT_API,
-         '-H', f'Authorization: Bearer {PAT}',
-         '-H', 'Content-Type: application/json', '-d', payload],
-        capture_output=True, text=True, timeout=timeout + 15)
+    fd, _path = _tf.mkstemp(suffix='.json')
+    try:
+        with os.fdopen(fd, 'w') as _f:
+            _f.write(payload)
+        r = subprocess.run(
+            ['curl', '-s', '--max-time', str(timeout), '-X', 'POST', MGMT_API,
+             '-H', f'Authorization: Bearer {PAT}',
+             '-H', 'Content-Type: application/json', '-d', f'@{_path}'],
+            capture_output=True, text=True, timeout=timeout + 15)
+    finally:
+        try:
+            os.remove(_path)
+        except OSError:
+            pass
     if r.returncode != 0:
         raise RuntimeError(f'curl fail: {r.stderr[:150]}')
     t = r.stdout.strip()

@@ -58,10 +58,9 @@ WINSOR = 0.05
 DDL = """
 -- ⚠️ 必须先 DROP 再建：`CREATE TABLE IF NOT EXISTS` 不会给已存在的表补新列，
 -- 而本表在开发期改过多次 schema，留着旧表会导致 INSERT 报 42703（列不存在）。
-DROP TABLE IF EXISTS index_scores_staging;
-DROP TABLE IF EXISTS index_scores;
-
-CREATE TABLE index_scores (
+-- ⚠️ 生产表 index_scores 绝不在 compute 阶段删除（只由 promote 原子切换）。
+-- 否则一旦 promote 护栏拒绝，生产表会被清空（10-19 已发生：变 0 行，指数选品页无数据）。
+CREATE TABLE IF NOT EXISTS index_scores (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   code text UNIQUE,
   name text,
@@ -88,6 +87,8 @@ CREATE TABLE index_scores (
 CREATE INDEX IF NOT EXISTS idx_index_scores_pool ON index_scores(pool);
 CREATE INDEX IF NOT EXISTS idx_index_scores_kall ON index_scores(k_all DESC);
 
+-- 每次重建 staging（算分中间表），不影响生产表
+DROP TABLE IF EXISTS index_scores_staging;
 CREATE TABLE index_scores_staging (LIKE index_scores INCLUDING ALL);
 
 
