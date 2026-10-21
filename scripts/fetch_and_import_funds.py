@@ -161,6 +161,12 @@ def _null_float(v):
 def _curl_json(url, tries=3, delay=5, timeout=20):
     """带重试的 curl JSON 拉取。遇到无响应/解析失败/异常自动重试，根除上游瞬时抽风
     （如 8/19 评分流水线因 ft=gp 接口瞬时返回空、导致 staging 股票型=0、promote 校验拒绝）。
+
+    容错增强（2026-10-21）：上游偶发返回截断/乱码字节流——混合型基金(hh) 曾因 5000/页 响应
+    在 376KB 处被截断、缺闭合 `}` 致 `'utf-8' codec can't decode`（text=True 崩溃）+ 重试耗尽后
+    **静默跳过整类**，staging 混合型=0、promote 守卫整批拒绝、流水线报错。改为：
+      - 捕字节而非 text，按 utf-8/ignore 容错解码（截断/乱码字节不抛异常）；
+      - JSON 结构不完整（缺 `}`）判为截断并重试，避免假失败吞掉整类数据。
     """
     for attempt in range(1, tries + 1):
         try:
@@ -168,9 +174,10 @@ def _curl_json(url, tries=3, delay=5, timeout=20):
                 ['curl', '-s', '--max-time', str(timeout),
                  '-H', 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
                  '-H', 'Referer: https://fund.eastmoney.com/', url],
-                capture_output=True, text=True, timeout=timeout + 5
+                capture_output=True, timeout=timeout + 5
             )
-            text = result.stdout
+            # 捕字节 + 容错解码：截断/乱码字节不抛异常，交给 json.loads 判定完整性
+            text = result.stdout.decode('utf-8', errors='ignore')
             if not text or '{' not in text:
                 print(f'  (第{attempt}/{tries}次) 无响应/非JSON')
                 if attempt < tries:
@@ -180,7 +187,7 @@ def _curl_json(url, tries=3, delay=5, timeout=20):
             s = text.find('{')
             e = text.rfind('}') + 1
             if s < 0 or e <= s:
-                print(f'  (第{attempt}/{tries}次) 括号定位失败')
+                print(f'  (第{attempt}/{tries}次) 括号定位失败(疑似截断)')
                 if attempt < tries:
                     time.sleep(delay)
                     continue
@@ -195,30 +202,47 @@ def _curl_json(url, tries=3, delay=5, timeout=20):
     return None
 
 
+def _fetch_page(ft, pi, pn):
+    """抓取单页（指定分页大小 pn），返回解析后的 dict 或 None。"""
+    url = (
+        'https://fund.eastmoney.com/data/FundGuideapi.aspx?dt=0&ft=' + ft +
+        '&sd=&ed=&sc=3nzf&st=desc&pi=' + str(pi) + '&pn=' + str(pn) + '&zf=diy&sh=list'
+    )
+    return _curl_json(url)
+
+
 def fetch_funds(ft, attempt=1):
     """从天天基金拉取指定分类的全部基金（用 curl 避免被限速）。
 
-    健壮性：若上游瞬时抽风（HTTP 200 + 空 datas，非网络错误）导致某大类首页/中页返回空，
-    则整类指数退避重试最多 FT_MAX_RETRY 次；仍失败才返回空列表（交由 promote 守卫兜底），
-    避免静默吞掉整类数据致使 staging 该大类=0、promote 校验整批拒绝、流水线挂掉。
+    健壮性：
+     - 默认分页 pn=2500（偏大分页易触发上游截断：混合型基金(hh) 曾因 5000/页 响应在 376KB
+       处被截断、缺闭合 } 致重试耗尽整类静默跳过）。
+     - 单页抓取失败先回退更小分页（pn=1000）重试，降低截断概率。
+     - 首页整页失败：整类指数退避重试最多 FT_MAX_RETRY 次；仍失败才返回空列表
+       （交由 promote 守卫兜底），不再静默吞掉整类数据。
+     - 空响应兜底（根治上游瞬时抽风致某大类=0、promote 整批拒绝）：首页即空或中页空且
+       未达声明总数，整类指数退避重试最多 FT_MAX_RETRY 次；重试耗尽仍空则整类返回 0。
     """
     all_funds = []
-    for pi in range(1, 5):
-        url = (
-            'https://fund.eastmoney.com/data/FundGuideapi.aspx?dt=0&ft=' + ft +
-            '&sd=&ed=&sc=3nzf&st=desc&pi=' + str(pi) + '&pn=5000&zf=diy&sh=list'
-        )
-        print(f'  拉取 {FT_MAP[ft]}({ft}) 第{pi}页...', end='', flush=True)
+    pn = 2500
+    for pi in range(1, 12):
+        print(f'  拉取 {FT_MAP[ft]}({ft}) 第{pi}页(pn={pn})...', flush=True)
+        data = _fetch_page(ft, pi, pn)
+        # 单页失败先回退更小分页（降截断概率），仍失败再决定整类重试/放弃
+        if data is None:
+            data = _fetch_page(ft, pi, 1000)
+        if data is None:
+            if pi == 1 and attempt < FT_MAX_RETRY:
+                delay = FT_RETRY_BASE_DELAY * attempt
+                print(f'  ⚠ {FT_MAP[ft]}({ft}) 首页多次抓取失败，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
+                time.sleep(delay)
+                return fetch_funds(ft, attempt + 1)
+            print(f'  {FT_MAP[ft]}({ft}) 第{pi}页抓取失败，停止该分类（数据不完整，交 promote 守卫兜底）')
+            break
         try:
-            data = _curl_json(url)
-            if data is None:
-                print(f'  {FT_MAP[ft]}({ft}) 重试耗尽仍无数据，跳过该分类')
-                break
             items = data.get('datas', [])
             total_count = int(data.get('datacount', 0))
             # ── 空响应兜底（根治上游瞬时抽风致某大类=0、promote 整批拒绝）──
-            # 首页即空、或中页空且尚未达声明总数，均判为上游瞬时故障，整类指数
-            # 退避重试最多 FT_MAX_RETRY 次；重试耗尽仍空则整类返回 0（交 promote 守卫兜底）。
             if not items and attempt < FT_MAX_RETRY and (pi == 1 or (total_count and len(all_funds) < total_count)):
                 delay = FT_RETRY_BASE_DELAY * attempt
                 print(f'  ⚠ {FT_MAP[ft]}({ft}) 第{pi}页空响应(疑似上游抽风)，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
@@ -275,7 +299,7 @@ def fetch_funds(ft, attempt=1):
                     'date': f[15].strip() if len(f) > 15 else '',
                 })
             print(f' +{len(items)}条 (总计{total_count}, 累计{len(all_funds)})')
-            if len(all_funds) >= total_count or len(items) < 5000:
+            if len(all_funds) >= total_count or len(items) < pn:
                 break
         except Exception as e:
             print(f' 异常: {e}')
