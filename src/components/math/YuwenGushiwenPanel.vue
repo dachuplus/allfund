@@ -195,15 +195,16 @@ function optClass(item, i) {
 .gsw-qtext { font-size: 16px; font-weight: 700; color: var(--text-primary, #0b0c0c); line-height: 1.6; }
 
 .gsw-opts { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
+/* 默认无边框（transparent 占位避免对齐跳动）；仅「答案项」揭示后带边框高亮 */
 .gsw-opt {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   width: 100%;
   text-align: left;
-  border: 2px solid #0b0c0c;
-  background: #fff;
-  padding: 10px 12px;
+  border: 2px solid transparent;
+  background: transparent;
+  padding: 8px 12px;
   font-family: inherit;
   font-size: 15px;
   color: var(--text-primary, #0b0c0c);
@@ -218,11 +219,13 @@ function optClass(item, i) {
   line-height: 22px;
   text-align: center;
   font-weight: 700;
-  border: 1px solid #0b0c0c;
+  border: 1px solid transparent;
   font-size: 13px;
+  color: var(--text-secondary, #505a5f);
 }
 .gsw-opt-text { flex: 1; min-width: 0; line-height: 1.5; }
 .gsw-opt.picked { background: #e7f0f8; border-color: #1d70b8; }
+.gsw-opt.picked .gsw-opt-key { color: #1d70b8; }
 .gsw-opt.right { background: #e6f3e6; border-color: #00703c; }
 .gsw-opt.right .gsw-opt-key { background: #00703c; color: #fff; border-color: #00703c; }
 .gsw-opt.wrong { background: #fbe9e7; border-color: #d4351c; }
