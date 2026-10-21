@@ -226,10 +226,42 @@
                 </div>
               </div>
 
+              <!-- 股票仓位区间（%） -->
+              <div class="filter-row">
+                <span class="filter-label">股票仓位</span>
+                <div class="filter-scale-range">
+                  <input type="number" class="scale-input" v-model="filterStockMin" placeholder="最小" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-dash">—</span>
+                  <input type="number" class="scale-input" v-model="filterStockMax" placeholder="最大" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-unit">%</span>
+                </div>
+              </div>
+
+              <!-- 债券仓位区间（%） -->
+              <div class="filter-row">
+                <span class="filter-label">债券仓位</span>
+                <div class="filter-scale-range">
+                  <input type="number" class="scale-input" v-model="filterBondMin" placeholder="最小" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-dash">—</span>
+                  <input type="number" class="scale-input" v-model="filterBondMax" placeholder="最大" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-unit">%</span>
+                </div>
+              </div>
+
+              <!-- 货币(现金)仓位区间（%） -->
+              <div class="filter-row">
+                <span class="filter-label">货币仓位</span>
+                <div class="filter-scale-range">
+                  <input type="number" class="scale-input" v-model="filterCashMin" placeholder="最小" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-dash">—</span>
+                  <input type="number" class="scale-input" v-model="filterCashMax" placeholder="最大" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-unit">%</span>
+                </div>
+              </div>
+
               <!-- 筛选说明 -->
               <div class="filter-tip">
                 注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。ETF/LOF/定开/申购状态/单日涨跌/异常基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。「异常」为收益数据合理性校验标注（如单月收益超 100%、债券型收益超上限、各期累计收益几乎相同等数据源脏值特征），名称旁带红标，选基时建议选「否」剔除。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
-                机构占比、股票占比数据暂未收录，后续版本更新。
               </div>
             </div>
             <div class="more-modal-footer">
@@ -810,6 +842,21 @@ const filterScaleMin = ref('')  // 基金规模区间（亿元）自定义最小
 const filterScaleMax = ref('')  // 基金规模区间（亿元）自定义最大值
 const scalePicks = ref([])      // 规模预设（多选）：gt2/2to5/5to10/10to20/20to50/50to100/gt100（空数组=全部）
 const scaleCustom = ref(false)  // 规模自定义区间开关（与预设多选互斥）
+
+// 资产配置仓位区间（%）：股票/债券/货币(现金)仓位，与规模筛选同构
+const filterStockMin = ref('')
+const filterStockMax = ref('')
+const filterBondMin = ref('')
+const filterBondMax = ref('')
+const filterCashMin = ref('')
+const filterCashMax = ref('')
+
+/** 把输入框字符串转成数字，空/非法返回 undefined（与规模自定义区间 NaN 守卫同构） */
+function numOrUndef(v) {
+  if (v === '' || v == null) return undefined
+  const n = Number(v)
+  return Number.isNaN(n) ? undefined : n
+}
 const SCALE_PRESETS = [
   { key: 'all',     label: '全部',      min: '',   max: '' },
   { key: 'gt2',     label: '大于2亿',   min: 2,    max: '' },
@@ -1112,6 +1159,12 @@ async function loadData(reset = true, _retryCount = 0) {
       dailyLimit: filterDailyLimit.value || undefined,
       retAnomaly: filterAnomaly.value || undefined,
       scaleRanges: scaleRanges.value.length ? scaleRanges.value : undefined,
+      stockMin: numOrUndef(filterStockMin.value),
+      stockMax: numOrUndef(filterStockMax.value),
+      bondMin: numOrUndef(filterBondMin.value),
+      bondMax: numOrUndef(filterBondMax.value),
+      cashMin: numOrUndef(filterCashMin.value),
+      cashMax: numOrUndef(filterCashMax.value),
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
     }
@@ -1209,6 +1262,12 @@ function clearMoreFilters() {
   filterScaleMax.value = ''
   scalePicks.value = []
   scaleCustom.value = false
+  filterStockMin.value = ''
+  filterStockMax.value = ''
+  filterBondMin.value = ''
+  filterBondMax.value = ''
+  filterCashMin.value = ''
+  filterCashMax.value = ''
 }
 
 // ========== 更多筛选弹窗（确认后才查询，取消恢复） ==========
@@ -1220,6 +1279,9 @@ function openMoreFilter() {
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
     sp: [...scalePicks.value], scu: scaleCustom.value,
+    psm: filterStockMin.value, psx: filterStockMax.value,
+    pbm: filterBondMin.value, pbx: filterBondMax.value,
+    pcm: filterCashMin.value, pcx: filterCashMax.value,
   }
   showMoreFilter.value = true
 }
@@ -1243,6 +1305,12 @@ function cancelMoreFilter() {
     filterT1.value = moreFilterSnapshot.t1
     scalePicks.value = [...moreFilterSnapshot.sp]
     scaleCustom.value = moreFilterSnapshot.scu
+    filterStockMin.value = moreFilterSnapshot.psm
+    filterStockMax.value = moreFilterSnapshot.psx
+    filterBondMin.value = moreFilterSnapshot.pbm
+    filterBondMax.value = moreFilterSnapshot.pbx
+    filterCashMin.value = moreFilterSnapshot.pcm
+    filterCashMax.value = moreFilterSnapshot.pcx
   }
   showMoreFilter.value = false
 }
@@ -1317,6 +1385,9 @@ const activeMoreFilterCount = computed(() => {
   if (filterDailyLimit.value) n++
   if (filterSG.value) n++
   if (scaleRanges.value.length) n++
+  if (filterStockMin.value !== '' || filterStockMax.value !== '') n++
+  if (filterBondMin.value !== '' || filterBondMax.value !== '') n++
+  if (filterCashMin.value !== '' || filterCashMax.value !== '') n++
   return n
 })
 
