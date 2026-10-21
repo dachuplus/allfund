@@ -110,26 +110,7 @@
           <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
         </div>
       </div>
-      <!-- 受限且未登录：提示先登录 -->
-      <div v-else-if="routeState === 'login'" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
-        <div class="no-feature-access__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4.5" y="10.5" width="15" height="10.5" />
-            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
-            <circle cx="12" cy="15.3" r="1.3" fill="currentColor" stroke="none" />
-            <line x1="12" y1="16.6" x2="12" y2="18.6" />
-          </svg>
-        </div>
-        <h1 id="nfa-title" class="no-feature-access__title">请先登录</h1>
-        <p class="no-feature-access__desc">
-          「<strong class="no-feature-access__feature">{{ currentFeatureLabel }}</strong>」需要登录并申请权限后才能访问。
-        </p>
-        <div class="no-feature-access__actions">
-          <button class="no-feature-access__btn" @click="showLogin">登录 / 注册</button>
-          <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
-        </div>
-      </div>
-      <!-- 受限且已登录无权限（或访问 ownerOnly）→ 申请权限 -->
+      <!-- 受限/无权限：未登录与已登录同一张卡片，文案与按钮按登录态区分 -->
       <div v-else-if="routeState === 'apply'" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
         <div class="no-feature-access__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -140,15 +121,21 @@
           </svg>
         </div>
         <h1 id="nfa-title" class="no-feature-access__title">无访问权限</h1>
-        <p class="no-feature-access__desc">
-          您当前的账号尚未开通 <strong class="no-feature-access__feature">「{{ currentFeatureLabel }}」</strong> 功能。
+        <template v-if="isLoggedIn">
+          <p class="no-feature-access__desc">
+            您当前的账号尚未开通 <strong class="no-feature-access__feature">「{{ currentFeatureLabel }}」</strong> 功能。
+          </p>
+          <p class="no-feature-access__hint">提交申请后由管理员审核开通，无需重新注册账号。</p>
+        </template>
+        <p v-else class="no-feature-access__desc">
+          登录后即可申请开通 <strong class="no-feature-access__feature">「{{ currentFeatureLabel }}」</strong> 功能，由管理员审核开通。
         </p>
-        <p class="no-feature-access__hint">提交申请后由管理员审核开通，无需重新注册账号。</p>
         <div class="no-feature-access__actions">
-          <button class="no-feature-access__btn" @click="handleRequestAccess">申请访问权限</button>
+          <button v-if="isLoggedIn" class="no-feature-access__btn" @click="handleRequestAccess">申请访问权限</button>
+          <button v-else class="no-feature-access__btn" @click="showLogin">登录 / 注册</button>
           <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
         </div>
-        <p class="no-feature-access__account">
+        <p v-if="isLoggedIn" class="no-feature-access__account">
           <span class="no-feature-access__account-label">当前登录账号</span>
           <span class="no-feature-access__account-value">{{ user?.email || '未知' }}</span>
         </p>
@@ -367,8 +354,8 @@ function isActiveNav(item) {
 /* ---- 当前路由的功能权限状态（三态模型：开放 / 受限需申请 / 关闭） ----
  * - allowed: 可访问（公开可读 或 已开通权限）
  * - closed:  功能已关闭，导航入口也会隐藏，直接访问显示「栏目已关闭」
- * - login:   受限（开放但需申请权限）且未登录 → 提示先登录
- * - apply:   受限且已登录但无权限（含非 owner 访问 ownerOnly）→ 显示「申请权限」卡片
+ * - apply:   受限未登录/已登录无权限（含非 owner 访问 ownerOnly）→ 统一「无访问权限」卡片，
+ *            文案与按钮按登录态区分；未登录点「登录 / 注册」、已登录点「申请访问权限」
  */
 const routeState = computed(() => {
   // 初始化（恢复会话 + 加载权限）未完成前，乐观放行：避免已登录用户刷新页面时闪现拦截。
@@ -379,11 +366,9 @@ const routeState = computed(() => {
   if (feat && !featureEnabled(feat)) return 'closed'   // 全局关闭 → 整条链路不可访问
   if (isAdmin.value) return 'allowed'
   if (!feat) return 'allowed'
-  // 受限（开放但需申请权限才能访问）
-  if (featureRestricted(feat)) {
-    if (!isLoggedIn.value) return 'login'
-    return hasFeature(feat) ? 'allowed' : 'apply'
-  }
+  // 受限（开放但需申请权限才能访问）：未登录与已登录无权限统一走「无访问权限」卡片，
+  // 文案与按钮由模板按 isLoggedIn 区分（未登录→登录/注册，已登录→申请访问权限）
+  if (featureRestricted(feat)) return hasFeature(feat) ? 'allowed' : 'apply'
   // 公开内容（内容/博客）：开放即可读
   if (feat === 'content' || feat === 'content-blog') return 'allowed'
   // 其余功能：需登录且已开通权限
