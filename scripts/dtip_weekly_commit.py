@@ -4,14 +4,22 @@
 dtip_weekly_commit.py — 定投助手 Part2 服务端真实定时定投写入
 
 每周一（北京时间 09:00，即 UTC 周一 01:00）由 GitHub Actions 自动触发：
-  1. 经同源 EdgeOne 边缘函数 /api/csi-pe 取 7 指数「当前 PE 全史分位」
+  1. 经同源边缘函数 /api/csi-pe 取 7 指数当前 PE 的**滚动 5 年分位 pct_5y**
      （规避 GitHub 云 IP 被 csindex WAF 403；边缘函数在海外节点代取）
-  2. 按 5 档估值区间映射本周定投金额（与前端 /api/dtip-backtest 完全一致）
+  2. 按 5 档估值区间映射本周操作（与前端 /api/dtip-backtest 完全一致：
+     低估买入 / 合理小额买 / 高估观望 / 极度高估按持仓市值 15% 赎回）
   3. 经腾讯财经 K 线（主）/ 新浪财经 K 线（回退）取最新收盘价
   4. 计算有符号份额 shares = amount / close（卖出为负）
   5. INSERT 进 public.dtip_auto_records（PK (index_code, trade_date) ON CONFLICT DO NOTHING 幂等）
 
 写入走 Supabase Management API（_pgsql.pg），绕过 RLS；前端读取走 anon + SELECT 策略。
+
+约束（与回测一致）：
+  - 【2026-10-22】分位锚由「全史 pct_all」改为「滚动 5 年 pct_5y」：
+    全史锚会被早年高 PE 体制长期污染（宽基指数永远显示便宜 → 几乎不触发卖出 /
+    短历史指数锚太短 → 过半时间卖出），滚动窗口才是真正的均值回复。
+  - 每周金额 450/300/150 由「指数波动周期测算法」反推（10 万本金 ÷ 历史最长买方季资金需求），
+    使固定本金在样本期内不出现资金耗尽。
 
 约束（与回测一致）：
   - 中证2000(932000) 在免费可直连源均无历史收盘 → 自动跳过，仅留估值看板。
@@ -39,14 +47,21 @@ DCA_INDICES = [
     ('000985', '中证全指'),
 ]
 
-# 5 档估值区间 → 每周调仓金额（有符号：买入正、卖出负）；边界为 [min, max)
+# 5 档估值区间 → 本周操作（与前端 ZONES / dtip-backtest.js 完全一致）
+#   buy  = 买入固定金额；hold = 观望不操作；trim = 按持仓市值比例赎回
+#   【2026-10-22 定版】金额由「指数波动周期测算法」反推：10 万本金 ÷ 历史最长买方季资金需求
+#   （7 指数中最坏者为中证500，scale=1.0 时需 66.4 万 → 缩放 0.150）。
+#   高估区由「买入 500」改「观望」：不在偏贵位置继续消耗资金。
 ZONES = [
-    {'key': 'deep_low',  'label': '极度低估', 'min': 0,        'max': 10,       'amount':  3000},
-    {'key': 'low',       'label': '低估',   'min': 10,       'max': 30,       'amount':  2000},
-    {'key': 'normal',    'label': '估值合理', 'min': 30,       'max': 70,       'amount':  1000},
-    {'key': 'high',      'label': '高估',   'min': 70,       'max': 90,       'amount':   500},
-    {'key': 'deep_high', 'label': '极度高估', 'min': 90,       'max': float('inf'), 'amount': -3000},
+    {'key': 'deep_low',  'label': '极度低估', 'min': 0,        'max': 10,       'mode': 'buy',  'amount':  450},
+    {'key': 'low',       'label': '低估',   'min': 10,       'max': 30,       'mode': 'buy',  'amount':  300},
+    {'key': 'normal',    'label': '估值合理', 'min': 30,       'max': 70,       'mode': 'buy',  'amount':  150},
+    {'key': 'high',      'label': '高估',   'min': 70,       'max': 90,       'mode': 'hold', 'amount':    0},
+    {'key': 'deep_high', 'label': '极度高估', 'min': 90,       'max': float('inf'), 'mode': 'trim', 'amount': 0, 'sell_pct': 0.15},
 ]
+
+# 极度高估时按「持仓市值的比例」赎回（非固定金额），使回补额随仓位规模自动伸缩
+SELL_RATIO = 0.15
 
 # 定投助手资金池模型：每个指数以 10 万元为唯一初始本金，每周一按估值分位在 现金↔权益 间调仓
 INIT_CAPITAL = 100000
@@ -85,11 +100,15 @@ def monday_of_this_week(now=None):
 # ============ 数据源 ============
 
 def fetch_pe_from_cache():
-    """从 dtip_pe_history 缓存表读取每个指数最新一行（pe/pct_all/name）。
-    返回 {code: {pe, pct_all, name}}；表不存在或异常时返回空字典（上层回退实时）。"""
+    """从 dtip_pe_history 缓存表读取每个指数最新一行（pe/pct_5y/pct_all/name）。
+
+    【2026-10-22】主判据改为 pct_5y（滚动 5 年分位），与回测引擎口径一致：
+    全史分位 pct_all 会被早年高 PE 体制长期污染，导致宽基指数「永远便宜」从而几乎不触发卖出。
+    返回 {code: {pe, pct_5y, pct_all, name}}；表不存在或异常时返回空字典（上层回退实时）。
+    """
     sql = (
-        "SELECT index_code, pe, pct_all, name FROM ("
-        "  SELECT index_code, pe, pct_all, name,"
+        "SELECT index_code, pe, pct_5y, pct_all, name FROM ("
+        "  SELECT index_code, pe, pct_5y, pct_all, name,"
         "         row_number() OVER (PARTITION BY index_code ORDER BY trade_date DESC) AS rn"
         "  FROM public.dtip_pe_history"
         ") t WHERE rn = 1;"
@@ -98,19 +117,24 @@ def fetch_pe_from_cache():
     out = {}
     for r in rows:
         code = r.get('index_code')
-        pct = r.get('pct_all')
+        # 优先滚动 5 年；pct_5y 缺失时退回全史，保证 Cron 不因缺列而漏写
+        pct = r.get('pct_5y')
+        if pct is None:
+            pct = r.get('pct_all')
         if code is None or pct is None:
             continue
         out[code] = {
             'pe': r.get('pe'),
-            'pct_all': float(pct),
+            'pct_5y': float(pct),
+            'pct_all': float(r['pct_all']) if r.get('pct_all') is not None else float(pct),
             'name': r.get('name') or code,
         }
     return out
 
 
 def fetch_csi_pe_live(codes):
-    """返回 {code: {pe, pct_all, name}}；失败的 code 不入字典。"""
+    """返回 {code: {pe, pct_5y, pct_all, name}}；失败的 code 不入字典。
+    优先取滚动 5 年分位 pct_5y，缺失时退回 pct_all。"""
     codes_arg = ','.join(c for c, _ in codes)
     url = f'{CSI_PE_URL}?codes={codes_arg}'
     out = {}
@@ -123,12 +147,15 @@ def fetch_csi_pe_live(codes):
         if not row.get('ok'):
             continue
         code = row.get('code')
-        pct = row.get('pct_all')
+        pct5 = row.get('pct_5y')
+        pctall = row.get('pct_all')
+        pct = pct5 if pct5 is not None else pctall
         if code is None or pct is None:
             continue
         out[code] = {
             'pe': row.get('pe'),
-            'pct_all': float(pct),
+            'pct_5y': float(pct),
+            'pct_all': float(pctall) if pctall is not None else float(pct),
             'name': row.get('name') or dict(codes).get(code, code),
         }
     return out
@@ -300,9 +327,10 @@ def main():
             print(f'  [skip] {code} {name}: 无 PE 分位（csi-pe 未覆盖）')
             skipped += 1
             continue
-        zone = zone_of(eva['pct_all'])
-        if zone is None or not zone['amount']:
-            print(f'  [skip] {code} {name}: 估值分位缺失，无法判定金额')
+        zone = zone_of(eva['pct_5y'])
+        pct_used = eva['pct_5y']
+        if zone is None:
+            print(f'  [skip] {code} {name}: 估值分位缺失，无法判定档位')
             skipped += 1
             continue
         close, src = fetch_close(code)
@@ -313,11 +341,17 @@ def main():
 
         # 资金池状态：读历史记录重建（首个运行周历史为空，现金=初始本金）
         deployed, withdrawn, shares, cash = fetch_prior_state(code, trade_date)
+        holdings_value = shares * close
 
-        raw_amount = zone['amount']
-        if raw_amount > 0:
+        if zone['mode'] == 'hold':
+            # 高估区：不买也不卖，等待估值进一步走向极端（避免在偏贵位置继续消耗资金）
+            print(f'  [skip] {code} {name}: 处于「{zone["label"]}」区，本周观望不操作（分位={pct_used:.1f}%）')
+            skipped += 1
+            continue
+
+        if zone['mode'] == 'buy':
             # 买入：从现金池支出，封顶可用现金
-            exec_amt = min(raw_amount, cash)
+            exec_amt = min(zone['amount'], cash)
             if exec_amt <= 0:
                 print(f'  [skip] {code} {name}: 现金池已耗尽（满仓），本周不再买入')
                 skipped += 1
@@ -325,11 +359,10 @@ def main():
             exec_shares = exec_amt / close
             signed_amt = exec_amt
         else:
-            # 卖出：赎回 zone 金额对应份额，封顶实际持仓市值；无持仓则跳过
-            sell_amt = -raw_amount
-            holdings_value = shares * close
-            exec_amt = min(sell_amt, holdings_value)
-            if exec_amt <= 0:
+            # trim：按「当前持仓市值的固定比例」赎回，自动跟随仓位规模伸缩
+            sell_pct = zone.get('sell_pct') or SELL_RATIO
+            exec_amt = holdings_value * sell_pct
+            if exec_amt <= 0.01:
                 print(f'  [skip] {code} {name}: 无持仓，无法卖出（已跳过）')
                 skipped += 1
                 continue
@@ -340,7 +373,7 @@ def main():
             "INSERT INTO public.dtip_auto_records "
             "(index_code, index_name, trade_date, pe, pe_pct, zone, amount, close_price, shares) "
             f"VALUES ('{code}', '{name}', '{trade_date}', "
-            f"{repr(float(eva['pe']))}, {repr(float(eva['pct_all']))}, '{zone['label']}', "
+            f"{repr(float(eva['pe']))}, {repr(float(pct_used))}, '{zone['label']}', "
             f"{repr(float(signed_amt))}, {repr(float(close))}, {repr(float(exec_shares))}) "
             "ON CONFLICT (index_code, trade_date) DO NOTHING;"
         )

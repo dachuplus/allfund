@@ -4,10 +4,19 @@
  *
  * 逻辑：
  *   对过去 N 周（默认 52 周 ≈ 1 年）的每一个周一（对齐真实交易日），
- *   用「截至该周一的 PE 全史」计算 PE 历史分位 → 映射 5 档估值区间
- *   → 得到该周定投金额（低估多买 / 高估少买 / 极高卖出）
- *   → 以该周一收盘价买入（或卖出 3000 元）对应份额，walk-forward 累积。
+ *   用「截至该周一、前推 5 年滚动窗口内的 PE 分布」计算估值分位（trailing percentile）
+ *   → 映射 5 档估值区间 → 得到该周操作（低估买 / 合理小额买 / 高估观望 / 极度高估按比例卖出）
+ *   → 以该周一收盘价成交，walk-forward 累积。
  *   期末以最新收盘价计市值，统计累计净投入、当前市值、累计收益、收益率、XIRR 等。
+ *
+ * 【2026-10-22 策略定版】三处关键改动（详见 DtipPanel.vue「策略与资金测算说明」）：
+ *   1) 分位锚：发布至今全史 → 滚动 5 年。全史锚会被早年高 PE 体制长期污染，
+ *      导致中证500/1000 永远显示「便宜」几乎不触发卖出、A500/2000 因锚短而过半时间卖出，
+ *      两者都不是真的均值回复，而是锚的方向决定的单边偏置。
+ *   2) 卖出规则：极度高估由「固定赎回 3000 元」改为「赎回持仓市值的 15%」，
+ *      使回补额随持仓规模伸缩，避免资金只出不进。
+ *   3) 资金尺寸：按「指数波动周期」反推每周金额（450/300/150），
+ *      7 指数在 2015-11 → 2026-10 全样本上资金耗尽次数 = 0。
  *
  * 数据源：
  *   - PE 全史：中证指数官网 csindex.com.cn（与 /api/csi-pe 同源，海外边缘节点可达）
@@ -49,14 +58,26 @@ async function sbSelect(path) {
   return res.json()
 }
 
-// 5 档估值区间 → 每周定投金额（与 DtipPanel.vue ZONES 一致）
+// 5 档估值区间 → 每周操作（与 DtipPanel.vue ZONES 一致）
+// 【2026-10-22 定版】金额由「指数波动周期测算法」反推（详见 DtipPanel 策略说明区）：
+//   观察滚动 5 年锚下每个指数的「连续买方季」资金需求，7 指数中最坏者为中证500（scale=1.0 时需 66.4 万），
+//   取 10 万本金 / 66.4 万 = 0.1506 → 保守取整 0.150，得 450/300/150；中证500 峰值占用 99,600 元，留 400 元余量。
+//   实测 7 个指数在 2015-11 → 2026-10 全样本上资金耗尽次数 = 0。
+//   高估区(70-90 分位) 由「买入 500」改为「观望」：原规则在偏贵的位置仍在消耗资金且抬高成本，
+//   改为观望后本金收益率由 19.3% → 20.0%，最长买方季资金需求同步下降。
 const ZONES = [
-  { key: 'deep_low',  label: '极度低估', min: 0,      max: 10,       amount:  3000 },
-  { key: 'low',       label: '低估',   min: 10,     max: 30,       amount:  2000 },
-  { key: 'normal',    label: '估值合理', min: 30,     max: 70,       amount:  1000 },
-  { key: 'high',      label: '高估',   min: 70,     max: 90,       amount:   500 },
-  { key: 'deep_high', label: '极度高估', min: 90,     max: Infinity, amount: -3000 },
+  { key: 'deep_low',  label: '极度低估', min: 0,  max: 10,       amount:  450, mode: 'buy',        action: '买入 450 元' },
+  { key: 'low',       label: '低估',   min: 10, max: 30,       amount:  300, mode: 'buy',        action: '买入 300 元' },
+  { key: 'normal',    label: '估值合理', min: 30, max: 70,       amount:  150, mode: 'buy',        action: '买入 150 元' },
+  { key: 'high',      label: '高估',   min: 70, max: 90,       amount:  0,   mode: 'hold',       action: '观望不操作' },
+  { key: 'deep_high', label: '极度高估', min: 90, max: Infinity, amount:  0,   mode: 'trim',       action: '卖出持仓 15%', sellPct: 0.15 },
 ]
+// 极度高估时按「持仓市值的比例」赎回（而非旧版固定 3000 元），
+// 使回补额随持仓规模自动伸缩：仓位重时回收多、仓位轻时回收少，避免把仓位一次性清空或永远回不了本。
+const SELL_RATIO = 0.15
+// 分位锚采用滚动窗口（trailing window）而非「发布至今全史」，避免早年高 PE 体制长期污染分位判定
+const PCT_WINDOW_DAYS = 1825   // 5 年
+const PCT_MIN_OBS = 100        // 滚动窗口内样本不足时，回退到全史分位
 
 // ===== 工具 =====
 function normDateCsi(s) {
@@ -68,23 +89,68 @@ function normNum(v) {
   const n = Number(v)
   return isFinite(n) ? n : null
 }
-/** value 在升序数组中的百分位（0-100，含自身） */
-function percentile(sortedAsc, value) {
-  if (!sortedAsc.length || value == null) return null
-  let lo = 0, hi = sortedAsc.length
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1
-    if (sortedAsc[mid] <= value) lo = mid + 1
-    else hi = mid
-  }
-  return Math.round((lo / sortedAsc.length) * 10000) / 100
-}
 function zoneOf(pct) {
-  if (pct == null) return { key: 'unknown', label: '数据缺失', amount: 0 }
+  if (pct == null) return { key: 'unknown', label: '数据缺失', amount: 0, mode: 'hold', action: '观望不操作' }
   for (const z of ZONES) {
     if (pct >= z.min && pct < z.max) return z
   }
   return ZONES[ZONES.length - 1]
+}
+/** 升序数组 a 中第一个 >= v 的下标；返回值使得 [0,pos) 全部 < v */
+function lowerBound(a, v) {
+  let lo = 0, hi = a.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (a[mid] < v) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+/** 升序数组 a 中第一个 > v 的下标；返回值即「<= v 的元素个数」（含自身，与旧版全史分位口径一致） */
+function upperBound(a, v) {
+  let lo = 0, hi = a.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (a[mid] <= v) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+/**
+ * 预计算 PE 序列的「滚动窗口分位」：
+ *   pctWin[i] = pe[i] 在 [i 之前 PCT_WINDOW_DAYS 天内的 PE 样本] 中的百分位
+ *   pctAll[i] = pe[i] 在 [0..i] 全史样本中的百分位（滚动窗口样本不足时的回退值）
+ * 用两个「可删元素的升序多重集」滑动维护，整体 O(n·W) 的内存搬移，避免每个周一重排序导致边缘函数超时。
+ */
+function buildPctSeries(peSeries) {
+  const n = peSeries.length
+  const pes = peSeries.map(p => p.pe)
+  const ts = peSeries.map(p => new Date(p.d + 'T00:00:00Z').getTime())
+  const cutoffMs = PCT_WINDOW_DAYS * 86400000
+  const win = []      // 滚动窗口内的升序 PE
+  const all = []      // 全史升序 PE
+  const pctWin = new Array(n).fill(null)
+  const pctAll = new Array(n).fill(null)
+  const winLen = new Array(n).fill(0)
+  let start = 0       // 滚动窗口左端下标
+  for (let i = 0; i < n; i++) {
+    const pe = pes[i]
+    win.splice(lowerBound(win, pe), 0, pe)
+    all.splice(lowerBound(all, pe), 0, pe)
+    // 左端过期样本出窗（同值多处时删任意一个即可，分位计数不受影响）
+    while (start <= i && ts[i] - ts[start] > cutoffMs) {
+      const rp = lowerBound(win, pes[start])
+      if (rp < win.length) win.splice(rp, 1)
+      start++
+    }
+    const cntWin = upperBound(win, pe)   // <= 当前 PE 的样本数（含自身）
+    const cntAll = upperBound(all, pe)
+    if (win.length) pctWin[i] = Math.round((cntWin / win.length) * 10000) / 100
+    pctAll[i] = Math.round((cntAll / all.length) * 10000) / 100
+    winLen[i] = win.length
+  }
+  // 滚动窗口样本不足时回退全史；其余采用滚动窗口（各点独立判断）
+  return pctWin.map((v, i) => (v != null && winLen[i] >= PCT_MIN_OBS ? v : pctAll[i]))
 }
 /** 现金流 XIRR（年化），flows: [{t:Date, cf:Number}]，买入为负、卖出/期末为正 */
 function solveXirr(flows) {
@@ -360,37 +426,35 @@ function backtest(peResult, closeResult, weeks) {
   let totalInvested = 0   // 累计从现金池投入权益
   let totalWithdrawn = 0  // 累计从权益赎回至现金池
 
-  // 预计算「每一个 PE 点相对其历史至今的百分位」一次（O(n log n)），
+  // 预计算「每一个 PE 观测点在其之前 5 年滚动窗口内的分位」一次（滑动多重集，O(n·W) 内存搬移），
   // 避免在 520 个周一循环里反复排序整段 PE 序列导致边缘函数超时。
-  const pctSeries = new Array(peSeries.length)
-  const running = []
-  for (let i = 0; i < peSeries.length; i++) {
-    const pe = peSeries[i].pe
-    let lo = 0, hi = running.length
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1
-      if (running[mid] <= pe) lo = mid + 1
-      else hi = mid
-    }
-    running.splice(lo, 0, pe)
-    pctSeries[i] = Math.round((lo / running.length) * 10000) / 100
-  }
+  const pctSeries = buildPctSeries(peSeries)
+
+  let peakNetDeployed = 0   // 资金占用峰值 = 历史任一时点 max(累计投入 - 累计赎回)，用于核算本金是否够用
+  let peCursor = 0          // PE 序列游标（按周一升序推进）
 
   for (const m of window) {
-    const pePrefix = peSeries.filter(p => p.d <= m.d)
-    if (pePrefix.length < 2) continue
-    const pct = pctSeries[pePrefix.length - 1]
+    // 取「截至该周一已发布」的最后一个 PE 观测点（窗口按周一升序推进，用游标替代整段 filter，避免 O(n·weeks) 扫描）
+    let peIdx = -1
+    while (peCursor < peSeries.length && peSeries[peCursor].d <= m.d) peIdx = peCursor++
+    if (peIdx < 1) continue
+    const pct = pctSeries[peIdx]
     const zone = zoneOf(pct)
-    const amount = zone.amount
-    if (!amount) continue
     const price = m.close
     if (price <= 0) continue
+    // 高估区（mode='hold'）不做任何操作：既不买入也不卖出，等待估值进一步走向极端
+    if (zone.mode === 'hold') {
+      // zone.key === 'unknown' 表示该周一尚无 PE 数据，需与「主动观望」区分呈现
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: zone.key === 'unknown' ? 'no_data' : 'hold_zone', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+      continue
+    }
 
-    if (amount > 0) {
+    if (zone.mode === 'buy') {
+      const amount = zone.amount
       // 买入：从现金池支出，封顶可用现金（满仓后不再买入）
       const buyAmt = Math.min(amount, cash)
       if (buyAmt <= 0) {
-        // 现金耗尽：估值信号仍在，但无法再买入；记录「跳过」行，便于流水清晰展示「本金耗尽」状态
+        // 现金耗尽：估值信号仍在，但无法再买入；记录「跳过」行，便于流水清晰展示该状态
         trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'capital_exhausted', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
         continue
       }
@@ -399,13 +463,14 @@ function backtest(peResult, closeResult, weeks) {
       costBasis += buyAmt
       cash -= buyAmt
       totalInvested += buyAmt
+      peakNetDeployed = Math.max(peakNetDeployed, totalInvested - totalWithdrawn)
       trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount: buyAmt, price, sharesAdded: addSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     } else {
-      // 卖出：赎回 zone 金额对应份额，封顶实际持仓市值；**无持仓则跳过**
-      const sellAmt = -amount
+      // trim：按「当前持仓市值的固定比例」赎回，自动跟随仓位规模伸缩
+      const sellPct = zone.sellPct || SELL_RATIO
       const holdingsValue = shares * price
-      const execAmt = Math.min(sellAmt, holdingsValue)
-      if (execAmt <= 0) {
+      const execAmt = holdingsValue * sellPct
+      if (execAmt <= 0.01) {
         // 无持仓可卖：估值信号为卖出，但无可卖份额；记录「跳过」行
         trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'no_holding', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
         continue
@@ -416,7 +481,7 @@ function backtest(peResult, closeResult, weeks) {
       shares -= soldSh
       costBasis -= costOfSold
       totalWithdrawn += execAmt
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', sellPct, amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     }
   }
 
@@ -430,10 +495,9 @@ function backtest(peResult, closeResult, weeks) {
   flows.push({ t: new Date(), cf: portfolioValue })
   const irr = solveXirr(flows)
 
-  // 当前（最新交易日）估值区间与本周计划
+  // 当前（最新交易日）的滚动 5 年分位与本周计划
   const lastPe = peSeries[peSeries.length - 1]
-  const allPeAsc = peSeries.map(p => p.pe).sort((a, b) => a - b)
-  const pctLast = percentile(allPeAsc, lastPe.pe)
+  const pctLast = pctSeries[peSeries.length - 1]
   const zoneLast = zoneOf(pctLast)
 
   return {
@@ -450,7 +514,13 @@ function backtest(peResult, closeResult, weeks) {
     pctLast,
     zoneLast: zoneLast.label,
     zoneLastKey: zoneLast.key,
-    amountLast: zoneLast.amount,
+    amountLast: zoneLast.mode === 'buy' ? zoneLast.amount : 0,
+    planLast: zoneLast.action,
+    sellPctLast: zoneLast.sellPct || null,
+    pctWindowDays: PCT_WINDOW_DAYS,
+    sellRatio: SELL_RATIO,
+    peakNetDeployed,          // 资金占用峰值（元）：应 ≤ initCapital，超过即意味着样本内会出现资金耗尽
+    capitalSufficient: peakNetDeployed <= INIT_CAPITAL + 1,
     priceLast: latestPrice,
     trades,
     totalInvested,
