@@ -54,72 +54,6 @@ FT_LIST = list(FT_MAP.keys())
 FT_MAX_RETRY = 3
 FT_RETRY_BASE_DELAY = 15  # 秒，指数退避基数（attempt×BASE）
 
-# ── 加载聚源分类映射 ────────────────────────────────────────────────
-HSPJ_MAP = {}
-HSPJ_NAMES = {}  # basename → [t0, t1]，用于份额基金匹配
-def load_hspj_map():
-    """加载聚源 Excel 分类映射 JSON 文件"""
-    global HSPJ_MAP, HSPJ_NAMES
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    map_path = os.path.join(script_dir, 'hspj_classify.json')
-    if os.path.exists(map_path):
-        with open(map_path, 'r') as f:
-            data = json.load(f)
-        HSPJ_MAP = data.get('code_map', {})
-        HSPJ_NAMES = data.get('name_map', {})
-        print(f'  ✓ 加载聚源分类映射: {len(HSPJ_MAP)} 主代码 + {len(HSPJ_NAMES)} 名称索引', flush=True)
-    else:
-        print('  ⚠ 未找到聚源分类映射文件，t1 将使用默认分类', flush=True)
-
-SHARE_SUFFIX_RE = None  # 编译后缓存的份额后缀正则
-
-def strip_share_suffix(name):
-    """去掉基金名称末尾的份额后缀 (A/B/C/D/E/Y等)"""
-    global SHARE_SUFFIX_RE
-    if SHARE_SUFFIX_RE is None:
-        import re
-        SHARE_SUFFIX_RE = re.compile(r'[ABCDEFHIORY]+$')
-    return SHARE_SUFFIX_RE.sub('', (name or '').strip())
-
-def classify_hspj(code, name, ft):
-    """
-    根据聚源 Excel 分类标准为基金分配 t1
-    返回: (t0, t1)
-    策略：
-    1. 直接代码匹配 → 使用 Excel 分类
-    2. 名称匹配（去掉份额后缀）→ 使用同名主基金的分类
-    3. 兜底 → 使用 FT_MAP[ft] 作为 t0 和 t1
-    
-    自学习：当通过代码匹配时，将主基金名称加入 HSPJ_NAMES，
-    使得同名的 B/C/D/E/Y 等份额基金能通过名称匹配到相同分类。
-    """
-    pure_code = code.replace('.OF', '')
-    
-    # 策略1: 直接代码匹配
-    if pure_code in HSPJ_MAP:
-        t0, t1 = HSPJ_MAP[pure_code]
-        # 自学习：将此主基金的 basename 加入名称索引
-        basename = strip_share_suffix(name)
-        if basename and basename not in HSPJ_NAMES:
-            HSPJ_NAMES[basename] = [t0, t1]
-        return (t0, t1)
-    
-    # 策略2: 名称匹配
-    basename = strip_share_suffix(name)
-    if basename in HSPJ_NAMES:
-        return tuple(HSPJ_NAMES[basename])
-    
-    # 策略3: 模糊匹配（尝试去掉更多尾部字符）
-    for trim_len in range(1, 4):
-        if len(basename) > trim_len + 2:
-            trimmed = basename[:-trim_len]
-            if trimmed in HSPJ_NAMES:
-                return tuple(HSPJ_NAMES[trimmed])
-    
-    # 兜底
-    return (FT_MAP[ft], FT_MAP[ft])
-
-
 def _float(v):
     try:
         return float(v) if v and v.strip() and v.strip() != '' else 0
@@ -257,7 +191,10 @@ def fetch_funds(ft, attempt=1):
                     continue
                 code = f[0].strip() + '.OF'
                 name = (f[1] or '').strip()
-                t0, t1 = classify_hspj(code, name, ft)
+                # 分类完全由天天基金 FundGuideapi 的 f[3]（「一级-二级」结构，如 指数型-股票）派生；
+                # 旧「聚源分类」已废弃删除。f[3] 为空时回落到 FT_MAP[ft] 初值（与 import_via_rest step 2g 兜底一致）。
+                t0 = (f[3].split('-')[0] if f[3] else FT_MAP[ft])
+                t1 = (f[3] if f[3] else FT_MAP[ft])
                 # 天天基金 FundGuideapi 的 ft 是权威一级分类：QDII 类基金必须保留 QDII 一级，
                 # 不可被聚源映射/指数型子类覆盖（否则 QDII 数量骤降、promote 校验整批拒绝）。
                 # 仅当聚源已给出 QDII-* 子类时保留其细分，否则强制归一为 QDII。
@@ -653,9 +590,6 @@ def main():
     print('=' * 60)
     print('fund_scores 全量抓取 + Supabase 导入')
     print('=' * 60)
-
-    # 0. 加载聚源分类映射
-    load_hspj_map()
 
     # 1. 拉取天天基金全量
     print('\n[1] 拉取天天基金全量数据...')
