@@ -293,6 +293,7 @@ if STAGING:
                 'n': r.get('name') or '',
                 't0': r.get('t0') or '货币型',
                 't1': r.get('t1') or '货币型-普通货币',
+                't1_tt': r.get('t1') or '货币型-普通货币',
                 'company': r.get('company'),
                 'fund_scale': r.get('fund_scale'),
                 'manage_fee': r.get('manage_fee'),
@@ -327,6 +328,8 @@ if STAGING:
                         fund[k] = v
                 if r.get('t1'):
                     fund['t1'] = r['t1']
+                if r.get('t1_tt'):
+                    fund['t1_tt'] = r['t1_tt']
                 merged += 1
         print(f'  ✓ 合并货币基金阶段收益 {merged}/{len(funds)} ({time.time()-t0f:.1f}s)', flush=True)
     else:
