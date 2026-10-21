@@ -3,16 +3,26 @@
 -- 在 Supabase 控制台 → SQL Editor 中执行一次即可。
 -- （沙箱无法直连 Supabase，故需手动执行；执行后前端即可在「管理-用户分析」
 --   的「功能开放控制」面板中由 57502460@qq.com 切换各功能开放/关闭。）
+--
+-- 三态模型（2026-10-21 新增 restricted）：
+--   open     = 开放（可见 + 可访问）
+--   restricted = 受限（开放但需登录后申请权限才能访问；导航入口仍展示）
+--   closed   = 关闭（不可见、不可访问）
+-- restricted 沿父链向上传播：任一祖先受限，则整体受限。
 -- ============================================================
 
 -- 1) 功能开关表（匿名可读；写入仅经 RPC）
 create table if not exists public.feature_flags (
   key          text primary key,
   open         boolean not null default true,
+  restricted   boolean not null default false,   -- 2026-10-21 新增：开放但需申请权限
   label        text,
   description  text,
   sort_order   int
 );
+
+-- 已存在旧表（无 restricted 列）时补列，保证向后兼容
+alter table public.feature_flags add column if not exists restricted boolean not null default false;
 
 alter table public.feature_flags enable row level security;
 
@@ -23,7 +33,12 @@ create policy feature_flags_public_read
   using (true);
 
 -- 2) 仅主管理员（57502460@qq.com）可切换开关的 RPC（SECURITY DEFINER 绕过 RLS）
-create or replace function public.set_feature_flag(p_key text, p_open boolean)
+--    p_restricted 默认 null：调用时若省略，则保留该行原有受限值（向后兼容旧调用）
+create or replace function public.set_feature_flag(
+  p_key        text,
+  p_open       boolean,
+  p_restricted boolean default null
+)
 returns void
 language plpgsql
 security definer
@@ -35,9 +50,12 @@ begin
     raise exception 'permission denied: only the primary admin can toggle feature flags';
   end if;
 
-  insert into public.feature_flags (key, open)
-  values (p_key, p_open)
-  on conflict (key) do update set open = excluded.open;
+  insert into public.feature_flags (key, open, restricted)
+  values (p_key, p_open, coalesce(p_restricted, false))
+  on conflict (key) do update
+    set open = excluded.open,
+        -- 未传 p_restricted（null）时保留原值，不影响既有受限状态
+        restricted = coalesce(p_restricted, public.feature_flags.restricted);
 end;
 $$;
 

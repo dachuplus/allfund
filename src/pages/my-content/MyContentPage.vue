@@ -170,7 +170,7 @@
     <div v-if="canManageContent" class="cp-viewswitch">
       <button :class="{ active: view === 'published' }" @click="setView('published')">已发布</button>
       <button :class="{ active: view === 'mine' }" @click="setView('mine')">我的全部（含草稿）</button>
-      <router-link to="/content/editor" class="cp-view-tab">写文章</router-link>
+      <router-link :to="isBlogMode ? '/blog/editor' : '/content/editor'" class="cp-view-tab">写文章</router-link>
     </div>
 
     <div v-if="loading && !articles.length" class="cp-loading">
@@ -187,7 +187,7 @@
 
     <ul v-else class="cp-list">
       <li v-for="a in articles" :key="a.id" class="cp-card">
-        <router-link :to="`/content/${a.id}`" class="cp-card-link">
+        <router-link :to="(a.category === 'blog' ? '/blog/' : '/content/') + a.id" class="cp-card-link">
           <div v-if="a.cover_image" class="cp-cover" :style="{ backgroundImage: 'url(' + a.cover_image + ')' }"></div>
           <div class="cp-card-body">
             <div class="cp-card-top">
@@ -208,7 +208,7 @@
           </div>
         </router-link>
         <div v-if="canManageContent" class="cp-card-actions">
-          <router-link :to="`/content/editor/${a.id}`" class="cp-link-edit">编辑</router-link>
+          <router-link :to="(a.category === 'blog' ? '/blog/editor/' : '/content/editor/') + a.id" class="cp-link-edit">编辑</router-link>
           <button class="cp-link-pin" @click="onTogglePin(a)">{{ a.is_pinned ? '取消置顶' : '置顶' }}</button>
           <button class="cp-link-del" @click="onDelete(a)">删除</button>
         </div>

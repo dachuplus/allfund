@@ -24,7 +24,7 @@
           <span class="dp-cat">{{ catLabel(article.category) }}</span>
           <span v-if="article.published_at">· {{ formatDateTime(article.published_at) }}</span>
           <span>· {{ article.views || 0 }} 浏览</span>
-          <span v-if="isOwner" class="dp-edit-wrap">· <button class="dp-edit" @click="router.push('/content/editor/' + article.id)">编辑</button></span>
+          <span v-if="isOwner" class="dp-edit-wrap">· <button class="dp-edit" @click="router.push((article.category === 'blog' ? '/blog/editor/' : '/content/editor/') + article.id)">编辑</button></span>
         </div>
         <div v-if="article.cover_image" class="dp-cover">
           <img :src="article.cover_image" :alt="article.title" />
@@ -100,7 +100,9 @@ async function loadArticle(id) {
 async function switchArticle(a) {
   if (Number(a.id) === currentId.value) return
   // 用 replace 更新 URL（不触发组件重建），用户可分享/刷新回到当前文章
-  router.replace(`/content/${a.id}`)
+  // 博客分类走 /blog/:id，其余走 /content/:id，保证顶部导航高亮正确
+  const prefix = a.category === 'blog' ? '/blog/' : '/content/'
+  router.replace(prefix + a.id)
   await loadArticle(a.id)
 }
 

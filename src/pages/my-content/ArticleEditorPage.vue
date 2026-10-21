@@ -263,8 +263,13 @@ async function copyIp() {
   }
 }
 
+/** 编辑器返回目标：博客文章回 /blog，其余回 /content（依据路由前缀判断） */
+function returnToList() {
+  return route.path.startsWith('/blog/editor') ? '/blog' : '/content'
+}
+
 function goBack() {
-  router.replace('/content')
+  router.replace(returnToList())
 }
 
 /** 将 UTC ISO 时间转为本地 datetime-local 输入值（YYYY-MM-DDTHH:MM） */
@@ -278,7 +283,7 @@ function toLocalInput(iso) {
 
 async function load() {
   if (!canManageContent.value) {
-    router.replace('/content')
+    router.replace(returnToList())
     return
   }
   if (isEdit.value) {
@@ -286,7 +291,7 @@ async function load() {
       const a = await getArticle(route.params.id)
       if (!a) {
         toast('文章不存在', 'error')
-        router.replace('/content')
+        router.replace(returnToList())
         return
       }
       form.value = {
@@ -622,7 +627,7 @@ async function onSave(targetStatus) {
       await pushToWechat()
     }
 
-    router.replace('/content')
+    router.replace(returnToList())
   } catch (err) {
     uploadProgress.value = null
     const msg = err.message || String(err)

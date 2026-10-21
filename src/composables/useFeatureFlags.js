@@ -224,6 +224,8 @@ export const TOGGLEABLE_FEATURES = FEATURE_GROUPS.flatMap(g => g.items)
 
 // 模块级单例：所有组件共享同一份 flags
 const flags = ref({ ...DEFAULT_FLAGS })
+// 受限标记（开放但需申请权限才能访问）；默认全部 false（未配置即不受限）
+const restrictedFlags = ref({})
 const loaded = ref(false)
 
 export function useFeatureFlags() {
@@ -233,15 +235,20 @@ export function useFeatureFlags() {
     try {
       const { data, error } = await supabase
         .from('feature_flags')
-        .select('key, open')
+        .select('key, open, restricted')
         .limit(100)
       if (!error && Array.isArray(data)) {
         const map = { ...DEFAULT_FLAGS }
-        for (const row of data) map[row.key] = !!row.open
+        const rmap = {}
+        for (const row of data) {
+          map[row.key] = !!row.open
+          rmap[row.key] = !!row.restricted
+        }
         flags.value = map
+        restrictedFlags.value = rmap
       }
     } catch (e) {
-      // 表不存在或网络异常：保留默认（全部开放）
+      // 表不存在或网络异常：保留默认（全部开放、不受限）
     } finally {
       loaded.value = true
     }
@@ -260,13 +267,32 @@ export function useFeatureFlags() {
     return true
   }
 
-  /** 管理员切换开关（走 SECURITY DEFINER RPC，服务端校验 57502460@qq.com） */
-  async function setFeatureFlag(key, open) {
-    if (!supabase) throw new Error('未连接数据库')
-    const { error } = await supabase.rpc('set_feature_flag', { p_key: key, p_open: open })
-    if (error) throw error
-    flags.value = { ...flags.value, [key]: open }
+  /** 某功能当前是否「受限」（开放但需申请权限才能访问；沿父链向上，任一祖先受限则整体受限） */
+  function featureRestricted(key) {
+    if (key == null) return false
+    let k = key
+    while (k != null) {
+      if (restrictedFlags.value[k]) return true   // 显式受限 → 整条链路受限
+      k = SUB_FEATURE_PARENTS[k] ?? null
+    }
+    return false
   }
 
-  return { flags, loaded, loadFeatureFlags, featureEnabled, setFeatureFlag }
+  /** 管理员切换开关（走 SECURITY DEFINER RPC，服务端校验 57502460@qq.com）。
+   *  open: 是否开放；restricted: 是否需申请权限（null = 保持原值，向后兼容旧调用） */
+  async function setFeatureFlag(key, open, restricted = null) {
+    if (!supabase) throw new Error('未连接数据库')
+    const { error } = await supabase.rpc('set_feature_flag', {
+      p_key: key,
+      p_open: open,
+      p_restricted: restricted,
+    })
+    if (error) throw error
+    flags.value = { ...flags.value, [key]: open }
+    if (restricted !== null) {
+      restrictedFlags.value = { ...restrictedFlags.value, [key]: restricted }
+    }
+  }
+
+  return { flags, restrictedFlags, loaded, loadFeatureFlags, featureEnabled, featureRestricted, setFeatureFlag }
 }

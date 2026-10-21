@@ -200,6 +200,39 @@ const routes = [
       keywords: 'ALLFUND,博客,个人观点,研究文章'
     }
   },
+  {
+    path: '/blog/:id',
+    component: () => import('../pages/my-content/ArticleDetailPage.vue'),
+    meta: {
+      tab: 'blog',
+      feature: 'content-blog',
+      title: '博客文章',
+      description: 'ALLFUND-博客文章：个人观点与研究文章。',
+      keywords: 'ALLFUND,博客,个人观点'
+    }
+  },
+  {
+    path: '/blog/editor',
+    component: () => import('../pages/my-content/ArticleEditorPage.vue'),
+    meta: {
+      tab: 'blog',
+      ownerOnly: true,
+      title: '写文章',
+      description: '撰写独立性研究文章。',
+      keywords: '写文章,独立研究'
+    }
+  },
+  {
+    path: '/blog/editor/:id',
+    component: () => import('../pages/my-content/ArticleEditorPage.vue'),
+    meta: {
+      tab: 'blog',
+      ownerOnly: true,
+      title: '编辑文章',
+      description: '编辑独立性研究文章。',
+      keywords: '编辑文章,独立研究'
+    }
+  },
   // ===== 娱乐（个人内容栏目，类公众号）=====
   // 权限模型（站长明确）：
   //  - 阅读：公开可读（任何登录用户均可查看，仅代表个人观点）；

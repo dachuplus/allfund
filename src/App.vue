@@ -92,7 +92,45 @@
 
     <!-- 主内容区 -->
     <main class="app-main" :class="{ 'pc-main': !isMobile }">
-      <div v-if="!routeAllowed" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
+      <!-- 栏目已关闭（全局关闭，导航入口也会隐藏） -->
+      <div v-if="routeState === 'closed'" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
+        <div class="no-feature-access__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="10.5" width="15" height="10.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+            <circle cx="12" cy="15.3" r="1.3" fill="currentColor" stroke="none" />
+            <line x1="12" y1="16.6" x2="12" y2="18.6" />
+          </svg>
+        </div>
+        <h1 id="nfa-title" class="no-feature-access__title">栏目已关闭</h1>
+        <p class="no-feature-access__desc">
+          「<strong class="no-feature-access__feature">{{ currentFeatureLabel }}</strong>」当前已关闭，暂不可访问。
+        </p>
+        <div class="no-feature-access__actions">
+          <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
+        </div>
+      </div>
+      <!-- 受限且未登录：提示先登录 -->
+      <div v-else-if="routeState === 'login'" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
+        <div class="no-feature-access__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="10.5" width="15" height="10.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+            <circle cx="12" cy="15.3" r="1.3" fill="currentColor" stroke="none" />
+            <line x1="12" y1="16.6" x2="12" y2="18.6" />
+          </svg>
+        </div>
+        <h1 id="nfa-title" class="no-feature-access__title">请先登录</h1>
+        <p class="no-feature-access__desc">
+          「<strong class="no-feature-access__feature">{{ currentFeatureLabel }}</strong>」需要登录并申请权限后才能访问。
+        </p>
+        <div class="no-feature-access__actions">
+          <button class="no-feature-access__btn" @click="showLogin">登录 / 注册</button>
+          <button class="no-feature-access__btn--ghost" @click="goHome">返回首页</button>
+        </div>
+      </div>
+      <!-- 受限且已登录无权限（或访问 ownerOnly）→ 申请权限 -->
+      <div v-else-if="routeState === 'apply'" class="no-feature-access" role="alert" aria-labelledby="nfa-title">
         <div class="no-feature-access__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4.5" y="10.5" width="15" height="10.5" />
@@ -162,7 +200,7 @@ const route   = useRoute()
 const router  = useRouter()
 const { user, isLoggedIn, isAdmin, isOwner, isStranger, blocked, rejected, permissionsReady, loading: authLoading, hasFeature, displayName, init, signOut, showLoginDialog, showLogin, hideLogin, checkRejected } = useAuth()
 const showLoginDialogValue = showLoginDialog  // 模板中用于 v-if 控制弹窗显隐
-const { featureEnabled, loadFeatureFlags, loaded: flagsLoaded } = useFeatureFlags()
+const { featureEnabled, featureRestricted, loadFeatureFlags, loaded: flagsLoaded } = useFeatureFlags()
 
 /* 公开内容路由（微信回调等）：未登录也可访问，登录墙对其放行。
  * 注意：当 login-wall 权限墙开启时，仅 meta.public 的回调路由放行，
@@ -172,9 +210,10 @@ const isPublicContentRoute = computed(() => {
   if (route.meta?.public) return true
   // 开关尚未加载完（状态未知）：先按「非公开」处理，让登录墙兜底，避免误放行内容造成「内容→墙」闪烁
   if (!flagsLoaded.value) return false
-  // 权限墙关闭时：博客/娱乐作为公开内容放行；权限墙开启时：也需登录
-  if (route.meta?.feature === 'content' && featureEnabled('content') && !featureEnabled('login-wall')) return true
-  if (route.meta?.feature === 'content-blog' && featureEnabled('content-blog') && !featureEnabled('login-wall')) return true
+  // 权限墙关闭时：博客/娱乐作为公开内容放行；权限墙开启时：也需登录。
+  // 注意：受限（需申请权限）的内容即使权限墙关闭也不再视为公开，必须登录+申请。
+  if (route.meta?.feature === 'content' && featureEnabled('content') && !featureEnabled('login-wall') && !featureRestricted('content')) return true
+  if (route.meta?.feature === 'content-blog' && featureEnabled('content-blog') && !featureEnabled('login-wall') && !featureRestricted('content-blog')) return true
   return false
 })
 
@@ -325,19 +364,30 @@ function isActiveNav(item) {
   return route.path === item.path || route.path.startsWith(item.path + '/')
 }
 
-/* ---- 当前路由的功能权限拦截（未授权功能显示「无访问权限」） ---- */
-const routeAllowed = computed(() => {
-  // 初始化（恢复会话 + 加载权限）未完成前，乐观放行：避免已登录用户刷新页面时，
-  // 因 permissionsReady 尚未就绪、hasFeature 暂返回 false 而闪现「无访问权限」弹窗。
-  if (!permissionsReady.value) return true
-  // ownerOnly 路由：仅管理员可进；管理员始终可进，不受功能开关影响（避免把自己锁在门外）
-  if (route.meta?.ownerOnly) return isOwner.value
+/* ---- 当前路由的功能权限状态（三态模型：开放 / 受限需申请 / 关闭） ----
+ * - allowed: 可访问（公开可读 或 已开通权限）
+ * - closed:  功能已关闭，导航入口也会隐藏，直接访问显示「栏目已关闭」
+ * - login:   受限（开放但需申请权限）且未登录 → 提示先登录
+ * - apply:   受限且已登录但无权限（含非 owner 访问 ownerOnly）→ 显示「申请权限」卡片
+ */
+const routeState = computed(() => {
+  // 初始化（恢复会话 + 加载权限）未完成前，乐观放行：避免已登录用户刷新页面时闪现拦截。
+  if (!permissionsReady.value) return 'allowed'
+  // ownerOnly 路由：仅管理员可进
+  if (route.meta?.ownerOnly) return isOwner.value ? 'allowed' : 'apply'
   const feat = route.meta?.feature
-  if (feat && !featureEnabled(feat)) return false  // 全局关闭的功能：任何登录用户都无权限
-  if (isAdmin.value) return true
-  if (!feat) return true
-  if (feat === 'content' || feat === 'content-blog') return true  // 内容/博客公开可读（关闭由上方 !featureEnabled 拦截）
-  return hasFeature(feat)
+  if (feat && !featureEnabled(feat)) return 'closed'   // 全局关闭 → 整条链路不可访问
+  if (isAdmin.value) return 'allowed'
+  if (!feat) return 'allowed'
+  // 受限（开放但需申请权限才能访问）
+  if (featureRestricted(feat)) {
+    if (!isLoggedIn.value) return 'login'
+    return hasFeature(feat) ? 'allowed' : 'apply'
+  }
+  // 公开内容（内容/博客）：开放即可读
+  if (feat === 'content' || feat === 'content-blog') return 'allowed'
+  // 其余功能：需登录且已开通权限
+  return hasFeature(feat) ? 'allowed' : 'apply'
 })
 const currentFeatureLabel = computed(() => {
   if (route.meta?.ownerOnly) return '管理/编辑'

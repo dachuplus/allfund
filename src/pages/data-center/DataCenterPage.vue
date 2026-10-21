@@ -954,29 +954,55 @@
     <div class="card" v-show="activeTab==='users'">
       <div class="card-title">功能开放控制</div>
       <p class="section-desc">
-        全局开关：开启后对应功能对「已登录且已开通权限」的用户可见；「内容（博客）」开启时，任何人（含未注册访客）均可直接访问。
+        每个功能可设为三态：<strong>公开</strong>（展示且任何人可访问）、<strong>需权限</strong>（展示但需登录并申请权限后才能访问）、<strong>关闭</strong>（不展示、不可访问，且父级关闭会连带关闭全部子级）。
         仅主管理员 <strong>{{ adminEmail }}</strong> 可修改，其余授权账户仅可查看。
       </p>
-      <div class="feature-flag-list">
-        <template v-for="group in featureGroups" :key="group.title">
-          <div class="feature-flag-group-title">{{ group.title }}</div>
-          <div class="feature-flag-row" v-for="f in group.items" :key="f.key">
+      <div class="feature-tree">
+        <div v-for="lvl1 in featureTree" :key="lvl1.key" class="ft-node ft-lvl1">
+          <div class="feature-flag-row">
             <div class="feature-flag-info">
-              <div class="feature-flag-label">{{ f.label }}</div>
-              <div class="feature-flag-desc">{{ f.desc }}</div>
+              <div class="feature-flag-label">{{ lvl1.label }}<span class="ft-level">一级</span></div>
+              <div class="feature-flag-desc">{{ lvl1.desc }}</div>
             </div>
-            <label class="switch" :class="{ 'switch--disabled': !isSuperAdmin }">
-              <input
-                type="checkbox"
-                :checked="featureEnabled(f.key)"
-                :disabled="!isSuperAdmin || savingFlag === f.key"
-                @change="toggleFeature(f.key, $event.target.checked)"
-              />
-              <span class="switch__track"><span class="switch__thumb"></span></span>
-              <span class="switch__state">{{ featureEnabled(f.key) ? '开放' : '关闭' }}</span>
-            </label>
+            <div class="ft-state" :class="{ 'ft-state--disabled': !isSuperAdmin }">
+              <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl1.key) && !featureRestrictedRaw(lvl1.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl1.key" @click="setFeatureState(lvl1.key, 'open')">公开</button>
+              <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl1.key) && featureRestrictedRaw(lvl1.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl1.key" @click="setFeatureState(lvl1.key, 'restricted')">需权限</button>
+              <button type="button" :class="['ft-state__opt', { active: !featureOpenRaw(lvl1.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl1.key" @click="setFeatureState(lvl1.key, 'closed')">关闭</button>
+            </div>
           </div>
-        </template>
+          <!-- 二级 Tab（挂在该一级下） -->
+          <div class="ft-children" v-if="lvl1.children.length">
+            <div v-for="lvl2 in lvl1.children" :key="lvl2.key" class="ft-node">
+              <div class="feature-flag-row">
+                <div class="feature-flag-info">
+                  <div class="feature-flag-label">{{ lvl2.label }}<span class="ft-level">二级</span></div>
+                  <div class="feature-flag-desc">{{ lvl2.desc }}</div>
+                </div>
+                <div class="ft-state" :class="{ 'ft-state--disabled': !isSuperAdmin }">
+                  <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl2.key) && !featureRestrictedRaw(lvl2.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl2.key" @click="setFeatureState(lvl2.key, 'open')">公开</button>
+                  <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl2.key) && featureRestrictedRaw(lvl2.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl2.key" @click="setFeatureState(lvl2.key, 'restricted')">需权限</button>
+                  <button type="button" :class="['ft-state__opt', { active: !featureOpenRaw(lvl2.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl2.key" @click="setFeatureState(lvl2.key, 'closed')">关闭</button>
+                </div>
+              </div>
+              <!-- 三级 Tab（挂在该二级下） -->
+              <div class="ft-children" v-if="lvl2.children.length">
+                <div v-for="lvl3 in lvl2.children" :key="lvl3.key" class="ft-node">
+                  <div class="feature-flag-row">
+                    <div class="feature-flag-info">
+                      <div class="feature-flag-label">{{ lvl3.label }}<span class="ft-level">三级</span></div>
+                      <div class="feature-flag-desc">{{ lvl3.desc }}</div>
+                    </div>
+                    <div class="ft-state" :class="{ 'ft-state--disabled': !isSuperAdmin }">
+                      <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl3.key) && !featureRestrictedRaw(lvl3.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl3.key" @click="setFeatureState(lvl3.key, 'open')">公开</button>
+                      <button type="button" :class="['ft-state__opt', { active: featureOpenRaw(lvl3.key) && featureRestrictedRaw(lvl3.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl3.key" @click="setFeatureState(lvl3.key, 'restricted')">需权限</button>
+                      <button type="button" :class="['ft-state__opt', { active: !featureOpenRaw(lvl3.key) }]" :disabled="!isSuperAdmin || savingFlag === lvl3.key" @click="setFeatureState(lvl3.key, 'closed')">关闭</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <p v-if="!isSuperAdmin" class="feature-flag-readonly">
         当前账户 {{ user?.email }} 为授权管理员但非主管理员，功能开关为只读。如需调整请联系主管理员 {{ adminEmail }}。
@@ -2091,7 +2117,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuth, FEATURES, ADMIN_EMAIL } from '../../composables/useAuth'
 import { confirm, toast } from '../../composables/useToast'
 import { usePermissionRequests } from '../../composables/usePermissionRequests'
-import { useFeatureFlags, FEATURE_GROUPS } from '../../composables/useFeatureFlags'
+import { useFeatureFlags, FEATURE_GROUPS, SUB_FEATURE_PARENTS, TOGGLEABLE_FEATURES } from '../../composables/useFeatureFlags'
 import { fetchPrivateFile, saveBlob } from '../../api/downloads'
 
 const { user, isLoggedIn, isOwner, showLogin, savePermissions, deletePermissions, blockUser } = useAuth()
@@ -2099,16 +2125,39 @@ const permFeatures = FEATURES
 const adminEmail = ADMIN_EMAIL
 
 // 功能开放控制：全局开关（仅主管理员 57502460@qq.com 可改）
-const { featureEnabled, setFeatureFlag, loadFeatureFlags } = useFeatureFlags()
-const featureGroups = FEATURE_GROUPS
+const { featureEnabled, featureRestricted, flags, restrictedFlags, setFeatureFlag, loadFeatureFlags } = useFeatureFlags()
+const featureTree = computed(() => {
+  // 树状渲染：一级 → 二级 → 三级，由 SUB_FEATURE_PARENTS（子→父）自动推导层级。
+  // 新增功能只需在 useFeatureFlags.js 登记 key 与父子映射，此处无需改动。
+  const all = TOGGLEABLE_FEATURES
+  const childrenOf = (parentKey) => all.filter(f => SUB_FEATURE_PARENTS[f.key] === parentKey)
+  return FEATURE_GROUPS[0].items.map(t => ({
+    ...t,
+    children: childrenOf(t.key).map(c => ({ ...c, children: childrenOf(c.key) })),
+  }))
+})
 const isSuperAdmin = computed(() => user.value?.email === adminEmail)
 const savingFlag = ref('')
-async function toggleFeature(key, open) {
+
+/** 节点自身「开放」原始值（不沿父链推导）：未配置视为开放 */
+function featureOpenRaw(key) {
+  return flags.value[key] !== false
+}
+/** 节点自身「受限」原始值（不沿父链推导） */
+function featureRestrictedRaw(key) {
+  return restrictedFlags.value[key] === true
+}
+
+/** 三态切换：open(公开) / restricted(需权限) / closed(关闭) */
+async function setFeatureState(key, state) {
   if (!isSuperAdmin.value) return
+  const open = state !== 'closed'
+  const restricted = state === 'restricted'
   savingFlag.value = key
   try {
-    await setFeatureFlag(key, open)
-    toast(open ? `已开放「${key}」` : `已关闭「${key}」`, 'success')
+    await setFeatureFlag(key, open, restricted)
+    const label = state === 'open' ? '公开' : state === 'restricted' ? '需权限' : '关闭'
+    toast(`「${key}」已设为${label}`, 'success')
   } catch (e) {
     toast('操作失败：' + (e?.message || '无权限'), 'error')
   } finally {
@@ -3173,14 +3222,26 @@ watch(isOwner, (val) => {
 .section-desc { font-size: 16px; color: var(--text-secondary); margin-bottom: var(--space-lg); }
 
 /* ===== 功能开放控制 ===== */
-.feature-flag-list { display: flex; flex-direction: column; margin-top: var(--space-md); }
-.feature-flag-group-title {
-  font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
-  color: #1d70b8; text-transform: none;
-  margin: var(--space-lg) 0 2px; padding: 6px 10px;
+.feature-tree { display: flex; flex-direction: column; margin-top: var(--space-md); }
+/* 一级：灰底 + 蓝色左边线（原分组标题样式），作为树的顶层节点 */
+.ft-lvl1 { margin-top: var(--space-md); }
+.ft-lvl1:first-child { margin-top: 0; }
+.ft-lvl1 > .feature-flag-row {
   background: #f3f2f1; border-left: 4px solid #1d70b8;
+  padding: var(--space-md) 10px; border-bottom: none;
 }
-.feature-flag-group-title:first-child { margin-top: 0; }
+/* 子级容器：缩进 + 竖向引导线，明确「挂在哪个父节点下 */
+.ft-children { margin-left: 24px; padding-left: 18px; border-left: 2px solid #b1b4b6; }
+.ft-children .ft-node { margin-top: 2px; }
+/* 层级字号递减，强化父子关系 */
+.ft-children .feature-flag-label { font-size: 16px; }
+.ft-children .ft-children .feature-flag-label { font-size: 15px; }
+.ft-level {
+  display: inline-block; margin-left: 8px; padding: 0 6px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+  color: #505a5f; background: #dee0e2; vertical-align: 2px;
+}
+.ft-lvl1 > .feature-flag-row .ft-level { background: #ffffff; color: #1d70b8; }
 .feature-flag-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-md); padding: var(--space-md) 0;
@@ -3206,6 +3267,20 @@ watch(isOwner, (val) => {
 .switch input:checked + .switch__track .switch__thumb { transform: translateX(24px); background: #ffffff; }
 .switch__state { font-size: 14px; font-weight: 700; min-width: 32px; color: var(--text-primary); }
 .feature-flag-readonly { margin-top: var(--space-md); color: #d4351c; font-weight: 700; }
+
+/* 三态开关：公开 / 需权限 / 关闭（gov.uk 风格分段控件） */
+.ft-state { display: inline-flex; border: 2px solid #0b0c0c; border-radius: 0; overflow: hidden; flex-shrink: 0; }
+.ft-state--disabled { opacity: 0.7; }
+.ft-state__opt {
+  appearance: none; border: none; background: #ffffff; color: #0b0c0c;
+  font-size: 13px; font-weight: 700; padding: 5px 12px; cursor: pointer;
+  border-right: 2px solid #0b0c0c; line-height: 1.2;
+}
+.ft-state__opt:last-child { border-right: none; }
+.ft-state__opt:hover:not(:disabled) { background: #f3f2f1; }
+.ft-state__opt.active { background: #1d70b8; color: #ffffff; }
+.ft-state--disabled .ft-state__opt { cursor: not-allowed; }
+.ft-state__opt:disabled { cursor: not-allowed; }
 
 /* 项目简介 */
 .intro-grid { border: 1px solid var(--border); }
