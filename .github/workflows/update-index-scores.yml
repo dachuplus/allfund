@@ -113,11 +113,13 @@ jobs:
           sql = """
           SELECT count(*) AS total, count(k_all) AS k_all_n,
                  count(pe_pct_5y) AS pe_n, count(DISTINCT pool) AS pools,
-                 max(trade_date) AS trade_date,
+                 max(to_date(regexp_replace(trade_date,'[^0-9]','','g'),'YYYYMMDD')) AS trade_date,
                  count(*) FILTER (WHERE pool='broad')  AS broad_n,
                  count(*) FILTER (WHERE pool='sector') AS sector_n,
                  count(*) FILTER (WHERE pool='fixed')  AS fixed_n
           FROM index_scores
+          WHERE trade_date IS NOT NULL AND trade_date <> ''
+            AND length(regexp_replace(trade_date,'[^0-9]','','g')) = 8
           """
           open('/tmp/_ci_sum.sql','w').write(sql)
           r = subprocess.run(['python3','scripts/_pgsql.py','--file','/tmp/_ci_sum.sql'],
@@ -133,37 +135,48 @@ jobs:
           import os, subprocess, json, re
           from datetime import datetime, timezone, timedelta
           TZ = timezone(timedelta(hours=8))
-          today = datetime.now(TZ).strftime('%Y-%m-%d')
+          today = datetime.now(TZ).date()
           waf = os.path.exists('/tmp/WAF_BLOCKED.flag')
-          d = ''
+          d = None
           try:
+              # 归一化 trade_date（混合格式 '2026-10-20' / '20261008'）→ 取最大真实日期，
+              # 避免文本排序误把无连字符的旧日期(如 B股指数 20261008)当成最新。
               open('/tmp/_ci_idx.sql','w').write(
-                  "SELECT max(trade_date) AS d, count(*) AS n FROM index_scores")
+                  "SELECT max(to_date(regexp_replace(trade_date,'[^0-9]','','g'),'YYYYMMDD')) AS d, "
+                  "count(*) AS n FROM index_scores "
+                  "WHERE trade_date IS NOT NULL AND trade_date <> '' "
+                  "AND length(regexp_replace(trade_date,'[^0-9]','','g')) = 8")
               r = subprocess.run(['python3','scripts/_pgsql.py','--file','/tmp/_ci_idx.sql'],
                                  capture_output=True, text=True, timeout=130)
               out = (r.stdout or '').strip()
               try:
                   data = json.loads(out)
                   if isinstance(data, list) and data:
-                      d = (data[0].get('d') or '')
+                      ds = (data[0].get('d') or '')
                   elif isinstance(data, dict):
-                      d = data.get('d') or ''
+                      ds = data.get('d') or ''
+                  else:
+                      ds = ''
+                  if ds:
+                      d = datetime.strptime(str(ds)[:10], '%Y-%m-%d').date()
               except Exception:
                   m = re.search(r'\d{4}-\d{2}-\d{2}', out)
-                  d = m.group(0) if m else ''
+                  if m:
+                      d = datetime.strptime(m.group(0), '%Y-%m-%d').date()
           except Exception as e:
               print('查询生产表失败:', e)
+          # 流水线 00:40 跑，数据天然是 T-1（最新交易日=昨天或今天均算刷新成功）
           if waf:
-              status, msg = 'skipped', f'EastMoney 整体不可达（云IP偶发），生产表保持上一版本（最新 trade_date={d}）'
-          elif d == today:
-              status, msg = 'success', f'指数评分已刷新（trade_date={d}）'
-          elif d:
-              status, msg = 'skipped', f'本次未切换（生产最新 trade_date={d}，今日 {today}）；若连续多日未更新，请检查 EastMoney 可达性'
-          else:
+              status, msg = 'skipped', f'EastMoney 整体不可达（云IP偶发），生产表保持上一版本（最新交易日={d}）'
+          elif d is None:
               status, msg = 'error', '生产表 index_scores 无数据'
+          elif (today - d).days <= 1:
+              status, msg = 'success', f'指数评分已刷新（最新交易日 trade_date={d}）'
+          else:
+              status, msg = 'skipped', f'本次未刷新（生产最新 trade_date={d}，今日 {today}）；若连续多日未更新，请检查 EastMoney 可达性'
           print('指数评分日志:', status, '|', msg)
           subprocess.run(['python3','scripts/log_etl_step.py','--step','指数评分 · 每日更新',
-                          '--status',status,'--message',msg,'--run-date',today], check=False)
+                          '--status',status,'--message',msg,'--run-date',today.isoformat()], check=False)
           PY
 
       - name: 抓取失败不阻断（限流/偶发不可达属常态）
