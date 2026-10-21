@@ -114,6 +114,7 @@ Deno.serve(async (req: Request) => {
       t0, t1, search,
       etf, lof, dk, sg, zz, dailyLimit, retAnomaly,
       scaleMin, scaleMax, scaleRanges,
+      stockMin, stockMax, bondMin, bondMax, cashMin, cashMax,
       shareClasses, mainCode, holding, holdingPeriods,
       filterCN,
     } = body
@@ -173,6 +174,13 @@ Deno.serve(async (req: Request) => {
       if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
       if (scaleMax != null) query = query.lte('fund_scale', scaleMax)
     }
+    // 资产配置仓位区间（%）：股票/债券/货币(现金)仓位，服务端下推 gte/lte（与 data.js 同构、口径一致）
+    if (stockMin != null) query = query.gte('stock_pct', stockMin)
+    if (stockMax != null) query = query.lte('stock_pct', stockMax)
+    if (bondMin != null) query = query.gte('bond_pct', bondMin)
+    if (bondMax != null) query = query.lte('bond_pct', bondMax)
+    if (cashMin != null) query = query.gte('cash_pct', cashMin)
+    if (cashMax != null) query = query.lte('cash_pct', cashMax)
     const shareFilter = (shareClasses && shareClasses.length)
       ? shareClassFilter(shareClasses)
       : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null)
