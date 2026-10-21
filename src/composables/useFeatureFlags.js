@@ -50,6 +50,8 @@ const DEFAULT_FLAGS = {
   'content-tool': true,
   'content-eng': true,
   'content-xinao': true,
+  // 娱乐 · 语文 · 三级
+  'yuwen-gushiwen': true,
   // 娱乐 · 奥数 · 三级
   'math-gaosi': true,
   'math-junior': true,
@@ -100,6 +102,7 @@ export const SUB_FEATURE_PARENTS = {
   'content-food': 'content',
   'content-math': 'content',
   'content-yuwen': 'content',
+  'yuwen-gushiwen': 'content-yuwen',
   'content-game': 'content',
   'content-tool': 'content',
   'content-eng': 'content',
@@ -216,6 +219,12 @@ export const FEATURE_GROUPS = [
     title: '娱乐 · 信奥 · 三级 Tab',
     items: [
       { key: 'xinao-ascii', label: 'ASCII码表', desc: '信奥下的 ASCII 码表查询工具' },
+    ],
+  },
+  {
+    title: '娱乐 · 语文 · 三级 Tab',
+    items: [
+      { key: 'yuwen-gushiwen', label: '古诗文大赛', desc: '语文下的古诗文大赛讲义（四年级·含答案，170 题）' },
     ],
   },
 ]

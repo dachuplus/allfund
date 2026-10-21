@@ -70,9 +70,19 @@
       <JuniorPanel v-else />
     </div>
 
-    <!-- 语文：小初高必背古诗文 333 篇（小学 / 初中 / 高中 三学段） -->
+    <!-- 语文：下辖两个三级 Tab —— 古诗文333篇 / 古诗文大赛 -->
     <div v-else-if="category === 'yuwen'">
-      <YuwenPanel />
+      <div class="cp-subtabs">
+        <div
+          v-for="t in visibleYuwenTabs"
+          :key="t.key"
+          class="cp-subtab"
+          :class="{ active: yuwenTab === t.key }"
+          @click="yuwenTab = t.key"
+        >{{ t.label }}</div>
+      </div>
+      <YuwenPanel v-if="yuwenTab === 'gw333'" />
+      <YuwenGushiwenPanel v-else />
     </div>
 
     <!-- 影视二级 Tab：影视观看榜（9+1电视剧评分框架） -->
@@ -227,6 +237,7 @@ import Grade5Panel from '../../components/math/Grade5Panel.vue'
 import EngPanel from '../../components/english/EngPanel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import YuwenPanel from '../../components/math/YuwenPanel.vue'
+import YuwenGushiwenPanel from '../../components/math/YuwenGushiwenPanel.vue'
 import PrimePanel from '../../components/math/PrimePanel.vue'
 import MultiplicationPanel from '../../components/math/MultiplicationPanel.vue'
 import MediaTools from '../../components/MediaTools.vue'
@@ -342,6 +353,15 @@ const xinaoTabs = [
 const visibleXinaoTabs = computed(() => (isAdminEmail.value || isOwner.value) ? xinaoTabs : xinaoTabs.filter(t => featureEnabled(t.feature)))
 const xinaoTab = ref('ascii')
 
+// 语文下辖 Tab：古诗文333篇（小学/初中/高中 必背）/ 古诗文大赛（四年级·含答案 170 题）
+const yuwenTabs = [
+  { key: 'gw333', label: '古诗文333篇', feature: 'content-yuwen' },
+  { key: 'dasai', label: '古诗文大赛', feature: 'yuwen-gushiwen' },
+]
+// 按功能开关（含父级 content-yuwen / content）过滤可见的语文三级 tab；管理员始终可见
+const visibleYuwenTabs = computed(() => (isAdminEmail.value || isOwner.value) ? yuwenTabs : yuwenTabs.filter(t => featureEnabled(t.feature)))
+const yuwenTab = ref('gw333')
+
 // 子功能关闭后，若当前选中项不再可见，回退到第一个可见项（避免停留在被关掉的 tab）。
 // ⚠️ 必须放在所有 visible* computed 之后：watch() 立即用 isRef 读取 source 变量，
 // 若写在 const 声明之前会触发 TDZ ReferenceError，导致整个组件 setup 崩溃、页面只显示外壳。
@@ -361,6 +381,9 @@ watch(visibleEngTabs, (list) => {
 })
 watch(visibleXinaoTabs, (list) => {
   if (list.length && !list.some(t => t.key === xinaoTab.value)) xinaoTab.value = list[0].key
+})
+watch(visibleYuwenTabs, (list) => {
+  if (list.length && !list.some(t => t.key === yuwenTab.value)) yuwenTab.value = list[0].key
 })
 
 // 各机构课程框架说明（依据公开资料整理，仅作背景介绍，不含评级/推荐）
