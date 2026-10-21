@@ -105,6 +105,7 @@ def fetch_hb_all():
                 'n': parts[1].strip() if len(parts) > 1 else '',
                 't0': '货币型',
                 't1': t1 if t1 else '货币型-普通货币',
+                't1_tt': t1 if t1 else '货币型-普通货币',
                 'r0w': _f(parts, 6),
                 'r1m': _f(parts, 7),
                 'r3m': _f(parts, 8),
