@@ -172,8 +172,9 @@ const isPublicContentRoute = computed(() => {
   if (route.meta?.public) return true
   // 开关尚未加载完（状态未知）：先按「非公开」处理，让登录墙兜底，避免误放行内容造成「内容→墙」闪烁
   if (!flagsLoaded.value) return false
-  // 权限墙关闭时：博客作为公开内容放行；权限墙开启时：博客也需登录
+  // 权限墙关闭时：博客/娱乐作为公开内容放行；权限墙开启时：也需登录
   if (route.meta?.feature === 'content' && featureEnabled('content') && !featureEnabled('login-wall')) return true
+  if (route.meta?.feature === 'content-blog' && featureEnabled('content-blog') && !featureEnabled('login-wall')) return true
   return false
 })
 
@@ -301,6 +302,7 @@ function handleRequestAccess() {
 /* ---- 全局金刚区 ---- */
 const quickLinks = [
   { path: '/content',          label: '娱乐', feature: 'content' },
+  { path: '/blog',             label: '博客', feature: 'content-blog' },
   { path: '/signal',           label: '策略', feature: 'signal' },
   { path: '/tools',  label: '选品', feature: 'fund-rank' },
   { path: '/portfolio',        label: '组合', feature: 'portfolio' },
@@ -334,7 +336,7 @@ const routeAllowed = computed(() => {
   if (feat && !featureEnabled(feat)) return false  // 全局关闭的功能：任何登录用户都无权限
   if (isAdmin.value) return true
   if (!feat) return true
-  if (feat === 'content') return true              // 内容公开可读
+  if (feat === 'content' || feat === 'content-blog') return true  // 内容/博客公开可读（关闭由上方 !featureEnabled 拦截）
   return hasFeature(feat)
 })
 const currentFeatureLabel = computed(() => {

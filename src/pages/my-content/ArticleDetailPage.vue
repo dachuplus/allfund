@@ -37,6 +37,7 @@
     </main>
   </div>
   <div v-else-if="loading" class="dp-loading">加载中…</div>
+  <div v-else-if="blocked" class="dp-empty">该博客内容已关闭，暂不可访问。</div>
   <div v-else class="dp-empty">文章不存在或尚未发布。</div>
 </template>
 
@@ -47,6 +48,7 @@ import { getArticle, getAuthor, incrementViews, listArticles, NETWORK_SLOW_MSG, 
 import { renderMarkdown } from '../../utils/markdown'
 import { toast } from '../../composables/useToast.js'
 import { useAuth } from '../../composables/useAuth'
+import { useFeatureFlags } from '../../composables/useFeatureFlags'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,6 +57,8 @@ const article = ref(null)
 const author = ref(null)
 const loading = ref(false)
 const articleList = ref([])
+const { featureEnabled } = useFeatureFlags()
+const blocked = ref(false)  // 博客关闭时禁止访问博客文章
 
 // 当前显示的文章 ID（用于侧边栏高亮）
 const currentId = computed(() => article.value?.id)
@@ -72,6 +76,12 @@ async function loadArticle(id) {
   loading.value = true
   try {
     const a = await getArticle(id)
+    // 博客分类：功能关闭时禁止访问（与路由 / 列表层一致）
+    if (a && a.category === 'blog' && !featureEnabled('content-blog')) {
+      article.value = null
+      blocked.value = true
+      return
+    }
     article.value = a || null
     if (a) {
       author.value = await getAuthor(a.author_email)
@@ -98,12 +108,15 @@ async function load() {
   const id = route.params.id
   // 并行加载侧边栏列表（只加载一次）；后台刷新有新文章时实时更新侧栏
   if (!articleList.value.length) {
-    articleList.value = await listArticles({
+    const list = await listArticles({
       status: 'published',
       limit: 200,
       onRefresh: (fresh) => { articleList.value = fresh },
     }).catch(() => [])
+    // 博客关闭时不展示博客文章入口
+    articleList.value = list.filter(a => a.category !== 'blog' || featureEnabled('content-blog'))
   }
+  blocked.value = false
   await loadArticle(id)
 }
 

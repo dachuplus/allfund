@@ -1,8 +1,8 @@
 <template>
   <div class="content-page">
-    <!-- 二级分类导航：博客 / 影视 / 美食 / 工具 / 游戏 / 奥数 / 语文 / 英文 / 信奥。
-         博客区「已发布 / 我的全部（含草稿）/ 写文章」三个子 tab 见下方 cp-viewswitch -->
-    <div class="cp-tabs">
+    <!-- 二级分类导航：博客（/blog，单分类）/ 娱乐下的影视 · 美食 · 工具 · 游戏 · 奥数 · 语文 · 英文 · 信奥。
+         博客模式下仅一个分类，隐藏 tab 栏；娱乐模式下多分类展示。 -->
+    <div class="cp-tabs" v-if="visibleCategories.length > 1">
       <div class="cp-tab-list">
         <div
           v-for="c in visibleCategories"
@@ -271,25 +271,36 @@ const slowHint = ref(false)  // 加载超过 5s 时给出"网络较慢"提示
 let slowTimer = null
 const view = ref('published')
 
-// 二级分类导航：博客 / 影视 / 美食 / 工具 / 游戏 / 奥数 / 语文 / 英文 / 信奥（默认「博客」）
-const category = ref('blog')
-const categories = [
-  { key: 'blog', label: '博客', feature: 'content-blog' },
-  { key: 'film', label: '影视', feature: 'content-film' },
-  { key: 'food', label: '美食', feature: 'content-food' },
-  { key: 'tool', label: '工具', feature: 'content-tool' },
-  { key: 'game', label: '游戏', feature: 'content-game' },
-  { key: 'math', label: '奥数', feature: 'content-math' },
-  { key: 'yuwen', label: '语文', feature: 'content-yuwen' },
-  { key: 'eng', label: '英文', feature: 'content-eng' },
-  { key: 'xinao', label: '信奥', feature: 'content-xinao' },
-]
 const { featureEnabled } = useFeatureFlags()
-// 按功能开关（含父级 content）过滤可见的二级分类；管理员不受全局开关限制，始终可见
-const visibleCategories = computed(() => (isAdminEmail.value || isOwner.value) ? categories : categories.filter(c => featureEnabled(c.feature)))
+// 博客（/blog 路由）为独立一级 Tab；娱乐（/content 路由）不再含博客分类。
+const isBlogMode = computed(() => route.meta?.tab === 'blog')
+// 二级分类导航：
+//  - 博客模式（/blog 路由）：仅「博客」一个分类（独立一级 Tab）
+//  - 娱乐模式（/content 路由）：影视 / 美食 / 工具 / 游戏 / 奥数 / 语文 / 英文 / 信奥（不再含博客）
+const category = ref(isBlogMode.value ? 'blog' : 'film')
+const categories = computed(() => isBlogMode.value
+  ? [{ key: 'blog', label: '博客', feature: 'content-blog' }]
+  : [
+      { key: 'film', label: '影视', feature: 'content-film' },
+      { key: 'food', label: '美食', feature: 'content-food' },
+      { key: 'tool', label: '工具', feature: 'content-tool' },
+      { key: 'game', label: '游戏', feature: 'content-game' },
+      { key: 'math', label: '奥数', feature: 'content-math' },
+      { key: 'yuwen', label: '语文', feature: 'content-yuwen' },
+      { key: 'eng', label: '英文', feature: 'content-eng' },
+      { key: 'xinao', label: '信奥', feature: 'content-xinao' },
+    ])
+// 按功能开关过滤可见的二级分类。
+// 娱乐模式：管理员可预览已关闭的分类（便于后台管理）；
+// 博客模式：博客开关关闭时即使管理员也不显示（用户明确关闭即全站不可见，路由级也已拦截）。
+const visibleCategories = computed(() => {
+  const all = categories.value
+  if (isBlogMode.value && !featureEnabled('content-blog')) return []
+  return (isAdminEmail.value || isOwner.value) ? all : all.filter(c => featureEnabled(c.feature))
+})
 /** 分类 key → 中文标签（缺省回退「博客」） */
 function catLabel(c) {
-  const m = categories.find((x) => x.key === c)
+  const m = categories.value.find((x) => x.key === c)
   return m ? m.label : '博客'
 }
 
@@ -334,9 +345,11 @@ const xinaoTab = ref('ascii')
 // 子功能关闭后，若当前选中项不再可见，回退到第一个可见项（避免停留在被关掉的 tab）。
 // ⚠️ 必须放在所有 visible* computed 之后：watch() 立即用 isRef 读取 source 变量，
 // 若写在 const 声明之前会触发 TDZ ReferenceError，导致整个组件 setup 崩溃、页面只显示外壳。
+// 子功能关闭后，若当前选中项不再可见，回退到第一个可见项；immediate 确保初始化时即生效
+// （修复：此前仅在变化时触发，导致「默认选中博客 + 博客被关闭」时首屏仍加载博客文章）。
 watch(visibleCategories, (list) => {
   if (list.length && !list.some(c => c.key === category.value)) category.value = list[0].key
-})
+}, { immediate: true })
 watch(visibleMathTabs, (list) => {
   if (list.length && !list.some(t => t.key === mathTab.value)) mathTab.value = list[0].key
 })
@@ -507,9 +520,18 @@ function formatDateTime(s) {
 }
 
 onMounted(load)
-// 从编辑页返回列表时刷新
+// 从编辑页返回列表、或在 娱乐(/content) 与 博客(/blog) 之间切换（同组件复用）时重新加载。
+// 仅在跨模式切换时重置默认分类，避免从编辑器返回娱乐页时丢失已选分类。
+let _lastMode = null
 watch(() => route.fullPath, () => {
-  if (route.path === '/content') load()
+  if (route.path === '/content' || route.path === '/blog') {
+    const blog = isBlogMode.value
+    if (blog !== _lastMode) {
+      category.value = blog ? 'blog' : 'film'
+      _lastMode = blog
+    }
+    load()
+  }
 })
 </script>
 

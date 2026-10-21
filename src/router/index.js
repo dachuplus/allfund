@@ -188,10 +188,23 @@ const routes = [
       keywords: '我的,自选关注,账户信息'
     }
   },
-  // ===== 我的内容（个人内容栏目，类公众号）=====
+  // ===== 博客（独立一级 Tab，置于娱乐之前；与娱乐 content 并列，开关独立）=====
+  {
+    path: '/blog',
+    component: () => import('../pages/my-content/MyContentPage.vue'),
+    meta: {
+      tab: 'blog',
+      feature: 'content-blog',
+      title: '博客 · 个人观点',
+      description: 'ALLFUND-博客：分享个人观点与研究文章，仅代表个人观点，不构成投资建议。',
+      keywords: 'ALLFUND,博客,个人观点,研究文章'
+    }
+  },
+  // ===== 娱乐（个人内容栏目，类公众号）=====
   // 权限模型（站长明确）：
   //  - 阅读：公开可读（任何登录用户均可查看，仅代表个人观点）；
   //  - 写/发布/编辑/删除：仅管理员可操作（ownerOnly），其他用户无任何写入口。
+  //  注意：博客已拆为独立一级 Tab（/blog），本路由不再含博客分类。
   {
     path: '/content',
     component: () => import('../pages/my-content/MyContentPage.vue'),

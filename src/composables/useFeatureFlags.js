@@ -95,8 +95,7 @@ export const SUB_FEATURE_PARENTS = {
   'factor-stock': 'signal-factor',
   'factor-bond': 'signal-factor',
   'factor-commodity': 'signal-factor',
-  // 娱乐 · 二级
-  'content-blog': 'content',
+  // 娱乐 · 二级（注意：content-blog 已提升为独立一级根节点，见 FEATURE_GROUPS[0]，不再挂 content 下）
   'content-film': 'content',
   'content-food': 'content',
   'content-math': 'content',
@@ -135,6 +134,7 @@ export const FEATURE_GROUPS = [
     title: '一级功能（总开关）',
     items: [
       { key: 'content', label: '娱乐', desc: '娱乐内容，公开可读（无需登录）' },
+      { key: 'content-blog', label: '博客', desc: '博客内容，公开可读（无需登录）；关闭后博客 Tab 与文章全站不可见。' },
       { key: 'signal', label: '策略', desc: '宏观信号、股债性价比、风格因子、行业估值' },
       { key: 'fund-rank', label: '选品', desc: '靠谱指数评分、基金详情、基金对比' },
       { key: 'portfolio', label: '组合', desc: '个人组合、智能选基、组合回测' },
@@ -173,7 +173,6 @@ export const FEATURE_GROUPS = [
   {
     title: '娱乐 · 二级 Tab',
     items: [
-      { key: 'content-blog', label: '博客', desc: '娱乐下的博客内容' },
       { key: 'content-film', label: '影视', desc: '娱乐下的影视内容' },
       { key: 'content-food', label: '美食', desc: '娱乐下的美食（含三级：大厨榜 / 必吃榜）' },
       { key: 'content-game', label: '游戏', desc: '娱乐下的游戏内容' },
