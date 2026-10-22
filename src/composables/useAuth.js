@@ -57,6 +57,8 @@ const rejected = ref(false)
 // 是否已初始化（App.vue 调用 init 后为 true）
 let _initDone = false
 let _initFailed = false
+// init 期间 getSession 触发内部事件（SIGNED_OUT 等）的守卫：恢复期内忽略，避免清空刚恢复的登录态
+let _restoring = false
 
 export function useAuth() {
   const isLoggedIn = computed(() => !!user.value)
@@ -116,8 +118,26 @@ export function useAuth() {
       }
     }, HARD_INIT_TIMEOUT_MS)
     try {
+      // 预捕获本地会话：getSession 在 token 过期时会触发刷新，刷新链路（境外直连被 GFW 拦 +
+      // sb-proxy 偶发 502）失败时 supabase-js 内部 _removeSession 会清空存储并返回 null，
+      // 表现为「新开窗口必掉线」（原窗口因手写登录从未建立内部会话、不重新校验而正常）。
+      // 这里在 getSession 之前先把存储会话读到内存，作为兜底恢复源（与手写登录只写 storage 的口径一致）。
+      let storedSession = null
+      try {
+        const raw = supabase.auth.storage.getItem(supabase.auth.storageKey)
+        if (raw) storedSession = JSON.parse(raw)
+      } catch (e) { /* ignore */ }
+      _restoring = true
       const { data } = await supabase.auth.getSession()
-      const u = data?.session?.user || null
+      _restoring = false
+      let u = data?.session?.user || null
+      // 兜底恢复：getSession 未返回会话、但本地存储确有有效会话（刷新失败被清空），
+      // 直接以存储会话恢复登录态，绕过刷新网络。
+      if (!u && storedSession && storedSession.user && storedSession.access_token) {
+        console.info('[auth] getSession 未返回会话，从本地存储恢复登录态（规避刷新链路失败）')
+        u = storedSession.user
+        try { supabase.auth.storage.setItem(supabase.auth.storageKey, JSON.stringify(storedSession)) } catch (e) {}
+      }
       user.value = u
       if (u) {
         if (checkSessionExpiry()) {
@@ -143,6 +163,8 @@ export function useAuth() {
     }
     // 监听全局状态变更
     supabase.auth.onAuthStateChange(async (event, session) => {
+      // init 恢复期内 getSession 触发的内部事件（如刷新失败 SIGNED_OUT）忽略，避免清空刚恢复的登录态
+      if (_restoring) return
       const newUser = session?.user || null
       // 真正的登录（非 token 刷新）才重置 1 周会话计时
       if (event === 'SIGNED_IN') {
