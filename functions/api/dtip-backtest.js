@@ -73,6 +73,12 @@ const ZONES = [
 // 极度高估时按「持仓市值的比例」赎回落袋（而非固定金额），
 // 使落袋额随持仓规模自动伸缩：仓位重时回收多、仓位轻时回收少，避免把仓位一次性清空或永远回不了本。
 const SELL_RATIO = 0.10
+// 【2026-10-22 选项 B】上班族现金流护栏：按月薪 5 万设定，每月最多从工资中投 2.5 万。
+// 回测按自然月累计买入额，达到上限后当月剩余买入信号按剩余额度部分成交或跳过，次月自动重置。
+// 注意：在当前档位（极度低估3000/低估2000/合理1000）下，单月最多约 5 个买入周 × 3000 = 1.5 万，
+// 恒小于 2.5 万上限，故默认参数下该护栏不会触发（结构性上限，档位上调后才真正约束）。
+const MONTHLY_SALARY = 50000
+const MONTHLY_INVEST_CAP = 25000
 // 分位锚采用滚动窗口（trailing window）而非「发布至今全史」，避免早年高 PE 体制长期污染分位判定
 const PCT_WINDOW_DAYS = 1825   // 5 年
 const PCT_MIN_OBS = 100        // 滚动窗口内样本不足时，回退到全史分位
@@ -400,6 +406,7 @@ async function fetchClose(code) {
 //   该金额作为当周外部现金流出；极度高估档按持仓市值 10% 赎回，赎回款作为当周现金流入（落袋）；
 //   高估档观望。期末组合现值 = 剩余持仓市值(份额×最新价) + 累计落袋现金；
 //   收益率 = (组合现值 − 累计投入) / 累计投入；XIRR 为按每周实际现金流（买入负、赎回正、期末清算剩余持仓）的资金加权年化。
+//   现金流护栏（选项 B）：每月累计买入不超过 MONTHLY_INVEST_CAP（月薪 5 万 → 月投上限 2.5 万），自然月重置。
 
 function backtest(peResult, closeResult, weeks) {
   const peSeries = peResult.series
@@ -423,6 +430,9 @@ function backtest(peResult, closeResult, weeks) {
   let totalInvested = 0        // 累计外部投入（各买入档固定金额之和）
   let totalWithdrawn = 0       // 累计赎回
   let buyWeeks = 0, sellWeeks = 0
+  let monthKey = null          // 当前自然月（YYYY-MM），月度现金流护栏用
+  let monthInvested = 0        // 当月累计买入额（受 MONTHLY_INVEST_CAP 约束）
+  let capHitWeeks = 0          // 因月度封顶被缩减/跳过的买入周数
 
   // 预计算「每一个 PE 观测点在其之前 5 年滚动窗口内的分位」一次（滑动多重集，O(n·W) 内存搬移），
   // 避免在 520 个周一循环里反复排序整段 PE 序列导致边缘函数超时。
@@ -432,6 +442,9 @@ function backtest(peResult, closeResult, weeks) {
   const flows = []             // XIRR 外部现金流：买入为负、赎回为正、期末清算剩余持仓为正
 
   for (const m of window) {
+    // 月度现金流护栏：自然月切换时重置当月已投额度（每月最多投 MONTHLY_INVEST_CAP）
+    const ym = m.d.slice(0, 7)
+    if (ym !== monthKey) { monthKey = ym; monthInvested = 0 }
     // 取「截至该周一已发布」的最后一个 PE 观测点（窗口按周一升序推进，用游标替代整段 filter，避免 O(n·weeks) 扫描）
     let peIdx = -1
     while (peCursor < peSeries.length && peSeries[peCursor].d <= m.d) peIdx = peCursor++
@@ -448,10 +461,19 @@ function backtest(peResult, closeResult, weeks) {
     }
 
     if (zone.mode === 'buy') {
-      const amount = zone.amount    // 本周外部固定投入
+      // 月度封顶：当月预算用尽则跳过买入；不足则按剩余额度部分成交
+      const budgetLeft = MONTHLY_INVEST_CAP - monthInvested
+      if (budgetLeft <= 0) {
+        capHitWeeks++
+        trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'monthly_cap', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+        continue
+      }
+      const amount = Math.min(zone.amount, budgetLeft)
+      if (amount < zone.amount) capHitWeeks++
       const addSh = amount / price
       shares += addSh
       costBasis += amount
+      monthInvested += amount
       // 注意：落袋现金（cash）不在低位自动复投——保持「固定金额买入」语义清晰，
       // 极度高估卖出的钱留在账上作为已兑现收益，仅随卖出累积、不被买入清零。
       totalInvested += amount
@@ -512,6 +534,9 @@ function backtest(peResult, closeResult, weeks) {
     sellPctLast: zoneLast.sellPct || null,
     pctWindowDays: PCT_WINDOW_DAYS,
     sellRatio: SELL_RATIO,
+    monthlySalary: MONTHLY_SALARY,
+    monthlyInvestCap: MONTHLY_INVEST_CAP,
+    capHitWeeks,
     buyWeeks, sellWeeks,
     priceLast: latestPrice,
     trades,
@@ -560,7 +585,7 @@ export async function onRequest(context) {
   // 组合汇总（各指数独立回测，等权累加）
   let agg = null
   if (okList.length) {
-    let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, cash = 0, equity = 0, shares = 0
+    let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, cash = 0, equity = 0, shares = 0, capHitWeeks = 0
     for (const r of okList) {
       totalInvested += r.totalInvested
       totalWithdrawn += r.totalWithdrawn
@@ -568,6 +593,7 @@ export async function onRequest(context) {
       cash += r.cash
       equity += r.equity
       shares += r.shares
+      capHitWeeks += r.capHitWeeks || 0
     }
     const totalProfit = marketValue - totalInvested
     agg = {
@@ -579,6 +605,7 @@ export async function onRequest(context) {
       shares,
       marketValue,
       totalProfit,
+      capHitWeeks,
       profitPct: totalInvested > 0 ? totalProfit / totalInvested : null,
     }
   }
