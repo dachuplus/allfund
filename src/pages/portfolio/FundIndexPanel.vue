@@ -16,16 +16,19 @@
     <div class="fi-note" v-if="sub === 'primary'">
       数据说明：基金指数按分类从 <b>fund_scores</b> 全量基金等权构建，
       每一类为该分类下所有基金各周期收益率的<b>等权平均值</b>，口径统一、可直接横向比较。数据每日更新。
+      <span class="fi-src">数据来源：公开网络（基金净值公开数据聚合）；数据时间：{{ metaTime || '更新中…' }}，每日 21:30 同步。</span>
     </div>
     <div class="fi-note fi-note--sec" v-if="sub === 'secondary'">
       二级分类指数按 <b>fund_scores</b> 全量基金的 <b>t1_tt（公募基金二级分类）</b> 分组，
       每类为该分类下所有基金各周期收益率的<b>等权平均值</b>。
       成分数量 = 该二级分类下的基金只数。
+      <span class="fi-src">数据来源：公开网络（基金净值公开数据聚合）；数据时间：{{ metaTime || '更新中…' }}，每日 21:30 同步。</span>
     </div>
     <div class="fi-note fi-note--em" v-if="sub === 'em_index'">
       数据说明：基金指数来自<b>腾讯财经</b>实时行情接口（qt.gtimg.cn）与日 K 线数据（web.ifzq.gtimg.cn），
       为市场上<b>真实发布的基金指数产品</b>（上证基金指数 / 深证基金指数 / 深证ETF / 国证基金 / 国证ETF / 乐富指数）。
       各周期收益按指数收盘价计算，与上方「分类聚合」口径不同，仅供横向参考。
+      <span class="fi-src">数据来源：腾讯财经公开行情接口（qt.gtimg.cn / web.ifzq.gtimg.cn）；数据时间：实时。</span>
     </div>
 
     <div class="fi-loading" v-if="loading">加载中…</div>
@@ -93,6 +96,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../../api/supabase'
+import { fetchFundMeta } from '../../api/data'
 
 const subTabs = [
   { key: 'primary', label: '一级分类' },
@@ -101,6 +105,7 @@ const subTabs = [
 ]
 const sub = ref('primary')
 const loading = ref(true)
+const metaTime = ref('')   // 数据截止日期（fund_scores_meta.tsq / update_time / nav_date）
 
 // 全部周期列（与自建组合 RETURN_COLS 对齐）
 const ALL_COLS = [
@@ -423,6 +428,12 @@ async function loadSecondary() {
 onMounted(async () => {
   loading.value = true
   try {
+    const meta = await fetchFundMeta()
+    if (meta && meta.updateTime) metaTime.value = String(meta.updateTime).slice(0, 10)
+  } catch (e) {
+    console.warn('[FundIndexPanel] fetchFundMeta failed:', e)
+  }
+  try {
     await Promise.all([loadPrimary(), loadSecondary(), loadEmIndex()])
   } catch (e) {
     console.error('[FundIndexPanel]', e)
@@ -448,6 +459,7 @@ onMounted(async () => {
   background: #fff4e6; border-left: 3px solid #f47738; padding: 8px 12px;
   font-size: 12px; color: #6b3e00; margin-bottom: var(--space-md); line-height: 1.6;
 }
+.fi-src { display: block; margin-top: 6px; font-size: 12px; color: #505a66; }
 .fi-loading { padding: 40px; text-align: center; color: #505a66; }
 .fi-table-wrap { overflow-x: auto; border: 1px solid var(--border); }
 .fi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
