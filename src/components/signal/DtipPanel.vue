@@ -4,7 +4,7 @@
     <div class="card">
       <div class="card-title">定投助手<span class="card-subtitle">估值分位策略定投 · 周度自动执行</span></div>
       <p class="card-desc">
-        系统依据指数 PE（TTM）相对其<b>滚动 5 年</b>历史的百分位，在每周一自动判定估值区间并执行：估值分位越低，买入金额越高；分位进入极高区间时按持仓市值 15% 卖出回收资金；中间「高估」档位<b>观望不操作</b>，不在偏贵的位置继续消耗资金。每周 450/300/150 元的金额并非随意设定，而是由指数波动周期测算反推，详见下方「策略与资金测算说明」。估值分位口径与历史成交价均取自公开网络。
+        系统依据指数 PE（TTM）相对其<b>滚动 5 年</b>历史的百分位，在每周一自动判定估值区间并执行：估值分位越低，买入金额越高——<b>极度低估买 3000 元、低估买 2000 元、估值合理买 1000 元</b>；分位进入极高区间时按持仓市值 <b>10%</b> 卖出落袋；中间「高估」档位<b>观望不操作</b>，不在偏贵的位置继续消耗资金。这是一套适合上班族的<b>周度固定金额定投</b>规则：钱从工资里每周按时投出，估值贵就少投、便宜就多投、极度贵就卖一点。估值分位口径与历史成交价均取自公开网络。
       </p>
       <div class="table-wrap">
         <table class="data-table rule-table">
@@ -31,17 +31,17 @@
 
     <!-- ============ 1.5 策略与资金测算说明 ============ -->
     <div class="card study-card">
-      <div class="card-title">策略与资金测算说明<span class="card-subtitle">为什么是每周 450 / 300 / 150 元</span></div>
+      <div class="card-title">策略与资金测算说明<span class="card-subtitle">为什么是 3000 / 2000 / 1000 元</span></div>
 
       <div class="study-step">
         <div class="study-idx">1</div>
         <div class="study-body">
-          <div class="study-h">每周金额不是拍脑袋定的，而是被「资金不能耗尽」这个约束反推出来的</div>
+          <div class="study-h">这是一套「上班族周度固定金额定投」规则，不是一次性砸 10 万</div>
           <p class="study-p">
-            真金白银是有限的：本金 <b>10 万元</b>一次性放入账户，此后不再追加。策略会自动买卖、卖出回款会补充现金，
-            但资金池没有任何外部补给，唯一的致命风险是——<b>遇上一段很长、一直没有触发卖出的单边买入行情</b>，本金被买光后策略就停摆了。
-            所以正确的算法不是「10 年 × 每周 500 元 = 26 万」这种按名义年限直接相乘的算法（它忽略了卖出回款），
-            而是先测出指数<b>最长的连续买入周期</b>要占用多少钱，再反推每周该买多少。
+            旧版用的是「一次性放入 10 万元、之后不再追加」的资金池模型，为了不让本金中途买光，
+            每周只能投 150 / 300 / 450 元——一周才买一百多块，对上班族而言既不好执行，也不像真的在定投。
+            新版改成更符合直觉的模型：<b>每周从工资里按时投出一笔固定金额</b>，估值越便宜投得越多，
+            估值贵了就少投甚至不投，极度贵了再卖一点落袋。资金随工资持续流入，不存在「本金枯竭」问题。
           </p>
         </div>
       </div>
@@ -49,48 +49,46 @@
       <div class="study-step">
         <div class="study-idx">2</div>
         <div class="study-body">
-          <div class="study-h">先测波动周期：滚动 5 年分位锚下，各指数最长「连续买方季」</div>
-          <p class="study-p">
-            「买方季」指相邻两次卖出之间的那段连续买入期。样本区间 {{ SIZING_STUDY.sample }}，实测结果：
-          </p>
+          <div class="study-h">五档金额怎么定：以「普通上班族可承受」为锚</div>
           <div class="table-wrap">
             <table class="data-table study-table">
               <thead>
                 <tr>
-                  <th>指数</th>
-                  <th class="num">最长买方季</th>
-                  <th class="num">折合</th>
-                  <th class="num">该季资金需求*</th>
+                  <th>估值区间</th>
+                  <th class="num">滚动 5 年 PE 分位</th>
+                  <th>每周操作</th>
+                  <th class="num">固定金额</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="s in SIZING_STUDY.seasons" :key="s.name" :class="{ 'row-worst': s.name === SIZING_STUDY.worstName }">
-                  <td>{{ s.name }}<span v-if="s.name === SIZING_STUDY.worstName" class="tag tag-blue study-badge">最坏</span></td>
-                  <td class="num">{{ s.weeks }} 周</td>
-                  <td class="num">{{ s.years }}</td>
-                  <td class="num">{{ fmt(s.need, 0) }} 元</td>
+                <tr v-for="z in ZONES" :key="z.key">
+                  <td><span class="tag" :class="z.tagClass">{{ z.label }}</span></td>
+                  <td class="num">{{ z.rangeText }}</td>
+                  <td>{{ z.sideText }}</td>
+                  <td class="num">{{ z.actionText }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p class="data-source">* 按改造前的基准金额（极低 3000 / 低 2000 / 合理 1000）测算，已扣除期间卖出回款，即真实的资金占用峰值。</p>
+          <p class="study-p">
+            极度低估周（分位 &lt; 10%）投 3000、低估（10%~30%）投 2000、估值合理（30%~70%）投 1000；
+            高估（70%~90%）<b>不操作</b>、极度高估（≥ 90%）<b>卖出持仓的 10% 落袋</b>。
+            三档买入额 3000/2000/1000 大致对应「市场很便宜时多攒点、平时正常攒、贵了就按兵不动」的常识节奏，
+            对一个月薪 1~2 万、每月能拿出几千块做长期储蓄的人而言是顺手可执行的量。
+          </p>
         </div>
       </div>
 
       <div class="study-step">
         <div class="study-idx">3</div>
         <div class="study-body">
-          <div class="study-h">反推尺寸：本金 ÷ 最坏需求</div>
-          <div class="study-formula">
-            缩放系数 = 固定本金 100,000 元 ÷ 最坏资金需求 {{ fmt(SIZING_STUDY.worstNeed, 0) }} 元（{{ SIZING_STUDY.worstName }}）= {{ fmt(SIZING_STUDY.scaleRaw, 4) }}
-            → 保守取整 <b>{{ fmt(SIZING_STUDY.scaleUsed, 3) }}</b>
-          </div>
-          <div class="study-formula">
-            每周金额 = 基准金额 × {{ fmt(SIZING_STUDY.scaleUsed, 3) }} → 极低 3000 → <b>450 元</b>　低 2000 → <b>300 元</b>　合理 1000 → <b>150 元</b>
-          </div>
+          <div class="study-h">估值分位为什么用「滚动 5 年」而不是「发布至今全史」</div>
           <p class="study-p">
-            也就是说：即使重演 {{ SIZING_STUDY.worstName }} 那段 {{ SIZING_STUDY.seasons.find(s => s.name === SIZING_STUDY.worstName).years }} 一次都没触发卖出的极端行情，
-            10 万元本金也刚好够用到最后一周（实际占用峰值 99,600 元，留有余量），不会中途枯竭。
+            分位判据 = 当前 PE 在「截至本周、前推 5 年」PE 样本里的位置。用全史锚会被早年高 PE 体制长期污染：
+            宽基指数锚到早年高估值时代后，现在永远显示「便宜」、几乎不触发卖出（等于只买不卖）；
+            而中证A500/2000 这类新指数因发布晚、样本短，又会有大半时间显示「极度高估」、过半周在卖出。
+            两者都不是真正的均值回复，而是「锚的方向」决定的单边偏置。滚动 5 年既能覆盖一轮完整牛熊，
+            又不把早年体制带进样本，是最稳的折中。
           </p>
         </div>
       </div>
@@ -98,53 +96,17 @@
       <div class="study-step">
         <div class="study-idx">4</div>
         <div class="study-body">
-          <div class="study-h">验证：7 个指数跑同样的 10 年，资金耗尽次数 = {{ SIZING_STUDY.exhausted }}</div>
-          <div class="table-wrap">
-            <table class="data-table study-table">
-              <thead>
-                <tr>
-                  <th>指数</th>
-                  <th class="num">周数</th>
-                  <th class="num">买入次数</th>
-                  <th class="num">卖出次数</th>
-                  <th class="num">累计投入</th>
-                  <th class="num">期末总值</th>
-                  <th class="num">本金收益率</th>
-                  <th class="num">资金 IRR</th>
-                  <th class="num">平均仓位</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in SIZING_STUDY.results" :key="r.name">
-                  <td>{{ r.name }}</td>
-                  <td class="num">{{ r.weeks }}</td>
-                  <td class="num">{{ r.buys }}</td>
-                  <td class="num">{{ r.sells }}</td>
-                  <td class="num">{{ fmt(r.invested, 0) }}</td>
-                  <td class="num">{{ fmt(r.value, 0) }}</td>
-                  <td class="num" :class="r.profitPct >= 0 ? 'text-up' : 'text-down'">{{ fmt(r.profitPct, 1) }}%</td>
-                  <td class="num" :class="r.irr >= 0 ? 'text-up' : 'text-down'">{{ fmt(r.irr, 1) }}%</td>
-                  <td class="num">{{ fmt(r.avgPos, 1) }}%</td>
-                </tr>
-                <tr class="row-sum">
-                  <td>平均</td>
-                  <td class="num">—</td>
-                  <td class="num">—</td>
-                  <td class="num">—</td>
-                  <td class="num">—</td>
-                  <td class="num">—</td>
-                  <td class="num text-up">{{ fmt(SIZING_STUDY.avgProfitPct, 1) }}%</td>
-                  <td class="num text-up">{{ fmt(SIZING_STUDY.avgIrr, 1) }}%</td>
-                  <td class="num">{{ fmt(SIZING_STUDY.avgPos, 1) }}%</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="data-source">
-            中证2000（160 周）与中证A500（100 周）样本较短，仅覆盖最近 2–3 年，其收益率不具统计意义，仅列出以保证口径完整。<br>
-            <b>两个收益率口径的区别</b>：「本金收益率」= 期末总值 ÷ 10 万本金 − 1，衡量这 10 万整体赚了多少；
-            「资金 IRR」= 按每周实际投入现金流计算的资金加权收益，衡量<b>已动用资金</b>的效率，因此数值明显高于前者。
-            上方回测卡片显示的 IRR 是前者口径（全组合年化），两者分母不同，不可直接比较。
+          <div class="study-h">怎么看回测的两个收益率</div>
+          <p class="study-p">
+            <b>收益率</b> = （期末组合现值 − 累计投入）÷ 累计投入，衡量这十年你总共投出去的钱赚了多少比例；
+            <b>XIRR</b> = 按每周实际投入现金流算出的资金加权年化收益率，考虑了「钱是分十年慢慢投进去的、
+            后期投入的本金还没来得及涨」这一事实，因此通常高于前者，是衡量已动用资金效率的更真实指标。
+            两者分母不同，不可直接比较；同一套规则下跨指数对比时，看「收益率」或「XIRR」的差值即可，
+            差值 100% 来自资产本身（想跑赢通胀，杠杆在选标的，不在调参数）。
+          </p>
+          <p class="study-p study-warn">
+            诚实边界：以上为单条历史路径的样本内测算，样本约 11 年、含 2015 年高点起步的不利起点，
+            未计交易费用与冲击成本；历史收益不代表未来，本工具仅用于演示策略逻辑，不构成投资建议。
           </p>
         </div>
       </div>
@@ -317,7 +279,7 @@
     <div class="card">
       <div class="card-title">
         自动定投回测 · 策略效果模拟
-        <span class="card-subtitle">过去 10 年（约 {{ btWeeks }} 周）每周一按滚动 5 年估值分位调仓 · 初始本金各指数 10 万元</span>
+        <span class="card-subtitle">过去 10 年（约 {{ btWeeks }} 周）每周一按滚动 5 年估值分位定投 · 极度低估3000/低估2000/合理1000 元</span>
         <button class="refresh-btn" type="button" :disabled="loadingBt" @click="loadBacktest">{{ loadingBt ? '计算中…' : '重新计算' }}</button>
       </div>
 
@@ -330,9 +292,9 @@
         <!-- 组合汇总 -->
         <div class="stat-grid" v-if="btData.summary">
           <div class="stat-cell">
-            <div class="stat-label">组合初始本金</div>
-            <div class="stat-value">{{ fmt(btData.summary.netInvested, 0) }} 元</div>
-            <div class="stat-sub">{{ btData.summary.indices }} 个指数 × {{ fmt(btData.summary.initCapital, 0) }} 元</div>
+            <div class="stat-label">组合累计投入</div>
+            <div class="stat-value">{{ fmt(btData.summary.totalInvested, 0) }} 元</div>
+            <div class="stat-sub">共 {{ btData.summary.indices }} 个指数</div>
           </div>
           <div class="stat-cell">
             <div class="stat-label">组合现值（权益+现金）</div>
@@ -355,7 +317,7 @@
               <tr>
                 <th>指数</th>
                 <th class="num">回测周数</th>
-                <th class="num">初始本金</th>
+                <th class="num">累计投入</th>
                 <th class="num">组合现值</th>
                 <th class="num">累计收益</th>
                 <th class="num">收益率</th>
@@ -367,7 +329,7 @@
                 <td>{{ idx.name }}</td>
                 <template v-if="btByCode[idx.code] && btByCode[idx.code].ok">
                   <td class="num">{{ btByCode[idx.code].weeksActual }}</td>
-                  <td class="num">{{ fmt(btByCode[idx.code].netInvested, 0) }}</td>
+                  <td class="num">{{ fmt(btByCode[idx.code].totalInvested, 0) }}</td>
                   <td class="num">{{ fmt(btByCode[idx.code].marketValue, 0) }}</td>
                   <td class="num" :class="btByCode[idx.code].totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(btByCode[idx.code].totalProfit, 0) }}</td>
                   <td class="num" :class="btByCode[idx.code].profitPct != null ? (btByCode[idx.code].profitPct >= 0 ? 'text-up' : 'text-down') : ''">{{ btByCode[idx.code].profitPct != null ? fmt(btByCode[idx.code].profitPct * 100, 2) + '%' : '--' }}</td>
@@ -395,7 +357,7 @@
                   <th class="num">成交价</th>
                   <th class="num">本期份额</th>
                   <th class="num">累计份额</th>
-                  <th class="num">剩余本金</th>
+                  <th class="num">落袋现金</th>
                   <th class="num">组合现值</th>
                 </tr>
               </thead>
@@ -432,7 +394,7 @@
         <span class="card-subtitle">滚动 5 年估值定投框架不变，仅切换指数 · 过去 10 年（约 {{ btWeeks }} 周）</span>
       </div>
       <p class="card-desc">
-        下面每一行都是<b>完全相同的定投规则</b>（450/300/150、高估观望、极度高估减仓 15%）、<b>完全相同的 10 年窗口</b>，
+        下面每一行都是<b>完全相同的定投规则</b>（极度低估买 3000 / 低估买 2000 / 合理买 1000、高估不操作、极度高估卖 10% 落袋）、<b>完全相同的 10 年窗口</b>，
         唯一区别是「买的是哪个指数」。收益差距 100% 来自资产本身——想真正跑赢通胀，杠杆在<b>选标的</b>，不在调参数。
       </p>
 
@@ -457,30 +419,30 @@
               <tr>
                 <th>指数</th>
                 <th class="num">回测周数</th>
+                <th class="num">累计投入</th>
                 <th class="num">期末市值</th>
                 <th class="num">累计收益</th>
                 <th class="num">收益率</th>
                 <th class="num">XIRR</th>
-                <th class="num">资金占用峰值</th>
-                <th class="num">本金耗尽</th>
+                <th class="num">赎回现金</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="r in cmpMerged" :key="r.code">
                 <td>{{ r.name }}</td>
                 <td class="num">{{ r.weeksActual }}</td>
+                <td class="num">{{ fmt(r.totalInvested, 0) }}</td>
                 <td class="num">{{ fmt(r.marketValue, 0) }}</td>
                 <td class="num" :class="r.totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(r.totalProfit, 0) }}</td>
                 <td class="num" :class="r.profitPct >= 0 ? 'text-up' : 'text-down'">{{ (r.profitPct * 100).toFixed(2) }}%</td>
                 <td class="num" :class="(r.irr || 0) >= 0 ? 'text-up' : 'text-down'">{{ r.irr != null ? (r.irr * 100).toFixed(2) + '%' : '--' }}</td>
-                <td class="num">{{ fmt(r.peakNetDeployed, 0) }}</td>
-                <td class="num">{{ r.capitalSufficient ? '否' : '是' }}</td>
+                <td class="num">{{ fmt(r.cash, 0) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p class="data-source">
-          注：XIRR 是按整笔 10 万本金折算的年化（含未投出的闲置现金，故普遍偏低）；「收益率」为期末总值 ÷ 10 万本金。
+          注：XIRR 为按每周实际投入现金流计算的资金加权年化收益率，衡量已投入资金的真实效率；「收益率」= (期末市值 − 累计投入) ÷ 累计投入。
           本对比为样本内历史模拟（2015 年起点的不利窗口），未计交易费用与冲击成本；不同指数风险收益特征不同，历史收益不代表未来。
         </p>
       </div>
@@ -502,9 +464,9 @@
         <!-- 组合汇总 -->
         <div class="stat-grid" v-if="autoSummary.indices">
           <div class="stat-cell">
-            <div class="stat-label">组合初始本金</div>
+            <div class="stat-label">组合累计投入</div>
             <div class="stat-value">{{ fmt(autoSummary.netInvested, 0) }} 元</div>
-            <div class="stat-sub">{{ autoSummary.indices }} 个指数 × {{ fmt(autoSummary.initCapital, 0) }} 元</div>
+            <div class="stat-sub">共 {{ autoSummary.indices }} 个指数</div>
           </div>
           <div class="stat-cell">
             <div class="stat-label">组合现值（权益+现金）</div>
@@ -528,7 +490,7 @@
                 <th>指数</th>
                 <th class="num">定投次数</th>
                 <th class="num">累计份额</th>
-                <th class="num">初始本金</th>
+                <th class="num">累计投入</th>
                 <th class="num">组合现值</th>
                 <th class="num">累计收益</th>
                 <th class="num">收益率</th>
@@ -618,27 +580,24 @@ const COMPARE_INDICES = [
   { code: '000922', name: '中证红利' },
 ]
 
-// ===== 5 档估值区间 → 每周操作 =====
-// 【2026-10-22 定版】金额由「指数波动周期测算法」反推，非拍脑袋给定：
-//   滚动 5 年锚下，7 个指数各自出现过的最长「连续买方季」资金需求（按原 3000/2000/1000 基准）为 4.5 万~66.4 万，
-//   取最坏者 66.4 万（中证500，含 95% 分位极端情形）→ 缩放系数 = 10 万 ÷ 66.4 万 = 0.1506 → 保守取整 0.150，
-//   得 450 / 300 / 150。实测该组合在 2015-11 → 2026-10 全样本上 7 个指数资金耗尽次数 = 0。
+// ===== 5 档估值区间 → 每周操作（上班族周度固定金额定投）=====
+// 极度低估 3000 / 低估 2000 / 估值合理 1000；高估观望；极度高估按持仓市值 10% 卖出落袋。
+// 金额以「普通上班族可承受、可长期执行」为锚，非由资金池约束反推。
 const ZONES = [
-  { key: 'deep_low',  label: '极度低估', min: 0,        max: 10,       amount:  450, side: 'buy',  tagClass: 'tag-green', rangeText: '< 10%',     sideText: '买入', amountText: '+450 元', actionText: '买入 450 元' },
-  { key: 'low',       label: '低估',   min: 10,       max: 30,       amount:  300, side: 'buy',  tagClass: 'tag-green', rangeText: '10% ~ 30%', sideText: '买入', amountText: '+300 元', actionText: '买入 300 元' },
-  { key: 'normal',    label: '估值合理', min: 30,       max: 70,       amount:  150, side: 'buy',  tagClass: 'tag-blue',  rangeText: '30% ~ 70%', sideText: '买入', amountText: '+150 元', actionText: '买入 150 元' },
+  { key: 'deep_low',  label: '极度低估', min: 0,        max: 10,       amount:  3000, side: 'buy',  tagClass: 'tag-green', rangeText: '< 10%',     sideText: '买入', amountText: '+3000 元', actionText: '买入 3000 元' },
+  { key: 'low',       label: '低估',   min: 10,       max: 30,       amount:  2000, side: 'buy',  tagClass: 'tag-green', rangeText: '10% ~ 30%', sideText: '买入', amountText: '+2000 元', actionText: '买入 2000 元' },
+  { key: 'normal',    label: '估值合理', min: 30,       max: 70,       amount:  1000, side: 'buy',  tagClass: 'tag-blue',  rangeText: '30% ~ 70%', sideText: '买入', amountText: '+1000 元', actionText: '买入 1000 元' },
   { key: 'high',      label: '高估',   min: 70,       max: 90,       amount:    0, side: 'hold', tagClass: 'tag-red',   rangeText: '70% ~ 90%', sideText: '观望', amountText: '0 元',    actionText: '观望不操作' },
-  { key: 'deep_high', label: '极度高估', min: 90,       max: Infinity, amount:    0, side: 'trim', tagClass: 'tag-red',   rangeText: '≥ 90%',     sideText: '卖出', amountText: '持仓 15%', actionText: '卖出持仓 15%' },
+  { key: 'deep_high', label: '极度高估', min: 90,       max: Infinity, amount:    0, side: 'trim', tagClass: 'tag-red',   rangeText: '≥ 90%',     sideText: '卖出', amountText: '持仓 10%', actionText: '卖出持仓 10%' },
 ]
-// 极度高估时按「持仓市值的比例」赎回，而非固定金额
-const SELL_RATIO = 0.15
-const SELL_RATIO_TEXT = '15%'
+// 极度高估时按「持仓市值的比例」赎回落袋，而非固定金额
+const SELL_RATIO = 0.10
+const SELL_RATIO_TEXT = '10%'
 const ZONE_TAG = {
   deep_low: 'tag-green', low: 'tag-green', normal: 'tag-blue', high: 'tag-red', deep_high: 'tag-red',
 }
 
 const btWeeks = 520
-const INIT_CAPITAL = 100000
 
 // ===== 策略与资金测算说明（实测数据，随代码版本固定）=====
 // 数据源：7 个指数的中证官方 PE 日史 + 公开行情日线，样本 2015-11 → 2026-10（约 570 周）。
@@ -891,12 +850,12 @@ const autoByCode = computed(() => {
     const live = liveCloses.value[code]
     const price = (live != null && live > 0) ? live : e.latestClose
     e.price = price
-    e.cash = INIT_CAPITAL - e.deployed + e.withdrawn
     e.equity = e.shares * price
+    e.cash = e.withdrawn                 // 累计赎回落袋现金
     e.marketValue = e.equity + e.cash
-    e.netInvested = INIT_CAPITAL
-    e.totalProfit = e.marketValue - INIT_CAPITAL
-    e.profitPct = e.totalProfit / INIT_CAPITAL
+    e.netInvested = e.deployed           // 累计外部投入
+    e.totalProfit = e.marketValue - e.netInvested
+    e.profitPct = e.netInvested > 0 ? e.totalProfit / e.netInvested : null
     e.weeks = e.records.length
   }
   return map
@@ -905,18 +864,17 @@ const autoByCode = computed(() => {
 const autoOkCodes = computed(() => Object.keys(autoByCode.value).filter(c => autoByCode.value[c].records.length > 0))
 
 const autoSummary = computed(() => {
-  let marketValue = 0, shares = 0, weeks = 0
+  let marketValue = 0, shares = 0, weeks = 0, netInvested = 0
   for (const c of autoOkCodes.value) {
     const e = autoByCode.value[c]
     marketValue += e.marketValue
     shares += e.shares
     weeks = Math.max(weeks, e.weeks)
+    netInvested += e.netInvested
   }
-  const netInvested = INIT_CAPITAL * autoOkCodes.value.length
   const totalProfit = marketValue - netInvested
   return {
     indices: autoOkCodes.value.length,
-    initCapital: INIT_CAPITAL,
     netInvested,
     marketValue,
     shares,

@@ -5,18 +5,16 @@
  * 逻辑：
  *   对过去 N 周（默认 52 周 ≈ 1 年）的每一个周一（对齐真实交易日），
  *   用「截至该周一、前推 5 年滚动窗口内的 PE 分布」计算估值分位（trailing percentile）
- *   → 映射 5 档估值区间 → 得到该周操作（低估买 / 合理小额买 / 高估观望 / 极度高估按比例卖出）
+ *   → 映射 5 档估值区间 → 得到该周操作（低估买 / 合理买 / 高估观望 / 极度高估按比例卖出）
  *   → 以该周一收盘价成交，walk-forward 累积。
- *   期末以最新收盘价计市值，统计累计净投入、当前市值、累计收益、收益率、XIRR 等。
+ *   模型为「上班族周度固定金额定投」：每个买入档对应一个固定周投入额（极度低估3000/低估2000/合理1000），
+ *   该金额作为当周外部现金流出；极度高估按持仓市值 10% 赎回落袋；期末组合现值 = 剩余持仓市值 + 累计落袋现金。
+ *   收益率 = (组合现值 − 累计投入) / 累计投入；XIRR 为按每周实际现金流的资金加权年化收益率。
  *
- * 【2026-10-22 策略定版】三处关键改动（详见 DtipPanel.vue「策略与资金测算说明」）：
- *   1) 分位锚：发布至今全史 → 滚动 5 年。全史锚会被早年高 PE 体制长期污染，
- *      导致中证500/1000 永远显示「便宜」几乎不触发卖出、A500/2000 因锚短而过半时间卖出，
- *      两者都不是真的均值回复，而是锚的方向决定的单边偏置。
- *   2) 卖出规则：极度高估由「固定赎回 3000 元」改为「赎回持仓市值的 15%」，
- *      使回补额随持仓规模伸缩，避免资金只出不进。
- *   3) 资金尺寸：按「指数波动周期」反推每周金额（450/300/150），
- *      7 指数在 2015-11 → 2026-10 全样本上资金耗尽次数 = 0。
+ * 【2026-10-22 改版】由「一次性 10 万本金资金池」改为「每周固定金额定投」模型：
+ *   原模型下每周仅投 150/300/450 元，是被「资金不能耗尽」约束反推出来的，对用户而言既不好执行、
+ *   也不符合真实工资定投习惯；且整笔本金躺在账上导致 XIRR 被闲置现金摊薄。新模型改为每周外部固定投入，
+ *   无枯竭风险，XIRR 即为真正的资金加权定投收益率。估值分位口径维持滚动 5 年（PCT_WINDOW_DAYS=1825）。
  *
  * 数据源：
  *   - PE 全史：中证指数官网 csindex.com.cn（与 /api/csi-pe 同源，海外边缘节点可达）
@@ -59,22 +57,22 @@ async function sbSelect(path) {
 }
 
 // 5 档估值区间 → 每周操作（与 DtipPanel.vue ZONES 一致）
-// 【2026-10-22 定版】金额由「指数波动周期测算法」反推（详见 DtipPanel 策略说明区）：
-//   观察滚动 5 年锚下每个指数的「连续买方季」资金需求，7 指数中最坏者为中证500（scale=1.0 时需 66.4 万），
-//   取 10 万本金 / 66.4 万 = 0.1506 → 保守取整 0.150，得 450/300/150；中证500 峰值占用 99,600 元，留 400 元余量。
-//   实测 7 个指数在 2015-11 → 2026-10 全样本上资金耗尽次数 = 0。
-//   高估区(70-90 分位) 由「买入 500」改为「观望」：原规则在偏贵的位置仍在消耗资金且抬高成本，
-//   改为观望后本金收益率由 19.3% → 20.0%，最长买方季资金需求同步下降。
+// 【2026-10-22 改版】改为「上班族周度固定金额定投」模型：每个买入档位对应一个固定周投入额，
+//   极度低估 3000 / 低估 2000 / 估值合理 1000；高估(70-90 分位) 观望不操作；极度高估(≥90) 按持仓市值 10% 卖出落袋。
+//   不再使用「一次性 10 万本金资金池」模型——那个模型下 150/300/450 的金额是被「资金不能耗尽」反推出来的，
+//   对用户而言「每周才买 150 元」既不好执行也不符合真实工资定投习惯。改为每周外部固定投入后，
+//   本金不再有枯竭风险，XIRR 也变为真正的「资金加权定投收益率」。
+//   估值分位口径：滚动 5 年（PCT_WINDOW_DAYS=1825），详见 buildPctSeries。
 const ZONES = [
-  { key: 'deep_low',  label: '极度低估', min: 0,  max: 10,       amount:  450, mode: 'buy',        action: '买入 450 元' },
-  { key: 'low',       label: '低估',   min: 10, max: 30,       amount:  300, mode: 'buy',        action: '买入 300 元' },
-  { key: 'normal',    label: '估值合理', min: 30, max: 70,       amount:  150, mode: 'buy',        action: '买入 150 元' },
+  { key: 'deep_low',  label: '极度低估', min: 0,  max: 10,       amount:  3000, mode: 'buy',        action: '买入 3000 元' },
+  { key: 'low',       label: '低估',   min: 10, max: 30,       amount:  2000, mode: 'buy',        action: '买入 2000 元' },
+  { key: 'normal',    label: '估值合理', min: 30, max: 70,       amount:  1000, mode: 'buy',        action: '买入 1000 元' },
   { key: 'high',      label: '高估',   min: 70, max: 90,       amount:  0,   mode: 'hold',       action: '观望不操作' },
-  { key: 'deep_high', label: '极度高估', min: 90, max: Infinity, amount:  0,   mode: 'trim',       action: '卖出持仓 15%', sellPct: 0.15 },
+  { key: 'deep_high', label: '极度高估', min: 90, max: Infinity, amount:  0,   mode: 'trim',       action: '卖出持仓 10%', sellPct: 0.10 },
 ]
-// 极度高估时按「持仓市值的比例」赎回（而非旧版固定 3000 元），
-// 使回补额随持仓规模自动伸缩：仓位重时回收多、仓位轻时回收少，避免把仓位一次性清空或永远回不了本。
-const SELL_RATIO = 0.15
+// 极度高估时按「持仓市值的比例」赎回落袋（而非固定金额），
+// 使落袋额随持仓规模自动伸缩：仓位重时回收多、仓位轻时回收少，避免把仓位一次性清空或永远回不了本。
+const SELL_RATIO = 0.10
 // 分位锚采用滚动窗口（trailing window）而非「发布至今全史」，避免早年高 PE 体制长期污染分位判定
 const PCT_WINDOW_DAYS = 1825   // 5 年
 const PCT_MIN_OBS = 100        // 滚动窗口内样本不足时，回退到全史分位
@@ -397,12 +395,11 @@ async function fetchClose(code) {
 }
 
 // ===== 回测核心（walk-forward）=====
-// 模型：以「初始本金 initCapital」为唯一外部资本，每周一按估值分位在 现金↔权益 间调仓：
-//   - 买入区：从现金池按 zone 金额买入（现金不足则满仓，不再买入）
-//   - 极度高估区：卖出 zone 金额对应的份额（**仅当实际持有时才卖；无持仓则跳过**，不能卖出没有的份额）
-// 期末组合现值 = 持仓市值(份额×最新价) + 剩余现金；收益率以初始本金为分母。
-// XIRR 仅含「期初本金流出」与「期末组合现值流入」两笔外部现金流（内部买卖为组合内调仓）。
-const INIT_CAPITAL = 100000
+// 模型（2026-10-22 改版：上班族周度固定金额定投）：
+//   不设固定本金池。每周一按估值分位判定：买入档从外部投入固定金额（极度低估3000/低估2000/合理1000），
+//   该金额作为当周外部现金流出；极度高估档按持仓市值 10% 赎回，赎回款作为当周现金流入（落袋）；
+//   高估档观望。期末组合现值 = 剩余持仓市值(份额×最新价) + 累计落袋现金；
+//   收益率 = (组合现值 − 累计投入) / 累计投入；XIRR 为按每周实际现金流（买入负、赎回正、期末清算剩余持仓）的资金加权年化。
 
 function backtest(peResult, closeResult, weeks) {
   const peSeries = peResult.series
@@ -422,16 +419,17 @@ function backtest(peResult, closeResult, weeks) {
 
   const trades = []
   let shares = 0, costBasis = 0
-  let cash = INIT_CAPITAL
-  let totalInvested = 0   // 累计从现金池投入权益
-  let totalWithdrawn = 0  // 累计从权益赎回至现金池
+  let cash = 0                  // 累计落袋现金（极度高估赎回款，期末计入总值）
+  let totalInvested = 0        // 累计外部投入（各买入档固定金额之和）
+  let totalWithdrawn = 0       // 累计赎回
+  let buyWeeks = 0, sellWeeks = 0
 
   // 预计算「每一个 PE 观测点在其之前 5 年滚动窗口内的分位」一次（滑动多重集，O(n·W) 内存搬移），
   // 避免在 520 个周一循环里反复排序整段 PE 序列导致边缘函数超时。
   const pctSeries = buildPctSeries(peSeries)
 
-  let peakNetDeployed = 0   // 资金占用峰值 = 历史任一时点 max(累计投入 - 累计赎回)，用于核算本金是否够用
-  let peCursor = 0          // PE 序列游标（按周一升序推进）
+  let peCursor = 0             // PE 序列游标（按周一升序推进）
+  const flows = []             // XIRR 外部现金流：买入为负、赎回为正、期末清算剩余持仓为正
 
   for (const m of window) {
     // 取「截至该周一已发布」的最后一个 PE 观测点（窗口按周一升序推进，用游标替代整段 filter，避免 O(n·weeks) 扫描）
@@ -450,26 +448,20 @@ function backtest(peResult, closeResult, weeks) {
     }
 
     if (zone.mode === 'buy') {
-      const amount = zone.amount
-      // 买入：从现金池支出，封顶可用现金（满仓后不再买入）
-      const buyAmt = Math.min(amount, cash)
-      if (buyAmt <= 0) {
-        // 现金耗尽：估值信号仍在，但无法再买入；记录「跳过」行，便于流水清晰展示该状态
-        trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'capital_exhausted', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
-        continue
-      }
-      const addSh = buyAmt / price
+      const amount = zone.amount    // 本周外部固定投入
+      const addSh = amount / price
       shares += addSh
-      costBasis += buyAmt
-      cash -= buyAmt
-      totalInvested += buyAmt
-      peakNetDeployed = Math.max(peakNetDeployed, totalInvested - totalWithdrawn)
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount: buyAmt, price, sharesAdded: addSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+      costBasis += amount
+      // 注意：落袋现金（cash）不在低位自动复投——保持「固定金额买入」语义清晰，
+      // 极度高估卖出的钱留在账上作为已兑现收益，仅随卖出累积、不被买入清零。
+      totalInvested += amount
+      buyWeeks++
+      flows.push({ t: new Date(m.d + 'T00:00:00'), cf: -amount })
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'buy', amount, price, sharesAdded: addSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     } else {
-      // trim：按「当前持仓市值的固定比例」赎回，自动跟随仓位规模伸缩
+      // trim：按持仓市值比例赎回落袋
       const sellPct = zone.sellPct || SELL_RATIO
-      const holdingsValue = shares * price
-      const execAmt = holdingsValue * sellPct
+      const execAmt = shares * price * sellPct
       if (execAmt <= 0.01) {
         // 无持仓可卖：估值信号为卖出，但无可卖份额；记录「跳过」行
         trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'skip', skipReason: 'no_holding', amount: 0, price, sharesAdded: 0, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
@@ -481,18 +473,20 @@ function backtest(peResult, closeResult, weeks) {
       shares -= soldSh
       costBasis -= costOfSold
       totalWithdrawn += execAmt
-      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', sellPct, amount: -execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
+      sellWeeks++
+      flows.push({ t: new Date(m.d + 'T00:00:00'), cf: execAmt })
+      trades.push({ date: m.d, zone: zone.label, zoneKey: zone.key, type: 'sell', sellPct, amount: execAmt, price, sharesAdded: -soldSh, sharesAfter: shares, cashAfter: cash, valueAfter: shares * price + cash })
     }
   }
 
   const lastClose = closeSeries[closeSeries.length - 1]
   const latestPrice = lastClose.close
   const equity = shares * latestPrice
-  const portfolioValue = equity + cash
+  const cashFromSells = cash
+  const marketValue = equity + cashFromSells
 
-  // XIRR：仅期初本金流出 + 期末组合现值流入（内部买卖非外部现金流）
-  const flows = [{ t: new Date(window[0].d + 'T00:00:00'), cf: -INIT_CAPITAL }]
-  flows.push({ t: new Date(), cf: portfolioValue })
+  // XIRR：外部现金流（买入负、赎回正），期末仅清算剩余持仓市值（落袋现金已在赎回周计入，避免重复）
+  flows.push({ t: new Date(), cf: equity })
   const irr = solveXirr(flows)
 
   // 当前（最新交易日）的滚动 5 年分位与本周计划
@@ -506,7 +500,6 @@ function backtest(peResult, closeResult, weeks) {
     name: peResult.name,
     weeksRequested: weeks,
     weeksActual: window.length,
-    initCapital: INIT_CAPITAL,
     startDate: window[0].d,
     endDate: window[window.length - 1].d,
     latestDate: lastClose.d,
@@ -519,19 +512,17 @@ function backtest(peResult, closeResult, weeks) {
     sellPctLast: zoneLast.sellPct || null,
     pctWindowDays: PCT_WINDOW_DAYS,
     sellRatio: SELL_RATIO,
-    peakNetDeployed,          // 资金占用峰值（元）：应 ≤ initCapital，超过即意味着样本内会出现资金耗尽
-    capitalSufficient: peakNetDeployed <= INIT_CAPITAL + 1,
+    buyWeeks, sellWeeks,
     priceLast: latestPrice,
     trades,
     totalInvested,
     totalWithdrawn,
-    netInvested: INIT_CAPITAL,
-    cash,
+    cash: cashFromSells,
     shares,
     equity,
-    marketValue: portfolioValue,
-    totalProfit: portfolioValue - INIT_CAPITAL,
-    profitPct: (portfolioValue - INIT_CAPITAL) / INIT_CAPITAL,
+    marketValue,
+    totalProfit: marketValue - totalInvested,
+    profitPct: totalInvested > 0 ? (marketValue - totalInvested) / totalInvested : null,
     irr,
     closeSource: closeResult.source,
   }
@@ -566,28 +557,29 @@ export async function onRequest(context) {
   }
 
   const okList = results.filter(r => r.ok)
-  // 组合汇总（等权累加：各指数独立 100k 资金池）
+  // 组合汇总（各指数独立回测，等权累加）
   let agg = null
   if (okList.length) {
-    let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, shares = 0
+    let totalInvested = 0, totalWithdrawn = 0, marketValue = 0, cash = 0, equity = 0, shares = 0
     for (const r of okList) {
       totalInvested += r.totalInvested
       totalWithdrawn += r.totalWithdrawn
       marketValue += r.marketValue
+      cash += r.cash
+      equity += r.equity
       shares += r.shares
     }
-    const netInvested = INIT_CAPITAL * okList.length
-    const totalProfit = marketValue - netInvested
+    const totalProfit = marketValue - totalInvested
     agg = {
       indices: okList.length,
-      initCapital: INIT_CAPITAL,
       totalInvested,
       totalWithdrawn,
-      netInvested,
+      cash,
+      equity,
       shares,
       marketValue,
       totalProfit,
-      profitPct: netInvested > 0 ? totalProfit / netInvested : null,
+      profitPct: totalInvested > 0 ? totalProfit / totalInvested : null,
     }
   }
 
