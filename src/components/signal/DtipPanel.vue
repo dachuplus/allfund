@@ -425,6 +425,67 @@
       </div>
     </div>
 
+    <!-- ============ 5.5 标的对比 · 同一套策略，不同资产 ============ -->
+    <div class="card compare-card">
+      <div class="card-title">
+        标的对比 · 同一套策略，不同资产
+        <span class="card-subtitle">滚动 5 年估值定投框架不变，仅切换指数 · 过去 10 年（约 {{ btWeeks }} 周）</span>
+      </div>
+      <p class="card-desc">
+        下面每一行都是<b>完全相同的定投规则</b>（450/300/150、高估观望、极度高估减仓 15%）、<b>完全相同的 10 年窗口</b>，
+        唯一区别是「买的是哪个指数」。收益差距 100% 来自资产本身——想真正跑赢通胀，杠杆在<b>选标的</b>，不在调参数。
+      </p>
+
+      <div class="error-card" v-if="cmpError">
+        <p>对比数据加载失败：{{ cmpError }}</p>
+      </div>
+      <p class="val-loading" v-else-if="loadingCmp || cmpMerged.length === 0">对比数据加载中（边缘函数逐指数拉取行情，首次约 10–20 秒，后续命中缓存更快）…</p>
+      <div v-else>
+        <!-- 横向条形图：收益率降序，直观呈现资产间的收益差 -->
+        <div class="cmp-bar-row" v-for="r in cmpMerged" :key="r.code">
+          <div class="cmp-name">{{ r.name }}</div>
+          <div class="cmp-bar-track">
+            <div class="cmp-bar" :class="(r.profitPct || 0) >= 0 ? 'bar-up' : 'bar-down'"
+                 :style="{ width: Math.max(2, Math.abs(r.profitPct || 0) / cmpMax * 100) + '%' }"></div>
+          </div>
+          <div class="cmp-val" :class="(r.profitPct || 0) >= 0 ? 'text-up' : 'text-down'">{{ (r.profitPct * 100).toFixed(2) }}%</div>
+        </div>
+
+        <div class="table-wrap" style="margin-top:16px">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>指数</th>
+                <th class="num">回测周数</th>
+                <th class="num">期末市值</th>
+                <th class="num">累计收益</th>
+                <th class="num">收益率</th>
+                <th class="num">XIRR</th>
+                <th class="num">资金占用峰值</th>
+                <th class="num">本金耗尽</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in cmpMerged" :key="r.code">
+                <td>{{ r.name }}</td>
+                <td class="num">{{ r.weeksActual }}</td>
+                <td class="num">{{ fmt(r.marketValue, 0) }}</td>
+                <td class="num" :class="r.totalProfit >= 0 ? 'text-up' : 'text-down'">{{ fmt(r.totalProfit, 0) }}</td>
+                <td class="num" :class="r.profitPct >= 0 ? 'text-up' : 'text-down'">{{ (r.profitPct * 100).toFixed(2) }}%</td>
+                <td class="num" :class="(r.irr || 0) >= 0 ? 'text-up' : 'text-down'">{{ r.irr != null ? (r.irr * 100).toFixed(2) + '%' : '--' }}</td>
+                <td class="num">{{ fmt(r.peakNetDeployed, 0) }}</td>
+                <td class="num">{{ r.capitalSufficient ? '否' : '是' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="data-source">
+          注：XIRR 是按整笔 10 万本金折算的年化（含未投出的闲置现金，故普遍偏低）；「收益率」为期末总值 ÷ 10 万本金。
+          本对比为样本内历史模拟（2015 年起点的不利窗口），未计交易费用与冲击成本；不同指数风险收益特征不同，历史收益不代表未来。
+        </p>
+      </div>
+    </div>
+
     <!-- ============ 6. 真实定投记录（服务端自动执行）============ -->
     <div class="card">
       <div class="card-title">
@@ -546,6 +607,17 @@ const DCA_INDICES = [
   { code: '000985', name: '中证全指' },
 ]
 
+// ===== 标的对比集（独立，不进入自动定投宇宙，避免改变 Part2 实盘标的）=====
+// 取与主回测相同的 10 年窗口、相同的估值定投框架，仅切换指数，用于直观呈现「资产选择」本身造成的收益差。
+// 其中 000300/000905/000852/000985 已在主回测 btData 中取过，仅 000922（中证红利）需单独补拉。
+const COMPARE_INDICES = [
+  { code: '000300', name: '沪深300' },
+  { code: '000905', name: '中证500' },
+  { code: '000852', name: '中证1000' },
+  { code: '000985', name: '中证全指' },
+  { code: '000922', name: '中证红利' },
+]
+
 // ===== 5 档估值区间 → 每周操作 =====
 // 【2026-10-22 定版】金额由「指数波动周期测算法」反推，非拍脑袋给定：
 //   滚动 5 年锚下，7 个指数各自出现过的最长「连续买方季」资金需求（按原 3000/2000/1000 基准）为 4.5 万~66.4 万，
@@ -624,6 +696,11 @@ const btData = ref(null)
 const loadingBt = ref(false)
 const btError = ref('')
 
+// ===== 标的对比（独立集，仅补拉主回测未覆盖的 000922）=====
+const cmpData = ref(null)
+const loadingCmp = ref(false)
+const cmpError = ref('')
+
 // ===== 真实定投记录（Part2）=====
 const autoRecords = ref([])
 const loadingAuto = ref(false)
@@ -687,6 +764,24 @@ async function loadBacktest() {
   }
 }
 
+// 标的对比：仅补拉主回测未覆盖的中证红利（000922），其余 4 个复用主回测 btData，
+// 避免重复 4 次边缘函数调用。
+async function loadCompare() {
+  loadingCmp.value = true
+  cmpError.value = ''
+  try {
+    const extra = COMPARE_INDICES.map(i => i.code).filter(c => !DCA_INDICES.some(d => d.code === c))
+    if (extra.length) {
+      const res = await fetchDtipBacktest(extra, btWeeks)
+      cmpData.value = res
+    }
+  } catch (e) {
+    cmpError.value = String(e && e.message || e)
+  } finally {
+    loadingCmp.value = false
+  }
+}
+
 async function loadAuto() {
   loadingAuto.value = true
   autoError.value = ''
@@ -744,6 +839,31 @@ const btByCode = computed(() => {
   return map
 })
 const activeBt = computed(() => btByCode.value[activeCode.value] || null)
+
+// ===== 标的对比：合并主回测（覆盖的指数）与补拉结果（中证红利）=====
+const cmpByCode = computed(() => {
+  const map = {}
+  if (cmpData.value && cmpData.value.data) {
+    for (const r of cmpData.value.data) map[r.code] = r
+  }
+  return map
+})
+// 按 COMPARE_INDICES 顺序取数（主回测优先，缺则取补拉），再按收益率降序，使收益差一目了然
+const cmpMerged = computed(() => {
+  const out = []
+  for (const idx of COMPARE_INDICES) {
+    const r = btByCode.value[idx.code] || cmpByCode.value[idx.code]
+    if (r && r.ok) out.push({ name: idx.name, code: idx.code, ...r })
+  }
+  out.sort((a, b) => (b.profitPct || 0) - (a.profitPct || 0))
+  return out
+})
+// 条形图最大宽度基准（取绝对值最大收益率）
+const cmpMax = computed(() => {
+  let m = 0
+  for (const r of cmpMerged.value) m = Math.max(m, Math.abs(r.profitPct || 0))
+  return m || 1
+})
 
 // 真实记录聚合：按「100k 初始本金资金池」口径逐指数重建 权益/现金/组合现值
 const autoByCode = computed(() => {
@@ -816,6 +936,7 @@ const autoFirstDate = computed(() => {
 onMounted(() => {
   loadEva()
   loadBacktest()
+  loadCompare()
   loadAuto()
 })
 </script>
@@ -1013,6 +1134,15 @@ onMounted(() => {
 .key-col { font-weight: 700; color: var(--text-primary); }
 .muted-col { color: var(--text-secondary); }
 .th-note { display: block; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+
+/* ===== 标的对比条形图（gov.uk 风格：无圆角/阴影，涨红跌绿与全站一致）===== */
+.cmp-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cmp-name { flex: 0 0 84px; font-size: 14px; color: var(--text-primary); font-weight: 700; }
+.cmp-bar-track { flex: 1; background: #f0f0f0; height: 22px; }
+.cmp-bar { height: 100%; background: var(--color-up); min-width: 2px; }
+.cmp-bar.bar-down { background: var(--color-down); }
+.cmp-val { flex: 0 0 72px; text-align: right; font-size: 14px; font-weight: 700; }
+.compare-card .data-table th, .compare-card .data-table td { padding: 8px 10px; }
 
 @media (max-width: 640px) {
   .study-step { flex-direction: column; gap: 8px; }
