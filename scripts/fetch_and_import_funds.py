@@ -159,6 +159,13 @@ def fetch_funds(ft, attempt=1):
     """
     all_funds = []
     pn = 2500
+    # 上游声明的该分类总数：任何页给出 >0 的 datacount 都记住（取最大）。
+    # 关键修复（2026-10-24）：此前空响应兜底与 break 终止都用「本页 datacount」，
+    # 上游抽风返回 datacount=0 的空页时 total_count 被覆盖为 0 → 兜底条件
+    # (total_count and ...) 恒 False 不重试，且 len(all_funds) >= 0 恒成立 →
+    # 提前 break 整类截断（10/23 run：混合型声明 9774 只，第2页空响应后只抓到
+    # 第1页 2500 只，staging 混合型 2143 < 50% 生产 7035，promote 拒绝切换）。
+    declared_total = 0
     for pi in range(1, 12):
         print(f'  拉取 {FT_MAP[ft]}({ft}) 第{pi}页(pn={pn})...', flush=True)
         data = _fetch_page(ft, pi, pn)
@@ -175,9 +182,12 @@ def fetch_funds(ft, attempt=1):
             break
         try:
             items = data.get('datas', [])
-            total_count = int(data.get('datacount', 0))
+            total_count = int(data.get('datacount', 0) or 0)
+            if total_count > declared_total:
+                declared_total = total_count
             # ── 空响应兜底（根治上游瞬时抽风致某大类=0、promote 整批拒绝）──
-            if not items and attempt < FT_MAX_RETRY and (pi == 1 or (total_count and len(all_funds) < total_count)):
+            # 用 declared_total 判断（本页 datacount=0 不可信，见上方 declared_total 注释）
+            if not items and attempt < FT_MAX_RETRY and (pi == 1 or len(all_funds) < declared_total):
                 delay = FT_RETRY_BASE_DELAY * attempt
                 print(f'  ⚠ {FT_MAP[ft]}({ft}) 第{pi}页空响应(疑似上游抽风)，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
                 time.sleep(delay)
@@ -185,6 +195,10 @@ def fetch_funds(ft, attempt=1):
             if not items and pi == 1:
                 print(f'  {FT_MAP[ft]}({ft}) 重试{FT_MAX_RETRY}次仍空，返回空列表(交由 promote 守卫处理)')
                 return []
+            if not items:
+                # 非首页空页：已抓满声明总数（正常到底）或重试耗尽 → 停止翻页
+                print(f'  {FT_MAP[ft]}({ft}) 第{pi}页空响应(累计{len(all_funds)}/声明{declared_total})，停止翻页', flush=True)
+                break
             for item in items:
                 f = item.split(',')
                 if len(f) < 13:
@@ -235,9 +249,14 @@ def fetch_funds(ft, attempt=1):
                     'nav': _return_float(f[16]) if len(f) > 16 else None,
                     'date': f[15].strip() if len(f) > 15 else '',
                 })
-            print(f' +{len(items)}条 (总计{total_count}, 累计{len(all_funds)})')
-            if len(all_funds) >= total_count or len(items) < pn:
+            print(f' +{len(items)}条 (总计{declared_total}, 累计{len(all_funds)})')
+            if declared_total and len(all_funds) >= declared_total:
                 break
+            if len(items) < pn:
+                if not declared_total or len(all_funds) >= declared_total:
+                    break
+                # 短页但尚未抓满声明总数：上游分页不齐/轻微截断，继续翻下一页
+                print(f'  ⓘ 第{pi}页短页({len(items)}<{pn})且累计{len(all_funds)}<声明{declared_total}，继续翻页', flush=True)
         except Exception as e:
             print(f' 异常: {e}')
             break
