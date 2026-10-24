@@ -2,7 +2,35 @@
   <div class="gsw">
     <p class="gsw-sub">{{ title }}　共 {{ list.length }} 题（含答案与解析）</p>
 
-    <!-- 工具栏：搜索 + 一键揭示全部答案 + 进度 -->
+    <!-- 实时统计条 + 错题本切换 -->
+    <div class="gsw-stats">
+      <div class="gsw-stat">
+        <span class="gsw-stat-num">{{ stats.answered }}</span>
+        <span class="gsw-stat-label">已作答</span>
+      </div>
+      <div class="gsw-stat ok">
+        <span class="gsw-stat-num">{{ stats.correct }}</span>
+        <span class="gsw-stat-label">答对</span>
+      </div>
+      <div class="gsw-stat no">
+        <span class="gsw-stat-num">{{ stats.wrong }}</span>
+        <span class="gsw-stat-label">答错</span>
+      </div>
+      <div class="gsw-stat">
+        <span class="gsw-stat-num">{{ stats.rate }}%</span>
+        <span class="gsw-stat-label">正确率</span>
+      </div>
+      <button
+        class="gsw-toggle"
+        type="button"
+        :class="{ on: onlyWrong }"
+        @click="onlyWrong = !onlyWrong"
+      >
+        {{ onlyWrong ? '退出错题本' : '只看错题' }}
+      </button>
+    </div>
+
+    <!-- 工具栏：搜索 + 一键揭示全部答案 -->
     <div class="gsw-filters">
       <input
         v-model="search"
@@ -13,11 +41,12 @@
       <button class="gsw-btn" type="button" @click="revealAll = !revealAll">
         {{ revealAll ? '收起全部答案' : '显示全部答案' }}
       </button>
-      <span class="gsw-count">已作答 {{ answeredCount }} / {{ list.length }}</span>
     </div>
 
     <!-- 题目列表 -->
-    <div v-if="!pageItems.length" class="gsw-empty">没有匹配的题目</div>
+    <div v-if="!pageItems.length" class="gsw-empty">
+      {{ onlyWrong ? '答错的题目会在这里～先做几道题吧' : '没有匹配的题目' }}
+    </div>
     <div v-else class="gsw-list">
       <div
         v-for="item in pageItems"
@@ -91,16 +120,40 @@ const pageSize = ref(10)
 const selected = ref({})   // { [id]: 'A'|'B'|'C'|'D' }
 const revealed = ref({})   // { [id]: true } —— 已点开答案
 const revealAll = ref(false)
+const onlyWrong = ref(false)   // 错题本筛选
 
-// 搜索变化时回到第一页
-watch(search, () => { page.value = 1 })
+// 搜索 / 切换错题本时回到第一页
+watch([search, onlyWrong], () => { page.value = 1 })
 
 const filtered = computed(() => {
   const kw = search.value.trim().toLowerCase()
-  if (!kw) return list
-  return list.filter(
-    (it) => it.q.toLowerCase().includes(kw) || it.analysis.toLowerCase().includes(kw),
-  )
+  let arr = list
+  if (kw) {
+    arr = arr.filter(
+      (it) => it.q.toLowerCase().includes(kw) || it.analysis.toLowerCase().includes(kw),
+    )
+  }
+  if (onlyWrong.value) {
+    arr = arr.filter((it) => selected.value[it.id] && !isCorrect(it))
+  }
+  return arr
+})
+
+// 实时统计：已作答 / 答对 / 答错 / 正确率
+const stats = computed(() => {
+  const sel = selected.value
+  let answered = 0
+  let correct = 0
+  let wrong = 0
+  for (const it of list) {
+    const s = sel[it.id]
+    if (!s) continue
+    answered++
+    if (s === it.answer) correct++
+    else wrong++
+  }
+  const rate = answered ? Math.round((correct / answered) * 100) : 0
+  return { answered, correct, wrong, rate }
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
@@ -108,10 +161,6 @@ const pageItems = computed(() => {
   const from = (page.value - 1) * pageSize.value
   return filtered.value.slice(from, from + pageSize.value)
 })
-
-const answeredCount = computed(
-  () => Object.keys(selected.value).filter((k) => selected.value[k]).length,
-)
 
 function select(item, i) {
   const letter = String.fromCharCode(65 + i)
@@ -144,6 +193,55 @@ function optClass(item, i) {
   color: var(--text-secondary, #505a5f);
 }
 
+/* 实时统计条 */
+.gsw-stats {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.gsw-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #d6d6d6);
+  background: #fff;
+}
+.gsw-stat-num {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary, #0b0c0c);
+  font-variant-numeric: tabular-nums;
+}
+.gsw-stat-label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary, #505a5f);
+}
+.gsw-stat.ok .gsw-stat-num { color: #00703c; }
+.gsw-stat.no .gsw-stat-num { color: #d4351c; }
+
+.gsw-toggle {
+  margin-left: auto;
+  align-self: center;
+  border: 2px solid #d4351c;
+  background: #fff;
+  color: #d4351c;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gsw-toggle:hover { background: #fbe9e7; }
+.gsw-toggle.on { background: #d4351c; color: #fff; }
+
 .gsw-filters {
   display: flex;
   align-items: center;
@@ -173,7 +271,6 @@ function optClass(item, i) {
   white-space: nowrap;
 }
 .gsw-btn:hover { background: #f3f2f1; }
-.gsw-count { font-size: 13px; color: var(--text-secondary, #505a5f); margin-left: auto; }
 
 .gsw-list { display: flex; flex-direction: column; gap: 10px; }
 .gsw-card { border: 1px solid var(--border, #d6d6d6); background: #fff; }
