@@ -54,6 +54,19 @@ FT_LIST = list(FT_MAP.keys())
 FT_MAX_RETRY = 3
 FT_RETRY_BASE_DELAY = 15  # 秒，指数退避基数（attempt×BASE）
 
+# ── 抓取完整性（2026-10-24 补齐「没拉满就报数据拉取错误」这一环）──
+# 背景：此前抓取阶段只管翻页，不做「实际 vs 上游声明总数」核对，抓少了照样写
+# NDJSON → 进 staging → 最后由 promote 按「分类数量」维度拦下，报错才长成
+# 「分类灾难性丢失」，看起来像分类/类型问题，实为数据没拉满。正确链路应是：
+#   拉多少存多少 → 未拉满即报「数据拉取失败」直接退出 → 拉满才进评分 → 计算完才切生产
+# 比例阈值：留 2% 容差，应对上游当日的少量新发/清盘与跨类重复代码去重。
+FT_COMPLETE_RATIO = 0.98
+# QDII 走「主列表名单 + pingzhongdata 逐只取数」，个别基金无 pingzhongdata 是常态，
+# 单独放宽到 90%，避免正常解析失败被误判为「数据拉取失败」。
+QDII_COMPLETE_RATIO = 0.90
+# 各类完整性登记：{ft: {'got': int, 'declared': int}}，由 main 汇总校验
+FETCH_COMPLETENESS = {}
+
 def _float(v):
     try:
         return float(v) if v and v.strip() and v.strip() != '' else 0
@@ -194,6 +207,7 @@ def fetch_funds(ft, attempt=1):
                 return fetch_funds(ft, attempt + 1)
             if not items and pi == 1:
                 print(f'  {FT_MAP[ft]}({ft}) 重试{FT_MAX_RETRY}次仍空，返回空列表(交由 promote 守卫处理)')
+                FETCH_COMPLETENESS[ft] = {'got': 0, 'declared': declared_total}
                 return []
             if not items:
                 # 非首页空页：已抓满声明总数（正常到底）或重试耗尽 → 停止翻页
@@ -261,6 +275,23 @@ def fetch_funds(ft, attempt=1):
             print(f' 异常: {e}')
             break
         time.sleep(0.5)
+
+    # ── 拉满校验：翻页结束后核对「实际抓到 / 上游声明总数」──
+    # 未达阈值先整类指数退避重试（上游间歇抽风多发于此），重试耗尽仍不足则登记
+    # 实际值，由 main 判定「数据拉取失败」直接退出——不带残缺数据进评分/staging/切换。
+    if declared_total and len(all_funds) < declared_total * FT_COMPLETE_RATIO:
+        ratio = len(all_funds) / declared_total * 100
+        if attempt < FT_MAX_RETRY:
+            delay = FT_RETRY_BASE_DELAY * attempt
+            print(f'  ⚠ {FT_MAP[ft]}({ft}) 未拉满: 实际{len(all_funds)}/声明{declared_total} ({ratio:.1f}%)，'
+                  f'整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
+            time.sleep(delay)
+            return fetch_funds(ft, attempt + 1)
+        print(f'  ✗ {FT_MAP[ft]}({ft}) 未拉满（已重试{FT_MAX_RETRY}次）: '
+              f'实际{len(all_funds)}/声明{declared_total} ({ratio:.1f}%)', flush=True)
+    else:
+        print(f'  ✓ {FT_MAP[ft]}({ft}) 已拉满: {len(all_funds)}/{declared_total or len(all_funds)}', flush=True)
+    FETCH_COMPLETENESS[ft] = {'got': len(all_funds), 'declared': declared_total}
     return all_funds
 
 
@@ -602,6 +633,8 @@ def fetch_qdii_full():
             if done % 100 == 0:
                 print(f'    已处理 {done}/{len(codes)}', flush=True)
     print(f'  pingzhongdata 成功解析: {len(results)} 只')
+    # 完整性登记：声明总数=主列表名单数，实际=成功解析数（main 据此判定是否拉满）
+    FETCH_COMPLETENESS['qdii'] = {'got': len(results), 'declared': len(codes)}
     return results
 
 
@@ -610,16 +643,55 @@ def main():
     print('fund_scores 全量抓取 + Supabase 导入')
     print('=' * 60)
 
-    # 1. 拉取天天基金全量
+    # 1. 拉取天天基金全量（边拉边落盘：抓完一个类立刻写中间文件，中途失败不丢已抓部分）
     print('\n[1] 拉取天天基金全量数据...')
+    raw_file = os.path.join(SCRIPT_DIR, 'funds_output_raw.ndjson')
     all_funds = []
+    raw_written = 0
+    with open(raw_file, 'w', encoding='utf-8') as fo:
+        for ft in FT_LIST:
+            if ft == 'qdii':
+                funds = fetch_qdii_full()
+            else:
+                funds = fetch_funds(ft)
+            for fund in funds:
+                fo.write(json.dumps(fund, ensure_ascii=False) + '\n')
+            fo.flush()          # 拉多少存多少，立即落盘
+            raw_written += len(funds)
+            print(f'  → 已落盘 {FT_MAP[ft]}({ft}) {len(funds)} 条（累计 {raw_written} 条）', flush=True)
+            all_funds.extend(funds)
+            time.sleep(0.5)
+    print(f'  中间文件 {raw_file}: {raw_written} 条（未去重）')
+
+    # 1.5 完整性校验：任何分类未拉满 → 判定「数据拉取失败」立即退出。
+    #     不再让残缺数据进入评分/staging/切换，报错即「数据拉取未完成（哪个类、声明多少、
+    #     实际多少）」，而不是最后 promote 的「分类灾难性丢失」。
+    print('\n[1.5] 抓取完整性校验（实际 / 上游声明总数）')
+    incomplete = []
     for ft in FT_LIST:
-        if ft == 'qdii':
-            funds = fetch_qdii_full()
+        info = FETCH_COMPLETENESS.get(ft)
+        if not info:
+            continue
+        got, declared = info['got'], info['declared']
+        if not declared:
+            print(f'  - {FT_MAP[ft]}({ft}): 上游未声明总数，跳过校验（实际 {got}）')
+            continue
+        ratio = got / declared
+        need = QDII_COMPLETE_RATIO if ft == 'qdii' else FT_COMPLETE_RATIO
+        if ratio < need:
+            incomplete.append((ft, got, declared, ratio * 100))
+            print(f'  ✗ {FT_MAP[ft]}({ft}): 未拉满 实际 {got} / 声明 {declared} ({ratio*100:.1f}%)')
         else:
-            funds = fetch_funds(ft)
-        all_funds.extend(funds)
-        time.sleep(0.5)
+            print(f'  ✓ {FT_MAP[ft]}({ft}): 已拉满 实际 {got} / 声明 {declared} ({ratio*100:.1f}%)')
+    if incomplete:
+        print('\n' + '=' * 60)
+        print('  ✗ 数据拉取失败：以下分类未拉满，终止本次运行（不写入 staging、不切换生产）')
+        for ft, got, declared, pct in incomplete:
+            print(f'     - {FT_MAP[ft]}({ft}): {got}/{declared} ({pct:.1f}%)')
+        print('  说明: 已抓部分保留在中间文件 funds_output_raw.ndjson；'
+              '生产 fund_scores 保持不变，请重跑本步骤。')
+        print('=' * 60)
+        sys.exit(1)
 
     # 去重
     deduped = {}
