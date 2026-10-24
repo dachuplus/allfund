@@ -1,6 +1,25 @@
 <template>
   <div class="gsw">
-    <p class="gsw-sub">{{ title }}　共 {{ list.length }} 题（含答案与解析）</p>
+    <!-- 试卷切换 -->
+    <div class="gsw-papers" role="tablist">
+      <button
+        v-for="p in papers"
+        :key="p.key"
+        type="button"
+        role="tab"
+        class="gsw-ptab"
+        :class="{ on: paperKey === p.key }"
+        :disabled="loading"
+        :aria-selected="paperKey === p.key"
+        @click="switchPaper(p.key)"
+      >
+        {{ p.label }}
+      </button>
+    </div>
+
+    <p class="gsw-sub">
+      {{ title }}　共 {{ list.length }} 题（含答案与解析）{{ loading ? '　加载中…' : '' }}
+    </p>
 
     <!-- 实时统计条 + 错题本切换 -->
     <div class="gsw-stats">
@@ -99,9 +118,10 @@
       <span class="gsw-pg-info">第 {{ page }} / {{ totalPages }} 页</span>
       <button class="gsw-pg" :disabled="page >= totalPages" type="button" @click="page = page + 1">下一页</button>
       <select v-model.number="pageSize" class="gsw-size" @change="page = 1">
-        <option :value="10">10 题/页</option>
-        <option :value="20">20 题/页</option>
+        <option :value="1000">1000 题/页</option>
         <option :value="50">50 题/页</option>
+        <option :value="20">20 题/页</option>
+        <option :value="10">10 题/页</option>
       </select>
     </div>
   </div>
@@ -111,23 +131,75 @@
 import { ref, computed, watch } from 'vue'
 import { GUSHIWEN_DASAI, GUSHIWEN_DASAI_TITLE } from '../../data/gushiwenDasai.js'
 
-const title = GUSHIWEN_DASAI_TITLE
-const list = GUSHIWEN_DASAI
+// 试卷清单：四年级（讲义3）静态内置，其余懒加载（动态 import 独立分包，不撑大主包）
+const papers = [
+  {
+    key: 'g4',
+    label: '四年级',
+    load: () => Promise.resolve({ title: GUSHIWEN_DASAI_TITLE, list: GUSHIWEN_DASAI }),
+  },
+  {
+    key: 'g3',
+    label: '三年级',
+    load: () => import('../../data/gushiwenDasaiG3.js').then((m) => ({ title: m.GUSHIWEN_DASAI_G3_TITLE, list: m.GUSHIWEN_DASAI_G3 })),
+  },
+  {
+    key: 'g5',
+    label: '五年级',
+    load: () => import('../../data/gushiwenDasaiG5.js').then((m) => ({ title: m.GUSHIWEN_DASAI_G5_TITLE, list: m.GUSHIWEN_DASAI_G5 })),
+  },
+  {
+    key: 'jy1',
+    label: '讲义1',
+    load: () => import('../../data/gushiwenDasaiJy1.js').then((m) => ({ title: m.GUSHIWEN_JY1_TITLE, list: m.GUSHIWEN_JY1 })),
+  },
+  {
+    key: 'jy2',
+    label: '讲义2',
+    load: () => import('../../data/gushiwenDasaiJy2.js').then((m) => ({ title: m.GUSHIWEN_JY2_TITLE, list: m.GUSHIWEN_JY2 })),
+  },
+]
+
+const paperKey = ref('g4')
+const title = ref(GUSHIWEN_DASAI_TITLE)
+const list = ref(GUSHIWEN_DASAI)
+const loading = ref(false)
 
 const search = ref('')
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(1000)   // 默认一页展示全部，减少翻页
 const selected = ref({})   // { [id]: 'A'|'B'|'C'|'D' }
 const revealed = ref({})   // { [id]: true } —— 已点开答案
 const revealAll = ref(false)
 const onlyWrong = ref(false)   // 错题本筛选
+
+async function switchPaper(key) {
+  if (key === paperKey.value || loading.value) return
+  paperKey.value = key
+  loading.value = true
+  try {
+    const p = papers.find((x) => x.key === key)
+    const { title: t, list: l } = await p.load()
+    // 切卷重置作答状态
+    selected.value = {}
+    revealed.value = {}
+    search.value = ''
+    onlyWrong.value = false
+    revealAll.value = false
+    page.value = 1
+    title.value = t
+    list.value = l
+  } finally {
+    loading.value = false
+  }
+}
 
 // 搜索 / 切换错题本时回到第一页
 watch([search, onlyWrong], () => { page.value = 1 })
 
 const filtered = computed(() => {
   const kw = search.value.trim().toLowerCase()
-  let arr = list
+  let arr = list.value
   if (kw) {
     arr = arr.filter(
       (it) => it.q.toLowerCase().includes(kw) || it.analysis.toLowerCase().includes(kw),
@@ -145,7 +217,7 @@ const stats = computed(() => {
   let answered = 0
   let correct = 0
   let wrong = 0
-  for (const it of list) {
+  for (const it of list.value) {
     const s = sel[it.id]
     if (!s) continue
     answered++
@@ -186,6 +258,33 @@ function optClass(item, i) {
 
 <style scoped>
 .gsw { padding: 4px 0 24px; }
+
+/* 试卷切换 tabs */
+.gsw-papers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--border, #d6d6d6);
+}
+.gsw-ptab {
+  border: none;
+  background: transparent;
+  padding: 10px 14px 8px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d70b8;
+  cursor: pointer;
+  box-shadow: inset 0 -4px 0 transparent;
+}
+.gsw-ptab:hover { background: #f3f2f1; }
+.gsw-ptab.on {
+  color: var(--text-primary, #0b0c0c);
+  background: #fff;
+  box-shadow: inset 0 -4px 0 #1d70b8;
+}
+.gsw-ptab:disabled { opacity: 0.5; cursor: wait; }
 
 .gsw-sub {
   margin: 0 0 14px;
