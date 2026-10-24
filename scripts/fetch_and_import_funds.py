@@ -51,8 +51,13 @@ FT_LIST = list(FT_MAP.keys())
 # promote 校验 80% 阈值整批拒绝、流水线直接挂掉。历史已发生多次：8/19 股票型、10/17 混合型）。
 # 首页即空或中页空且未达声明总数 → 判为上游瞬时抽风，整类指数退避重试最多 FT_MAX_RETRY 次；
 # 重试耗尽仍空 → 整类返回 0（交由 promote 守卫兜底，不再静默吞掉）。
-FT_MAX_RETRY = 3
-FT_RETRY_BASE_DELAY = 15  # 秒，指数退避基数（attempt×BASE）
+# 重试到 10 次：数据没拉满就一直拉（上游抽风多为间歇性，多试几次通常能满）。
+# 说明：未拉满最终失败 = 当晚整条流水线不更新，但这与「走到 promote 报分类错误被拒」
+# 的后果完全相同（都是不切生产），区别只是**报错要说真话**：报「数据拉取失败」并指明
+# 是哪个类、声明多少、实际多少，而不是甩锅成「分类灾难性丢失」这种类型错误。
+FT_MAX_RETRY = 10
+FT_RETRY_BASE_DELAY = 15   # 秒，指数退避基数（attempt×BASE）
+FT_RETRY_MAX_DELAY = 60    # 秒，单次退避上限（避免 10 次重试累计等待过久）
 
 # ── 抓取完整性（2026-10-24 补齐「没拉满就报数据拉取错误」这一环）──
 # 背景：此前抓取阶段只管翻页，不做「实际 vs 上游声明总数」核对，抓少了照样写
@@ -187,7 +192,7 @@ def fetch_funds(ft, attempt=1):
             data = _fetch_page(ft, pi, 1000)
         if data is None:
             if pi == 1 and attempt < FT_MAX_RETRY:
-                delay = FT_RETRY_BASE_DELAY * attempt
+                delay = min(FT_RETRY_BASE_DELAY * attempt, FT_RETRY_MAX_DELAY)
                 print(f'  ⚠ {FT_MAP[ft]}({ft}) 首页多次抓取失败，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
                 time.sleep(delay)
                 return fetch_funds(ft, attempt + 1)
@@ -201,7 +206,7 @@ def fetch_funds(ft, attempt=1):
             # ── 空响应兜底（根治上游瞬时抽风致某大类=0、promote 整批拒绝）──
             # 用 declared_total 判断（本页 datacount=0 不可信，见上方 declared_total 注释）
             if not items and attempt < FT_MAX_RETRY and (pi == 1 or len(all_funds) < declared_total):
-                delay = FT_RETRY_BASE_DELAY * attempt
+                delay = min(FT_RETRY_BASE_DELAY * attempt, FT_RETRY_MAX_DELAY)
                 print(f'  ⚠ {FT_MAP[ft]}({ft}) 第{pi}页空响应(疑似上游抽风)，整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
                 time.sleep(delay)
                 return fetch_funds(ft, attempt + 1)
@@ -282,7 +287,7 @@ def fetch_funds(ft, attempt=1):
     if declared_total and len(all_funds) < declared_total * FT_COMPLETE_RATIO:
         ratio = len(all_funds) / declared_total * 100
         if attempt < FT_MAX_RETRY:
-            delay = FT_RETRY_BASE_DELAY * attempt
+            delay = min(FT_RETRY_BASE_DELAY * attempt, FT_RETRY_MAX_DELAY)
             print(f'  ⚠ {FT_MAP[ft]}({ft}) 未拉满: 实际{len(all_funds)}/声明{declared_total} ({ratio:.1f}%)，'
                   f'整类重试 {attempt}/{FT_MAX_RETRY}，{delay}s 后', flush=True)
             time.sleep(delay)
@@ -683,13 +688,50 @@ def main():
             print(f'  ✗ {FT_MAP[ft]}({ft}): 未拉满 实际 {got} / 声明 {declared} ({ratio*100:.1f}%)')
         else:
             print(f'  ✓ {FT_MAP[ft]}({ft}): 已拉满 实际 {got} / 声明 {declared} ({ratio*100:.1f}%)')
-    if incomplete:
+    # 1.6 第二道防线：与「生产表基线」比对。
+    #     仅按上游声明总数校验防不住「上游整体少报」——10/18 QDII 上游声明就是 115
+    #     （115/115=100% 看起来"拉满"），而生产基线 738，最后仍会走到 promote 报
+    #     「分类灾难性丢失」这种类型错误。故此处直接以生产表既有数量为基线做核对，
+    #     把类型错误在抓取阶段就还原成「数据拉取失败」。
+    #     口径：只比 .OF（本步骤只产场外基金；场内 ETF/LOF 由 5h 步骤单独补充）。
+    print('\n[1.6] 与生产表基线比对（实际抓取 / 生产 .OF 同分类数量）')
+    baseline_fail = []
+    try:
+        raw = run_mgmt_sql("SELECT t0, count(*) AS n FROM fund_scores WHERE c LIKE '%.OF' GROUP BY t0")
+        base_rows = raw if isinstance(raw, list) else (raw.get('rows') or raw.get('data') or [])
+        _CANON = {'股票型基金': '股票型', '混合型基金': '混合型', '债券型基金': '债券型'}
+        base = {}
+        for r in base_rows:
+            key = _CANON.get(r['t0'], r['t0'])
+            base[key] = base.get(key, 0) + r['n']
+        got_map = {}
+        for fund in all_funds:
+            key = _CANON.get(fund.get('t0'), fund.get('t0'))
+            got_map[key] = got_map.get(key, 0) + 1
+        for t0, bn in sorted(base.items(), key=lambda x: -x[1]):
+            gn = got_map.get(t0, 0)
+            if bn < 100:      # 太小的类不做硬校验，避免噪声误杀
+                continue
+            ratio = gn / bn
+            if ratio < 0.50:
+                baseline_fail.append((t0, gn, bn, ratio * 100))
+                print(f'  ✗ [{t0}] 远低于生产基线: 实际 {gn} / 生产 {bn} ({ratio*100:.1f}%)')
+            elif ratio < 0.95:
+                print(f'  ⚠ [{t0}] 低于生产基线 ({ratio*100:.1f}%): 实际 {gn} / 生产 {bn}（放行，promote 会回钉）')
+            else:
+                print(f'  ✓ [{t0}] 与生产基线一致 ({ratio*100:.1f}%): {gn}/{bn}')
+    except Exception as e:
+        print(f'  [WARN] 生产基线比对跳过（查询失败，不影响 declared 校验）: {e}')
+
+    if incomplete or baseline_fail:
         print('\n' + '=' * 60)
-        print('  ✗ 数据拉取失败：以下分类未拉满，终止本次运行（不写入 staging、不切换生产）')
+        print('  ✗ 数据拉取失败：数据未拉满，终止本次运行')
+        print('     （不写入 staging、不计算评分、不切换生产；生产 fund_scores 保持不变）')
         for ft, got, declared, pct in incomplete:
-            print(f'     - {FT_MAP[ft]}({ft}): {got}/{declared} ({pct:.1f}%)')
-        print('  说明: 已抓部分保留在中间文件 funds_output_raw.ndjson；'
-              '生产 fund_scores 保持不变，请重跑本步骤。')
+            print(f'     - 未达上游声明总数: {FT_MAP[ft]}({ft}) {got}/{declared} ({pct:.1f}%)，已重试 {FT_MAX_RETRY} 次')
+        for t0, gn, bn, pct in baseline_fail:
+            print(f'     - 远低于生产基线: [{t0}] {gn}/{bn} ({pct:.1f}%)')
+        print('  说明: 已抓部分保留在中间文件 funds_output_raw.ndjson；请重跑本步骤。')
         print('=' * 60)
         sys.exit(1)
 
