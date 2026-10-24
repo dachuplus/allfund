@@ -158,6 +158,31 @@ const papers = [
     label: '讲义2',
     load: () => import('../../data/gushiwenDasaiJy2.js').then((m) => ({ title: m.GUSHIWEN_JY2_TITLE, list: m.GUSHIWEN_JY2 })),
   },
+  {
+    key: 'fs11',
+    label: '复赛1-1',
+    load: () => import('../../data/gushiwenDasaiFs11.js').then((m) => ({ title: m.GUSHIWEN_FS11_TITLE, list: m.GUSHIWEN_FS11 })),
+  },
+  {
+    key: 'fs12',
+    label: '复赛1-2',
+    load: () => import('../../data/gushiwenDasaiFs12.js').then((m) => ({ title: m.GUSHIWEN_FS12_TITLE, list: m.GUSHIWEN_FS12 })),
+  },
+  {
+    key: 'fs13',
+    label: '复赛1-3',
+    load: () => import('../../data/gushiwenDasaiFs13.js').then((m) => ({ title: m.GUSHIWEN_FS13_TITLE, list: m.GUSHIWEN_FS13 })),
+  },
+  {
+    key: 'fs14',
+    label: '复赛1-4',
+    load: () => import('../../data/gushiwenDasaiFs14.js').then((m) => ({ title: m.GUSHIWEN_FS14_TITLE, list: m.GUSHIWEN_FS14 })),
+  },
+  {
+    key: 'fs15',
+    label: '复赛1-5',
+    load: () => import('../../data/gushiwenDasaiFs15.js').then((m) => ({ title: m.GUSHIWEN_FS15_TITLE, list: m.GUSHIWEN_FS15 })),
+  },
 ]
 
 const paperKey = ref('g4')
