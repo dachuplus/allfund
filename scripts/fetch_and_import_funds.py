@@ -69,6 +69,9 @@ FT_COMPLETE_RATIO = 0.98
 # QDII 走「主列表名单 + pingzhongdata 逐只取数」，个别基金无 pingzhongdata 是常态，
 # 单独放宽到 90%，避免正常解析失败被误判为「数据拉取失败」。
 QDII_COMPLETE_RATIO = 0.90
+# 生产基线里「不由本脚本抓取」的大类：货币型由步骤2d 的专用接口产出后合并。
+# 这些类在生产表存在但本步骤恒为 0，若纳入基线硬校验必然误判（10/25 回归：货币型 0/956）。
+NOT_FETCHED_HERE = {'货币型'}
 # 各类完整性登记：{ft: {'got': int, 'declared': int}}，由 main 汇总校验
 FETCH_COMPLETENESS = {}
 
@@ -668,6 +671,14 @@ def main():
             time.sleep(0.5)
     print(f'  中间文件 {raw_file}: {raw_written} 条（未去重）')
 
+    # 去重（必须在完整性校验之前：同一只基金可能同时在多个大类里被上游返回，
+    # 不去重会得到 200% 这类虚高计数，使校验口径失真）
+    deduped = {}
+    for fund in all_funds:
+        deduped[fund['c']] = fund
+    all_funds = list(deduped.values())
+    print(f'\n  去重后: {len(all_funds)}只')
+
     # 1.5 完整性校验：任何分类未拉满 → 判定「数据拉取失败」立即退出。
     #     不再让残缺数据进入评分/staging/切换，报错即「数据拉取未完成（哪个类、声明多少、
     #     实际多少）」，而不是最后 promote 的「分类灾难性丢失」。
@@ -710,6 +721,13 @@ def main():
             got_map[key] = got_map.get(key, 0) + 1
         for t0, bn in sorted(base.items(), key=lambda x: -x[1]):
             gn = got_map.get(t0, 0)
+            # 货币型不由本脚本抓取（走 fetch_currency_funds.py 的 hb rankhandler 单独接口，
+            # 步骤2d 产出 currency_output.ndjson 后由 import_via_rest 合并）。纳入硬校验会
+            # 恒为 0 → 误杀。此处只提示、不校验。
+            if t0 in NOT_FETCHED_HERE:
+                print(f'  - [{t0}] 本步骤不抓取（由步骤2d 货币基金专用接口产出），跳过基线校验'
+                      f'（生产 {bn} 只）')
+                continue
             if bn < 100:      # 太小的类不做硬校验，避免噪声误杀
                 continue
             ratio = gn / bn
@@ -734,13 +752,6 @@ def main():
         print('  说明: 已抓部分保留在中间文件 funds_output_raw.ndjson；请重跑本步骤。')
         print('=' * 60)
         sys.exit(1)
-
-    # 去重
-    deduped = {}
-    for fund in all_funds:
-        deduped[fund['c']] = fund
-    all_funds = list(deduped.values())
-    print(f'\n  去重后: {len(all_funds)}只')
 
     # 2. 初始化靠谱分和风险指标字段
     for fund in all_funds:
