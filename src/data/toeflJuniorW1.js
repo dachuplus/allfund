@@ -1,7 +1,7 @@
 /**
  * 小托福加油站 · Week 1（听力 + 语用（名词与冠词））
  *
- * 数据来源：Week 讲义 PDF（题目与选项）+ 答案解析 PDF（答案、简析、听力原文）。
+ * 数据来源：Week 讲义 PDF（题目、选项、专项练习）+ 答案解析 PDF（答案、简析、听力原文）。
  * 静态数据，零网络请求；听力音频为原讲义二维码解析出的外链。
  */
 
@@ -259,16 +259,22 @@ export const WEEK = {
       ],
       "drills": [
         {
-          "title": "专项练习答案",
-          "answer": "A 识别问法 1 M　2 D　3 D　4 D　5 M"
+          "title": "A. 识别问法 —— 判断下面每小题的类型，主旨题写 “M” ，细节题写 “D” 。",
+          "prompt": "1. What is the speaker mainly talking about? ______\n2. When does the bus leave in the morning? ______\n3. What do students need to bring to the museum? ______\n4. Why was the meeting moved to Thursday? ______\n5. What is the class project mainly about? ______",
+          "answer": "识别问法 1 M　2 D　3 D　4 D　5 M",
+          "note": "主旨题（M）问整段讲话在讲什么、目的是什么；细节题（D）问具体的时间、地点、要带什么。看到 mainly talking about / purpose 是 M，看到 when / where / how many 是 D。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "B 找关键词 转折：but / however / still / yet / though / despite 因果：because / since / due to；so / that's why / as a result of 目的：want you to / to tell you about / in order to / don't forget to / so that"
+          "title": "B. 找关键信号 —— 在下面各句中划出起相应作用的关键词。",
+          "prompt": "1. 划出表示「对比或转折」的关键词\nWe planned to go on Friday, but the trip is now on Thursday.\nThe library usually opens at nine; however, this week it opens at eight.\nThe test was difficult; still, everyone passed.\nThe film was long, yet it was really good.\nThough the class is cancelled, the work needs to be submitted.\nDespite the rain, the survival camp will continue.\n2. 划出表示「原因或结果」的关键词\nThe teacher moved the quiz because she will be away.\nIt was raining, so we stayed inside.\nSince the bus was late, we missed the beginning of the game.\nThe match was cancelled due to the heavy rain.\nThe bus was late; that's why we missed the game.\nThe event was postponed as a result of the storm.\n3. 划出表示「目的或意图」的关键词\nI want you to bring your permission form.\nDon't forget to hand in your homework.\nThis notice is to tell you about a small change.\nHe made a list in order to remember everything.\nShe woke up early so that she could catch the bus.",
+          "answer": "找关键词 转折：but / however / still / yet / though / despite",
+          "note": "转折词（but / however / still / yet / though / despite）之后才是真正要说的内容，常是出题点；因果词（because / since / due to / so / that's why）指向原因或结果；目的词（want you to / to tell you about / in order to / don't forget to / so that）直接给出说话人的意图。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "C 识别同义替换 B"
+          "title": "C. 识别同义替换 —— 阅读下面的听力原文和题目，选出正确答案，并在原文中划出和正确答案形成同义",
+          "prompt": "替换的关键句。\nNarrator: Listen to a teacher talking to her class.\nTeacher: \"Good morning, everyone. As you know, our school trip to the history museum is next Wednesday. I\nknow many of you are excited, but I want to remind you of two things. First, you must bring the signed\npermission form tomorrow — not on the day of the trip — because it takes time to check them all. Second,\nplease be at the school gate by 7:45 in the morning. The bus leaves at eight sharp, and we can't wait for\nanyone. If you haven't handed in your form by the end of tomorrow, you'll have to stay at school, which I'm\nsure you don't want.\"\n题目：What does the teacher want the students to do?\nA. Arrive at the gate half an hour before the bus leaves\nB. Give back the signed form by the end of the next day\nC. Wait at the museum for the bus after school\nD. Visit the history museum on Friday",
+          "answer": "识别同义替换 B",
+          "note": "正确答案几乎不会照抄原文，而是换一种说法。先在选项里圈出关键词，回到原文找意思相同的那句话，能对上就是答案。"
         }
       ]
     },
@@ -741,28 +747,40 @@ export const WEEK = {
       ],
       "drills": [
         {
-          "title": "专项练习答案",
-          "answer": "A 复数 books, cities, children, knives, photos, buses, roofs, ／ , ／ , ／； women, leaves, teeth, sheep, ／ , houses, ／ , ／ , heroes, toys"
+          "title": "A. 可数名词复数与不可数名词 —— 写出下列名词的复数形式；若为不可数名词，请写\"／\"。",
+          "prompt": "名词 复数形式（不可数写 ／） 名词 复数形式（不可数写 ／）\nbook ______ woman ______\ncity ______ leaf ______\nchild ______ tooth ______\nknife ______ sheep ______\nphoto ______ milk ______\nbus ______ house ______\nroof ______ money ______\ninformation ______ news ______\nfurniture ______ hero ______\nadvice ______ toy ______",
+          "answer": "复数 books, cities, children, knives, photos, buses, roofs, ／ , ／ , ／； women, leaves, teeth, sheep, ／ ,",
+          "note": "规则名词直接加 -s；s / x / ch / sh 结尾加 -es；辅音字母 + y 结尾变 y 为 i 加 -es；f / fe 结尾变 f 为 v 加 -es；hero 加 -es 但 photo 只加 -s；information / news / furniture / advice / money / milk 是不可数名词，没有复数形式。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "B 数量表达 one: egg / chair / book 　 many: buses / people / leaves 　 much: rice / water / information / help"
+          "title": "B. 数量表达",
+          "prompt": "1. 复数表达 —— 把以下  10 个词填入合适的一列（每个词只用一次）。\negg chair book buses people leaves rice water information help\none many much",
+          "answer": "数量表达 one: egg / chair / book 　 many: buses / people / leaves 　 much: rice / water / information / help",
+          "note": "one 后面接单数可数名词；many 后面接复数可数名词；much 后面接不可数名词。先判断词是可数还是不可数，再看单复数。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "C 所有格 1 Tom's 　 2 girls' 　 3 children's 　 4 Mr. Green's"
+          "title": "C. 名词所有格 —— 用括号内词语的正确所有格形式填空（ 's / ' ）。",
+          "prompt": "1.  (Tom) book 2. the  (girls) room\n3.  (children) classroom 4.  (Mr. Green) car",
+          "answer": "所有格 1 Tom's 　 2 girls' 　 3 children's 　 4 Mr. Green's",
+          "note": "不以 s 结尾的词（包括不规则复数 children）加 's；以 s 结尾的复数名词只加 '。看括号里的词本身是否以 s 结尾即可判断。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "D 名词作定1 five-minute 　 2 three-day 　 3 ten-page 　 4 one-hour"
+          "title": "D. 名词作形容词 —— 参考例子，改写下列句子。",
+          "prompt": "例：The test lasted two hours. → This is a two-hour test.\n1. The walk took five minutes.2. The trip lasted three days.\n→ This is a walk.→ This is a trip.\n3. The report is ten pages long.4. The meeting lasted an hour.\n→ This is a report.→ This is a meeting.",
+          "answer": "名词作定1 five-minute 　 2 three-day 　 3 ten-page 　 4 one-hour",
+          "note": "名词作定语修饰另一个名词时，即使意义上是复数也用单数形式，并用连字符连接：five-minute walk、three-day trip、ten-page report、one-hour meeting。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "E 量词词组 1 a lot of 　 2 a piece of 　 3 a variety of 　 4 a great deal of 　 5 a number of 　 6 an amount of 　 7 the number of 　 8 a couple of"
+          "title": "E. 量词词组 —— 用方框中的量词词组填空（每个词组只用一次）。",
+          "prompt": "a lot of a variety of a piece of a great deal of a number of an amount of the number of a couple of\n1. There is  information on the school website.\n2. We bought  furniture for the reading corner.\n3. The club has  activities after school.\n4. Our teacher gave us  advice about the test.\n5. There are  new books in the library.\n6. Please add  water to the paint.\n7.  students in our class is thirty.\n8. I will stay for  days in your town.",
+          "answer": "量词词组 1 a lot of 　 2 a piece of 　 3 a variety of 　 4 a great deal of 　 5 a number of 　 6 an amount of 　 7 the",
+          "note": "information / news / advice 等不可数名词搭配 a lot of、a piece of、a great deal of、an amount of；activities / books 等可数复数搭配 a variety of、a number of、a couple of；the number of 表示「……的数目」，后面谓语用单数。"
         },
         {
-          "title": "专项练习答案",
-          "answer": "F 冠词 1 a 　 2 an 　 3 the 　 4 ø 　 5 ø 　 6 an 　 7 the 　 8 a 　 9 the 　 10 the"
+          "title": "F. 冠词 —— 用 a / an / the / ø（零冠词）填空。",
+          "prompt": "1.  university 6.  honest boy\n2.  hour 7. in  morning\n3.  sun 8.  European\n4. play  tennis 9. each of  students\n5. at  breakfast 10.  best writer",
+          "answer": "冠词 1 a 　 2 an 　 3 the 　 4 ø 　 5 ø 　 6 an 　 7 the 　 8 a 　 9 the 　 10 the",
+          "note": "首次提到的单数可数名词用 a / an（a 接辅音音素、an 接元音音素，注意 university 用 a、hour 用 an）；双方都知道或第二次提到用 the；复数泛指、三餐、球类、固定搭配前用零冠词。"
         }
       ]
     }

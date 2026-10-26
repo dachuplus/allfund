@@ -85,15 +85,31 @@
           </div>
         </div>
 
-        <!-- 专项练习答案（可折叠，非选择题） -->
+        <!-- 专项练习：题面 + 答案（折叠）+ 解题要点 -->
         <div v-if="part.drills && part.drills.length" class="tj-drills">
           <button type="button" class="tj-fold" @click="toggleDrill(part.key)">
-            {{ drillOpen[part.key] ? '收起专项练习答案' : '展开专项练习答案' }}
+            {{ drillOpen[part.key] ? '收起专项练习' : '展开专项练习（题目 + 答案 + 解题要点）' }}
           </button>
           <div v-if="drillOpen[part.key]" class="tj-drill-body">
             <div v-for="(d, i) in part.drills" :key="i" class="tj-drill">
               <div class="tj-drill-title">{{ d.title }}</div>
-              <div class="tj-drill-text">{{ d.answer }}</div>
+              <div v-if="d.prompt" class="tj-drill-prompt">{{ d.prompt }}</div>
+              <button
+                v-if="d.answer || d.note"
+                type="button"
+                class="tj-fold sm"
+                @click="toggleDrillAns(part.key + '-' + i)"
+              >
+                {{ drillAnsOpen[part.key + '-' + i] ? '收起答案与解题要点' : '查看答案与解题要点' }}
+              </button>
+              <div v-if="drillAnsOpen[part.key + '-' + i]" class="tj-drill-ans">
+                <div v-if="d.answer" class="tj-drill-ansline">
+                  <span class="tj-why-tag">答案</span>{{ d.answer }}
+                </div>
+                <div v-if="d.note" class="tj-drill-note">
+                  <span class="tj-why-tag ok">解题要点</span>{{ d.note }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -203,6 +219,7 @@ const answers = reactive({})
 const whyOpen = reactive({})
 const transOpen = reactive({})
 const drillOpen = reactive({})
+const drillAnsOpen = reactive({})
 const onlyWrong = ref(false)
 const revealAll = ref(false)
 
@@ -230,6 +247,7 @@ function resetAll() {
   Object.keys(whyOpen).forEach((k) => delete whyOpen[k])
   Object.keys(transOpen).forEach((k) => delete transOpen[k])
   Object.keys(drillOpen).forEach((k) => delete drillOpen[k])
+  Object.keys(drillAnsOpen).forEach((k) => delete drillAnsOpen[k])
   onlyWrong.value = false
   revealAll.value = false
 }
@@ -307,6 +325,9 @@ function toggleTrans(k) {
 function toggleDrill(k) {
   drillOpen[k] = !drillOpen[k]
 }
+function toggleDrillAns(k) {
+  drillAnsOpen[k] = !drillAnsOpen[k]
+}
 function toggleWrong() {
   onlyWrong.value = !onlyWrong.value
   if (onlyWrong.value) window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -383,9 +404,19 @@ loadWeek('w1')
 .tj-trans-text {
   font-size: 13px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap;
 }
-.tj-drill { margin-bottom: 8px; }
-.tj-drill-title { font-size: 12px; font-weight: 700; color: #0b0c0c; }
-.tj-drill-text { font-size: 13px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; }
+.tj-drill {
+  margin-bottom: 12px; padding-bottom: 10px;
+  border-bottom: 1px dashed #b1b4b6;
+}
+.tj-drill-title { font-size: 13px; font-weight: 700; color: #0b0c0c; margin-bottom: 4px; }
+.tj-drill-prompt {
+  font-size: 13px; line-height: 1.75; color: var(--text-secondary);
+  white-space: pre-wrap; background: #fff;
+  border: 1px solid #b1b4b6; padding: 8px 10px; margin-bottom: 6px;
+}
+.tj-drill-ans { margin-top: 6px; }
+.tj-drill-ansline { font-size: 13px; line-height: 1.7; color: #0b0c0c; margin-bottom: 6px; }
+.tj-drill-note { font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
 
 .tj-group { margin-top: 14px; }
 .tj-group-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
