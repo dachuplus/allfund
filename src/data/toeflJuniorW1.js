@@ -222,39 +222,39 @@ export const WEEK = {
       "transcript": [
         {
           "label": "Q1",
-          "text": "Narrator: Listen to a teacher talking about a school trip.\nTeacher: \"Class, a quick reminder about Friday's trip to the science museum. You need to bring back the permission form that\nyour parents signed. Please give it to me by Wednesday, not Thursday, because I need to count how many tickets to order. If\nyou forget it, you won't be able to come.\""
+          "text": "Narrator: Listen to a teacher talking about a school trip.\nTeacher: \"Class, a quick reminder about Friday's trip to the science museum. You need to bring back the permission form that your parents signed. Please give it to me by Wednesday, not Thursday, because I need to count how many tickets to order. If you forget it, you won't be able to come.\""
         },
         {
           "label": "Q2",
-          "text": "Narrator: Listen to a coach talking to a sports team.\nCoach: \"Thanks, everyone, for a great practice today! One change to our week: our team meeting is now on Thursday at noon\nin room 12, not Wednesday. On Wednesday I'm helping out at the middle school game, so we can't meet then. Please bring\nyour playbook and a water bottle.\""
+          "text": "Narrator: Listen to a coach talking to a sports team.\nCoach: \"Thanks, everyone, for a great practice today! One change to our week: our team meeting is now on Thursday at noon in room 12, not Wednesday. On Wednesday I'm helping out at the middle school game, so we can't meet then. Please bring your playbook and a water bottle.\""
         },
         {
           "label": "Q3",
-          "text": "Narrator: Listen to a librarian talking to students.\nLibrarian: \"Just a note for everyone: starting next Monday, our library will open at 8:30 in the morning instead of 9:00. The\nchange is because more students are coming early to study. Please come in quietly, and remember to bring your student card\nto take books home.\""
+          "text": "Narrator: Listen to a librarian talking to students.\nLibrarian: \"Just a note for everyone: starting next Monday, our library will open at 8:30 in the morning instead of 9:00. The change is because more students are coming early to study. Please come in quietly, and remember to bring your student card to take books home.\""
         },
         {
           "label": "Q4",
-          "text": "Narrator: Listen to a school principal making an announcement.\nPrincipal: \"I'm very happy to announce that we'll welcome a famous nature photographer to our school on Friday morning.\nShe'll share her pictures from around the world at a special assembly in the main hall. All students are encouraged to attend.\""
+          "text": "Narrator: Listen to a school principal making an announcement.\nPrincipal: \"I'm very happy to announce that we'll welcome a famous nature photographer to our school on Friday morning. She'll share her pictures from around the world at a special assembly in the main hall. All students are encouraged to attend.\""
         },
         {
           "label": "Q5",
-          "text": "Narrator: Listen to a teacher introducing a class project.\nTeacher: \"This term we're starting a class project. We're going to grow a small garden by the classroom window — flowers\nand a few herbs. You'll each take care of one plant and keep notes about how it grows. By June, we'll have our own little\ngarden!\""
+          "text": "Narrator: Listen to a teacher introducing a class project.\nTeacher: \"This term we're starting a class project. We're going to grow a small garden by the classroom window — flowers and a few herbs. You'll each take care of one plant and keep notes about how it grows. By June, we'll have our own little garden!\""
         },
         {
           "label": "Q6",
-          "text": "Narrator: Listen to a school nurse talking to students.\nNurse: \"With the cold weather coming, please look after yourselves. The most important thing is this: if you have a fever,\nstay home and rest until you feel better. That way you won't pass it to your classmates. Drink plenty of water and cover your\ncough.\""
+          "text": "Narrator: Listen to a school nurse talking to students.\nNurse: \"With the cold weather coming, please look after yourselves. The most important thing is this: if you have a fever, stay home and rest until you feel better. That way you won't pass it to your classmates. Drink plenty of water and cover your cough.\""
         },
         {
           "label": "Q7",
-          "text": "Narrator: Listen to a teacher explaining a change to the homework schedule.\nTeacher: \"Just so you know, I've moved our grammar quiz to Monday. I'll be away at a conference this Friday, so we can't\ntake the test on the day I'd planned. Please bring your homework on Monday, and we'll go over it together before the quiz.\""
+          "text": "Narrator: Listen to a teacher explaining a change to the homework schedule.\nTeacher: \"Just so you know, I've moved our grammar quiz to Monday. I'll be away at a conference this Friday, so we can't take the test on the day I'd planned. Please bring your homework on Monday, and we'll go over it together before the quiz.\""
         },
         {
           "label": "Q8",
-          "text": "Narrator: Listen to a school manager talking about the new bus route.\nManager: \"From next term, the school bus will drop students at the gate on Austin Road instead of the old stop on the corner.\nIt's a bit further from the school building — you may need to walk five more minutes. Please plan for the extra time so you're\nnot late.\""
+          "text": "Narrator: Listen to a school manager talking about the new bus route.\nManager: \"From next term, the school bus will drop students at the gate on Austin Road instead of the old stop on the corner. It's a bit further from the school building — you may need to walk five more minutes. Please plan for the extra time so you're not late.\""
         },
         {
           "label": "Q9",
-          "text": "Narrator: Listen to a teacher talking about a class competition.\nTeacher: \"This writing competition is open to everyone, and I'd really love to see each of you take part. You don't have to be\nthe best writer to join — we'll work in teams, and everyone gets a chance to share ideas. It's about enjoying the process, not\njust winning.\""
+          "text": "Narrator: Listen to a teacher talking about a class competition.\nTeacher: \"This writing competition is open to everyone, and I'd really love to see each of you take part. You don't have to be the best writer to join — we'll work in teams, and everyone gets a chance to share ideas. It's about enjoying the process, not just winning.\""
         }
       ],
       "drills": [
@@ -266,13 +266,13 @@ export const WEEK = {
         },
         {
           "title": "B. 找关键信号 —— 在下面各句中划出起相应作用的关键词。",
-          "prompt": "1. 划出表示「对比或转折」的关键词\nWe planned to go on Friday, but the trip is now on Thursday.\nThe library usually opens at nine; however, this week it opens at eight.\nThe test was difficult; still, everyone passed.\nThe film was long, yet it was really good.\nThough the class is cancelled, the work needs to be submitted.\nDespite the rain, the survival camp will continue.\n2. 划出表示「原因或结果」的关键词\nThe teacher moved the quiz because she will be away.\nIt was raining, so we stayed inside.\nSince the bus was late, we missed the beginning of the game.\nThe match was cancelled due to the heavy rain.\nThe bus was late; that's why we missed the game.\nThe event was postponed as a result of the storm.\n3. 划出表示「目的或意图」的关键词\nI want you to bring your permission form.\nDon't forget to hand in your homework.\nThis notice is to tell you about a small change.\nHe made a list in order to remember everything.\nShe woke up early so that she could catch the bus.",
+          "prompt": "1. 划出表示「对比或转折」的关键词 We planned to go on Friday, but the trip is now on Thursday. The library usually opens at nine; however, this week it opens at eight. The test was difficult; still, everyone passed. The film was long, yet it was really good. Though the class is cancelled, the work needs to be submitted. Despite the rain, the survival camp will continue.\n2. 划出表示「原因或结果」的关键词 The teacher moved the quiz because she will be away. It was raining, so we stayed inside. Since the bus was late, we missed the beginning of the game. The match was cancelled due to the heavy rain. The bus was late; that's why we missed the game. The event was postponed as a result of the storm.\n3. 划出表示「目的或意图」的关键词 I want you to bring your permission form. Don't forget to hand in your homework. This notice is to tell you about a small change. He made a list in order to remember everything. She woke up early so that she could catch the bus.",
           "answer": "找关键词 转折：but / however / still / yet / though / despite",
           "note": "转折词（but / however / still / yet / though / despite）之后才是真正要说的内容，常是出题点；因果词（because / since / due to / so / that's why）指向原因或结果；目的词（want you to / to tell you about / in order to / don't forget to / so that）直接给出说话人的意图。"
         },
         {
           "title": "C. 识别同义替换 —— 阅读下面的听力原文和题目，选出正确答案，并在原文中划出和正确答案形成同义",
-          "prompt": "替换的关键句。\nNarrator: Listen to a teacher talking to her class.\nTeacher: \"Good morning, everyone. As you know, our school trip to the history museum is next Wednesday. I\nknow many of you are excited, but I want to remind you of two things. First, you must bring the signed\npermission form tomorrow — not on the day of the trip — because it takes time to check them all. Second,\nplease be at the school gate by 7:45 in the morning. The bus leaves at eight sharp, and we can't wait for\nanyone. If you haven't handed in your form by the end of tomorrow, you'll have to stay at school, which I'm\nsure you don't want.\"\n题目：What does the teacher want the students to do?\nA. Arrive at the gate half an hour before the bus leaves\nB. Give back the signed form by the end of the next day\nC. Wait at the museum for the bus after school\nD. Visit the history museum on Friday",
+          "prompt": "替换的关键句。\nNarrator: Listen to a teacher talking to her class.\nTeacher: \"Good morning, everyone. As you know, our school trip to the history museum is next Wednesday. I know many of you are excited, but I want to remind you of two things. First, you must bring the signed permission form tomorrow — not on the day of the trip — because it takes time to check them all. Second, please be at the school gate by 7:45 in the morning. The bus leaves at eight sharp, and we can't wait for anyone. If you haven't handed in your form by the end of tomorrow, you'll have to stay at school, which I'm sure you don't want.\" 题目：What does the teacher want the students to do?\nA. Arrive at the gate half an hour before the bus leaves\nB. Give back the signed form by the end of the next day\nC. Wait at the museum for the bus after school\nD. Visit the history museum on Friday",
           "answer": "识别同义替换 B",
           "note": "正确答案几乎不会照抄原文，而是换一种说法。先在选项里圈出关键词，回到原文找意思相同的那句话，能对上就是答案。"
         }
@@ -308,7 +308,7 @@ export const WEEK = {
             },
             {
               "n": 2,
-              "q": "I need to booknear your house for two night and I will reach the station. ______",
+              "q": "I need to book ______ near your house for two night and I will reach the station.",
               "options": [
                 "the hotel",
                 "a hotel",
@@ -326,7 +326,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "on Friday morning. Last week I sent to your mother, but I am not sure she has read it. ______",
+              "q": "on Friday morning. Last week I sent ______ to your mother, but I am not sure she has read it.",
               "options": [
                 "a email",
                 "an email",
@@ -344,7 +344,7 @@ export const WEEK = {
             },
             {
               "n": 4,
-              "q": "I was happy to get about your new school. ______",
+              "q": "I was happy to get ______ about your new school.",
               "options": [
                 "a news",
                 "a piece of news",
@@ -362,7 +362,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "I would love to seeof your town, so please bring your camera. ______",
+              "q": "I would love to see ______ of your town, so please bring your camera.",
               "options": [
                 "photo",
                 "photos",
@@ -380,7 +380,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "My sister will join us on Saturday, so we needfor the show. ______",
+              "q": "My sister will join us on Saturday, so we need ______ for the show.",
               "options": [
                 "the more tickets",
                 "a tickets",
@@ -399,7 +399,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "I will bringfor us, so you do not need to prepare anything. ______",
+              "q": "I will bring ______ for us, so you do not need to prepare anything.",
               "options": [
                 "enough sleeping bags",
                 "sleeping bag enough",
@@ -418,7 +418,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "Thank you again for. I am looking forward to seeing you. ______",
+              "q": "Thank you again for ______. I am looking forward to seeing you.",
               "options": [
                 "a invitation",
                 "an invitation",
@@ -442,7 +442,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 9,
-              "q": "Our community will hold a sports day next month. It isbig event for everyone in the town. ______",
+              "q": "Our community will hold a sports day next month. It is ______ big event for everyone in the town.",
               "options": [
                 "a",
                 "an",
@@ -461,7 +461,7 @@ export const WEEK = {
             },
             {
               "n": 10,
-              "q": "The games will start at nine and finish at noon, so the whole morning will last . ______",
+              "q": "The games will start at nine and finish at noon, so the whole morning will last ______.",
               "options": [
                 "a hour",
                 "an hour",
@@ -480,7 +480,7 @@ export const WEEK = {
             },
             {
               "n": 11,
-              "q": "We need helpers for the races. Every must bring comfortable shoes. ______",
+              "q": "We need helpers for the races. Every ______ must bring comfortable shoes.\u0002",
               "options": [
                 "student",
                 "students",
@@ -497,7 +497,7 @@ export const WEEK = {
             },
             {
               "n": 12,
-              "q": "Please also bring, because the weather will be hot all day. ______",
+              "q": "Please also bring ______, because the weather will be hot all day.\u0002",
               "options": [
                 "a water",
                 "waters",
@@ -516,7 +516,7 @@ export const WEEK = {
             },
             {
               "n": 13,
-              "q": "We must take care of all the, because the school lends it to us. ______",
+              "q": "We must take care of all the ______, because the school lends it to us.\u0002",
               "options": [
                 "equipments",
                 "equipment",
@@ -535,7 +535,7 @@ export const WEEK = {
             },
             {
               "n": 14,
-              "q": "Two parents are preparingfor the running race. ______",
+              "q": "Two parents are preparing ______ for the running race.",
               "options": [
                 "the list of players",
                 "players the list",
@@ -552,7 +552,7 @@ export const WEEK = {
             },
             {
               "n": 15,
-              "q": "We hope everyone will come and enjoywith us. ______",
+              "q": "We hope everyone will come and enjoy ______ with us.",
               "options": [
                 "a day",
                 "the day",
@@ -596,7 +596,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 1,
-              "q": "Last year our school startedscience club for students who love science. ______",
+              "q": "Last year our school started ______ science club for students who love science.\u0002",
               "options": [
                 "a",
                 "an",
@@ -615,7 +615,7 @@ export const WEEK = {
             },
             {
               "n": 2,
-              "q": "The old instrument was once used by . ______",
+              "q": "The old instrument was once used by ______.",
               "options": [
                 "a famous local astronomer",
                 "famous a local astronomer",
@@ -634,7 +634,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "incupboard next to the door. ______",
+              "q": "in ______ cupboard next to the door.\u0002",
               "options": [
                 "the",
                 "a",
@@ -651,7 +651,7 @@ export const WEEK = {
             },
             {
               "n": 4,
-              "q": "There are alsoon the shelf. The lamp is switched on every evening ______",
+              "q": "There are also ______ on the shelf. The lamp is switched on every evening",
               "options": [
                 "some old bottles",
                 "old some bottles",
@@ -670,7 +670,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "so that we can see. This telescope is than the old one, so we use it most. ______",
+              "q": "so that we can see. This telescope is ______ than the old one, so we use it most.",
               "options": [
                 "more better",
                 "much better",
@@ -687,7 +687,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "The club has bought for the new laboratory. ______",
+              "q": "The club has bought ______ for the new laboratory.",
               "options": [
                 "several new instruments",
                 "new several instrument",
@@ -706,7 +706,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "The next meeting will be held next Friday.of the members is excited to share ideas. ______",
+              "q": "The next meeting will be held next Friday. ______ of the members is excited to share ideas.\u0002",
               "options": [
                 "Many",
                 "Both",
@@ -725,7 +725,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "The club always needshelp from new students, so you are welcomed to join us ! ______",
+              "q": "The club always needs ______ help from new students, so you are welcomed to join us\u0002!",
               "options": [
                 "every",
                 "many",
@@ -754,35 +754,35 @@ export const WEEK = {
         },
         {
           "title": "B. 数量表达",
-          "prompt": "1. 复数表达 —— 把以下  10 个词填入合适的一列（每个词只用一次）。\negg chair book buses people leaves rice water information help\none many much",
+          "prompt": "1. 复数表达 —— 把以下 ______ 10 个词填入合适的一列（每个词只用一次）。 egg chair book buses people leaves rice water information help one many much",
           "answer": "数量表达 one: egg / chair / book 　 many: buses / people / leaves 　 much: rice / water / information / help",
           "note": "one 后面接单数可数名词；many 后面接复数可数名词；much 后面接不可数名词。先判断词是可数还是不可数，再看单复数。"
         },
         {
           "title": "C. 名词所有格 —— 用括号内词语的正确所有格形式填空（ 's / ' ）。",
-          "prompt": "1.  (Tom) book 2. the  (girls) room\n3.  (children) classroom 4.  (Mr. Green) car",
+          "prompt": "1. (Tom) book\n2. the ______ (girls) room\n3. (children) classroom\n4. (Mr. Green) car",
           "answer": "所有格 1 Tom's 　 2 girls' 　 3 children's 　 4 Mr. Green's",
           "note": "不以 s 结尾的词（包括不规则复数 children）加 's；以 s 结尾的复数名词只加 '。看括号里的词本身是否以 s 结尾即可判断。"
         },
         {
           "title": "D. 名词作形容词 —— 参考例子，改写下列句子。",
-          "prompt": "例：The test lasted two hours. → This is a two-hour test.\n1. The walk took five minutes.2. The trip lasted three days.\n→ This is a walk.→ This is a trip.\n3. The report is ten pages long.4. The meeting lasted an hour.\n→ This is a report.→ This is a meeting.",
+          "prompt": "例：The test lasted two hours.\n→ This is a two-hour test.\n1. The walk took five minutes.\n2. The trip lasted three days. → This is a walk.→ This is a trip.\n3. The report is ten pages long.\n4. The meeting lasted an hour. → This is a report.→ This is a meeting.",
           "answer": "名词作定1 five-minute 　 2 three-day 　 3 ten-page 　 4 one-hour",
           "note": "名词作定语修饰另一个名词时，即使意义上是复数也用单数形式，并用连字符连接：five-minute walk、three-day trip、ten-page report、one-hour meeting。"
         },
         {
           "title": "E. 量词词组 —— 用方框中的量词词组填空（每个词组只用一次）。",
-          "prompt": "a lot of a variety of a piece of a great deal of a number of an amount of the number of a couple of\n1. There is  information on the school website.\n2. We bought  furniture for the reading corner.\n3. The club has  activities after school.\n4. Our teacher gave us  advice about the test.\n5. There are  new books in the library.\n6. Please add  water to the paint.\n7.  students in our class is thirty.\n8. I will stay for  days in your town.",
+          "prompt": "a lot of a variety of a piece of a great deal of a number of an amount of the number of a couple of\n1. There is ______ information on the school website.\n2. We bought ______ furniture for the reading corner.\n3. The club has ______ activities after school.\n4. Our teacher gave us ______ advice about the test.\n5. There are ______ new books in the library.\n6. Please add ______ water to the paint.\n7. students in our class is thirty.\n8. I will stay for ______ days in your town.",
           "answer": "量词词组 1 a lot of 　 2 a piece of 　 3 a variety of 　 4 a great deal of 　 5 a number of 　 6 an amount of 　 7 the",
           "note": "information / news / advice 等不可数名词搭配 a lot of、a piece of、a great deal of、an amount of；activities / books 等可数复数搭配 a variety of、a number of、a couple of；the number of 表示「……的数目」，后面谓语用单数。"
         },
         {
           "title": "F. 冠词 —— 用 a / an / the / ø（零冠词）填空。",
-          "prompt": "1.  university 6.  honest boy\n2.  hour 7. in  morning\n3.  sun 8.  European\n4. play  tennis 9. each of  students\n5. at  breakfast 10.  best writer",
+          "prompt": "1. university\n2. hour\n3. sun\n4. play ______ tennis\n5. at ______ breakfast\n6. honest boy\n7. in ______ morning\n8. European\n9. each of ______ students\n10. best writer",
           "answer": "冠词 1 a 　 2 an 　 3 the 　 4 ø 　 5 ø 　 6 an 　 7 the 　 8 a 　 9 the 　 10 the",
           "note": "首次提到的单数可数名词用 a / an（a 接辅音音素、an 接元音音素，注意 university 用 a、hour 用 an）；双方都知道或第二次提到用 the；复数泛指、三餐、球类、固定搭配前用零冠词。"
         }
       ]
     }
   ]
-}
+};

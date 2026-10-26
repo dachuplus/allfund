@@ -288,33 +288,33 @@ export const WEEK = {
       "transcript": [
         {
           "label": "Q1–Q4",
-          "text": "Narrator: Listen to a conversation between a student and a librarian.\nStudent: Excuse me. I looked for this book on the shelf, but I couldn't find it anywhere.\nLibrarian: Let me check. ... Ah, I see — every copy is out right now. Someone returned one about ten minutes ago, though,\nso it's still on the sorting cart at the back.\nStudent: Great. Could you put it aside for me? I really need it for my history report.\nLibrarian: Sure. I'll write your name on a slip and keep it behind the desk until Friday.\nStudent: Thank you. And when do I have to bring it back?\nLibrarian: Our usual loan is two weeks, so it's due on the twenty-eighth, before five in the afternoon.\nStudent: The twenty-eighth? That's the day of my presentation.\nLibrarian: Then you might want to renew it. You can do that on the library website — just log in with your student number\nand click “renew”.\nStudent: I didn't know that. I'll do it on the website, then. Thanks a lot.\nLibrarian: You're welcome. And good luck with the report."
+          "text": "Narrator: Listen to a conversation between a student and a librarian.\nStudent: Excuse me. I looked for this book on the shelf, but I couldn't find it anywhere.\nLibrarian: Let me check. ... Ah, I see — every copy is out right now. Someone returned one about ten minutes ago, though, so it's still on the sorting cart at the back.\nStudent: Great. Could you put it aside for me? I really need it for my history report.\nLibrarian: Sure. I'll write your name on a slip and keep it behind the desk until Friday.\nStudent: Thank you. And when do I have to bring it back?\nLibrarian: Our usual loan is two weeks, so it's due on the twenty-eighth, before five in the afternoon.\nStudent: The twenty-eighth? That's the day of my presentation.\nLibrarian: Then you might want to renew it. You can do that on the library website — just log in with your student number and click “renew”.\nStudent: I didn't know that. I'll do it on the website, then. Thanks a lot.\nLibrarian: You're welcome. And good luck with the report."
         },
         {
           "label": "Q5–Q8",
-          "text": "Narrator: Listen to a conversation between a student and a cafeteria worker.\nStudent: Excuse me. I usually have the vegetarian meal here on Tuesdays, but I didn't see it on the menu today. Do you know\nwhy?\nWorker: Ah, that's because of the repairs in the kitchen. From next week, we'll only serve hot meals on Monday, Tuesday,\nWednesday and Thursday — not on Friday. The sandwich counter will stay open every day, though.\nStudent: I see. So there won't be any hot food at all on Fridays?\nWorker: That's right. It should only be for a month or so, while the new ovens are put in.\nStudent: But I don't eat meat, so I don't want a chicken sandwich.\nWorker: Then you can ask for a vegetarian meal. Write your name on the form at the front desk and hand it in by Friday, and\nthe kitchen will keep one for you.\nStudent: Great. I'll fill it in before I go home.\nWorker: No problem. Next, please!"
+          "text": "Narrator: Listen to a conversation between a student and a cafeteria worker.\nStudent: Excuse me. I usually have the vegetarian meal here on Tuesdays, but I didn't see it on the menu today. Do you know why?\nWorker: Ah, that's because of the repairs in the kitchen. From next week, we'll only serve hot meals on Monday, Tuesday, Wednesday and Thursday — not on Friday. The sandwich counter will stay open every day, though.\nStudent: I see. So there won't be any hot food at all on Fridays?\nWorker: That's right. It should only be for a month or so, while the new ovens are put in.\nStudent: But I don't eat meat, so I don't want a chicken sandwich.\nWorker: Then you can ask for a vegetarian meal. Write your name on the form at the front desk and hand it in by Friday, and the kitchen will keep one for you.\nStudent: Great. I'll fill it in before I go home.\nWorker: No problem. Next, please!"
         },
         {
           "label": "Q9–Q12",
-          "text": "Narrator: Listen to a conversation between a student and his teacher, Ms. Warren.\nStudent: Morning, Ms. Warren. Do you have a minute?\nMs. Warren: Of course. What can I do for you?\nStudent: Well, you might have seen the photos on our class blog — the ones I took at the school fair.\nMs. Warren: I did. I thought they were lovely. Did you come to ask about the photography competition? The deadline is next\nFriday.\nStudent: That's right. I'd like to enter the picture of the science stand.\nMs. Warren: Then let's check it against the rules. Every photo has to be A4 size ... Is yours?\nStudent: I'm not sure. I printed it at home, and it came out smaller.\nMs. Warren: I'm afraid the rules are strict about that. Last year two entries were sent back because they were the wrong size.\nYou'll need to print it again.\nStudent: No problem. I can do that this evening.\nMs. Warren: There's one more thing. The judges only accept photos taken in the last two months. How old is yours?\nStudent: I took it at the school fair last March.\nMs. Warren: That's much too old, I'm afraid. But the competition doesn't need a school event. A photo of anything is fine, so\nlong as you took it yourself.\nStudent: Really? I've got three tests this week, so I probably won't have time before the weekend.\nMs. Warren: The weekend is fine. There's still almost a week before the deadline.\nStudent: Then I'll go to the park on Saturday and try to get something better than this one."
+          "text": "Narrator: Listen to a conversation between a student and his teacher, Ms. Warren.\nStudent: Morning, Ms. Warren. Do you have a minute?\nMs. Warren: Of course. What can I do for you?\nStudent: Well, you might have seen the photos on our class blog — the ones I took at the school fair.\nMs. Warren: I did. I thought they were lovely. Did you come to ask about the photography competition? The deadline is next Friday.\nStudent: That's right. I'd like to enter the picture of the science stand.\nMs. Warren: Then let's check it against the rules. Every photo has to be A4 size ... Is yours?\nStudent: I'm not sure. I printed it at home, and it came out smaller.\nMs. Warren: I'm afraid the rules are strict about that. Last year two entries were sent back because they were the wrong size. You'll need to print it again.\nStudent: No problem. I can do that this evening.\nMs. Warren: There's one more thing. The judges only accept photos taken in the last two months. How old is yours?\nStudent: I took it at the school fair last March.\nMs. Warren: That's much too old, I'm afraid. But the competition doesn't need a school event. A photo of anything is fine, so long as you took it yourself.\nStudent: Really? I've got three tests this week, so I probably won't have time before the weekend.\nMs. Warren: The weekend is fine. There's still almost a week before the deadline.\nStudent: Then I'll go to the park on Saturday and try to get something better than this one."
         }
       ],
       "drills": [
         {
           "title": "A. 判断说话人关系 —— 阅读下列对话，选出说话人之间最可能的关系。",
-          "prompt": "1.\nA: Have you finished marking our essays, Mr. Bell?\nB: Almost. I'll hand them back on Thursday, and we can talk about the comments in class.\nA. Two classmates\nB. A customer and a shop assistant\nC. A student and a teacher\n2.\nA: Could I have two tickets for the eight o'clock show?\nB: Certainly. That'll be sixteen dollars. Screen Three, on your right.\nA. A customer and a cinema worker\nB. A student and a librarian\nC. Two neighbours\n3.\nA: Mum, I can't find my swimming goggles.\nB: Look in the bag by the door. And don't forget your towel this time.\n1\nA. A coach and a player\nB. Two students\nC. A parent and a child\n4.\nA: Excuse me, is this seat free?\nB: Yes, go ahead. The lecture starts in five minutes.\nA. Two students in a university classroom\nB. A teacher and a parent at home\nC. Two passengers on a plane\n5.\nA: Good morning. I'd like to open a savings account for my daughter.\nB: Certainly, sir. Could I see your ID, please?\nA. A student and a teacher\nB. A customer and a bank clerk\nC. Two friends",
+          "prompt": "1. A: Have you finished marking our essays, Mr. Bell? B: Almost. I'll hand them back on Thursday, and we can talk about the comments in class.\nA. Two classmates\nB. A customer and a shop assistant\nC. A student and a teacher\nA. A coach and a player\nB. Two students\nC. A parent and a child\n2. A: Could I have two tickets for the eight o'clock show? B: Certainly. That'll be sixteen dollars. Screen Three, on your right.\nA. A customer and a cinema worker\nB. A student and a librarian\nC. Two neighbours\n3. A: Mum, I can't find my swimming goggles. B: Look in the bag by the door. And don't forget your towel this time.\n4. A: Excuse me, is this seat free? B: Yes, go ahead. The lecture starts in five minutes.\nA. Two students in a university classroom\nB. A teacher and a parent at home\nC. Two passengers on a plane\n5. A: Good morning. I'd like to open a savings account for my daughter. B: Certainly, sir. Could I see your ID, please?\nA. A student and a teacher\nB. A customer and a bank clerk\nC. Two friends",
           "answer": "判断说话人关系1 C  　2 A 　3 C 　4 A 　5 B",
           "note": "抓称呼和场景词判断关系：Mr. / Ms. 加姓氏多为师生，excuse me 加 menu / ticket 多为服务人员与顾客，谈论作业和作业布置多为同学之间。"
         },
         {
           "title": "B. 识别细节 —— 阅读下列对话以及题目，选出正确选项，并在对话原文中划出相关句子。",
-          "prompt": "1.\nStudent: Are you coming to the football match on Saturday? We're meeting at the school gate at two.\nFriend: I'd love to, but I'm visiting my grandparents that afternoon.\nStudent: That's a pity. What about Sunday? There's another match, but it's in the morning.\nFriend: Sunday morning is fine. I'll bring the tickets.\nWhat is the friend going to do on Saturday?\nA. Visit his grandparents\nB. Go to a football match\nC. Buy the tickets\n2.\nStudent: The bus to the science museum leaves at nine, doesn't it? I don't want to be late.\nClerk: Not this week. It's leaving at half past eight, and there's another one at noon.\nStudent: Half past eight? I thought the early bus was at eight.\nClerk: That's the city bus, not the school bus. The school bus is the one at half past eight.\nWhen does the school bus leave this week?\nA. At 8:30\nB. At 9:00\nC. At noon\n3.\nStudent: I can't find my library card anywhere. I looked through my schoolbag twice this morning.\nFriend: You left it on the desk in the reading room. I saw it there when I came in.\nStudent: Are you sure? I was only in the reading room for ten minutes.\nFriend: Yes, and someone handed it to the librarian at the front desk later. Go and ask her.\n2\nWhere did the woman first see the card?\nA. On the desk in the reading room\nB. In the student's schoolbag\nC. At the front desk\n4.\nTeacher: Did you finish the whole project by yourself? That poster looks like a lot of work.\nStudent: No, my cousin helped me with the drawings. I did the writing and the title.\nTeacher: Your cousin is good at drawing, isn't she?\nStudent: Yes, she's much better than I am. She wants to study art.\nWhat did the student's cousin do?\nA. She wrote the report.\nB. She helped with the drawings.\nC. She did the whole project.\n5.\nStudent: When does the library close today? I n",
+          "prompt": "1. Student: Are you coming to the football match on Saturday? We're meeting at the school gate at two. Friend: I'd love to, but I'm visiting my grandparents that afternoon. Student: That's a pity. What about Sunday? There's another match, but it's in the morning. Friend: Sunday morning is fine. I'll bring the tickets. What is the friend going to do on Saturday?\nA. Visit his grandparents\nB. Go to a football match\nC. Buy the tickets\n2. Student: The bus to the science museum leaves at nine, doesn't it? I don't want to be late. Clerk: Not this week. It's leaving at half past eight, and there's another one at noon. Student: Half past eight? I thought the early bus was at eight. Clerk: That's the city bus, not the school bus. The school bus is the one at half past eight. When does the school bus leave this week?\nA. At 8:30\nB. At 9:00\nC. At noon Where did the woman first see the card?\nA. On the desk in the reading room\nB. In the student's schoolbag\nC. At the front desk\n3. Student: I can't find my library card anywhere. I looked through my schoolbag twice this morning. Friend: You left it on the desk in the reading room. I saw it there when I came in. Student: Are you sure? I was only in the reading room for ten minutes. Friend: Yes, and someone handed it to the librarian at the front desk later. Go and ask her.\n4. Teacher: Did you finish the whole project by yourself? That poster looks like a lot of work. Student: No, my cousin helped me with the drawings. I did the writing and the title. Teacher: Your cousin is good at drawing, isn't she? Student: Yes, she's much better than I am. She wants to study art. What did the student's cousin do?\nA. She wrote the report.\nB. She helped with the drawings.\nC. She did the whole project.\n5. Student: When does the library close today? I n",
           "answer": "识别细节 1 A  　2 A 　3 A 　4 B 　5 B",
           "note": "先读题干确定要找的信息（时间、价格、地点、数量），听的时候只抓对应的具体词，不要指望听懂每一个词。"
         },
         {
           "title": "C. 推断意图 —— 阅读下列对话，根据下划线句子，选出该说话人真正想表达的意思。",
-          "prompt": "1.\nFriend: Can you help me with the poster on Sunday?\nStudent: I've got three tests next week.\nA. He is not free on Sunday.\nB. He wants to borrow the test papers.\nC. He wants help with his tests.\n2.\nFriend: Let's take a taxi. It's only a ten-minute walk.\nStudent: It's raining, and I'm carrying two heavy bags.\nA. She wants to walk faster.\nB. She does not want to walk.\nC. She is worried about missing the train.\n3.\nClassmate: Are you coming to the party?\nStudent: I'll see how much homework I have.\nA. He has already decided to come.\nB. He would like to come, but he is not sure yet.\n3\nC. He does not like parties at all.\n4.\nStudent: Mr. Chen, I've finished all the exercises but the last one.\nTeacher: That's fine. Bring your questions to class tomorrow.\nA. He wants the teacher to check his work.\nB. He wants the teacher to give him more exercises.\nC. He wants to know the answer to the last exercise.\n5.\nStudent: Look, I've got the new game!\nFriend: You've already got three games you never play.\nA. She thinks he should play more games.\nB. She thinks he has bought too many games.\nC. She wants to borrow the new game.",
+          "prompt": "1. Friend: Can you help me with the poster on Sunday? Student: I've got three tests next week.\nA. He is not free on Sunday.\nB. He wants to borrow the test papers.\nC. He wants help with his tests.\n2. Friend: Let's take a taxi. It's only a ten-minute walk. Student: It's raining, and I'm carrying two heavy bags.\nA. She wants to walk faster.\nB. She does not want to walk.\nC. She is worried about missing the train.\n3. Classmate: Are you coming to the party? Student: I'll see how much homework I have.\nA. He has already decided to come.\nB. He would like to come, but he is not sure yet.\nC. He does not like parties at all.\n4. Student: Mr. Chen, I've finished all the exercises but the last one. Teacher: That's fine. Bring your questions to class tomorrow.\nA. He wants the teacher to check his work.\nB. He wants the teacher to give him more exercises.\nC. He wants to know the answer to the last exercise.\n5. Student: Look, I've got the new game! Friend: You've already got three games you never play.\nA. She thinks he should play more games.\nB. She thinks he has bought too many games.\nC. She wants to borrow the new game.",
           "answer": "推断意图1 A  　2 B 　3 B 　4 C 　5 B",
           "note": "说话人常常不直说，要结合语境推断真实意思：委婉拒绝、间接请求、提醒或抱怨。字面意思往往不是答案。"
         }
@@ -331,7 +331,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 1,
-              "q": "I'm reallythat you're joining our science club next Saturday. ______",
+              "q": "I'm really ______ that you're joining our science club next Saturday.",
               "options": [
                 "exciting",
                 "excited",
@@ -350,7 +350,7 @@ export const WEEK = {
             },
             {
               "n": 2,
-              "q": "The project sounds, and we'll test how much weight each bridge can hold. ______",
+              "q": "The project sounds ______, and we'll test how much weight each bridge can hold.",
               "options": [
                 "interested",
                 "interestingly",
@@ -369,7 +369,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "At the start, please listenwhile Mr. Hall explains the rules. ______",
+              "q": "At the start, please listen ______ while Mr. Hall explains the rules.",
               "options": [
                 "carefully",
                 "careful",
@@ -388,7 +388,7 @@ export const WEEK = {
             },
             {
               "n": 4,
-              "q": "There was so much noise that we couldhear his instructions! ______",
+              "q": "There was so much noise that we could ______ hear his instructions!",
               "options": [
                 "hard",
                 "harder",
@@ -407,7 +407,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "This time, we'll meet in the library, which isthan our usual classroom. ______",
+              "q": "This time, we'll meet in the library, which is ______ than our usual classroom.",
               "options": [
                 "more quieter",
                 "much quieter",
@@ -426,7 +426,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "We'll give everyone a box that is smallto fit inside a schoolbag. ______",
+              "q": "We'll give everyone a box that is small ______ to fit inside a schoolbag.",
               "options": [
                 "too",
                 "so",
@@ -445,7 +445,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "You don't need to bring paper or glue because I'vebought all the supplies. ______",
+              "q": "You don't need to bring paper or glue because I've ______ bought all the supplies.",
               "options": [
                 "yet",
                 "ever",
@@ -464,7 +464,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "I'll send you another message asas I know. ______",
+              "q": "I'll send you another message as ______ as I know.",
               "options": [
                 "soon",
                 "sooner",
@@ -489,7 +489,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 9,
-              "q": "The school's old reading corner wasa whole class, ______",
+              "q": "The school's old reading corner was ______ a whole class,",
               "options": [
                 "too small for hold",
                 "too small to hold",
@@ -508,7 +508,7 @@ export const WEEK = {
             },
             {
               "n": 10,
-              "q": "The reading room was, receiving almost sixty percent of the votes. ______",
+              "q": "The reading room was ______, receiving almost sixty percent of the votes.",
               "options": [
                 "the more popular choice",
                 "the most popularly choice",
@@ -527,7 +527,7 @@ export const WEEK = {
             },
             {
               "n": 11,
-              "q": "\"The new room will beour old corner,\" ______",
+              "q": "\"The new room will be ______ our old corner,\"",
               "options": [
                 "much more comfortable than",
                 "much comfortable than",
@@ -565,7 +565,7 @@ export const WEEK = {
             },
             {
               "n": 13,
-              "q": "\"It will bethat teachers will be able to bring small groups here ______",
+              "q": "\"It will be ______ that teachers will be able to bring small groups here",
               "options": [
                 "so a useful space",
                 "such a useful space",
@@ -584,7 +584,7 @@ export const WEEK = {
             },
             {
               "n": 14,
-              "q": "Several volunteers areafter school ______",
+              "q": "Several volunteers are ______ after school",
               "options": [
                 "working hard and staying late",
                 "working hardly and staying late",
@@ -603,7 +603,7 @@ export const WEEK = {
             },
             {
               "n": 15,
-              "q": "However, the roomfor students to use. ______",
+              "q": "However, the room ______ for students to use.",
               "options": [
                 "is not yet safely enough",
                 "is not yet enough safe",
@@ -628,7 +628,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 16,
-              "q": "On a hot day, a tree-lined street can feeleven in summer. ______",
+              "q": "On a hot day, a tree-lined street can feel ______ even in summer.",
               "options": [
                 "surprising cool",
                 "surprisingly coolly",
@@ -647,7 +647,7 @@ export const WEEK = {
             },
             {
               "n": 17,
-              "q": "Generally, the more sunlight their leaves block, reaches the ground. ______",
+              "q": "Generally, the more sunlight their leaves block, ______ reaches the ground.",
               "options": [
                 "the less direct sunlight",
                 "the fewer direct sunlight",
@@ -666,7 +666,7 @@ export const WEEK = {
             },
             {
               "n": 18,
-              "q": "A tree shading forty square meters covers an areathat of a tree ______",
+              "q": "A tree shading forty square meters covers an area ______ that of a tree",
               "options": [
                 "exactly twice larger as",
                 "exactly as twice large as",
@@ -685,7 +685,7 @@ export const WEEK = {
             },
             {
               "n": 19,
-              "q": "However, if the soil becomes roots struggle to take up water, ______",
+              "q": "However, if the soil becomes ______ ",
               "options": [
                 "such dry that",
                 "so dry that",
@@ -704,7 +704,7 @@ export const WEEK = {
             },
             {
               "n": 20,
-              "q": "For these reasons, choosing trees for a city is it might seem. ______",
+              "q": "For these reasons, choosing trees for a city is ______ it might seem.",
               "options": [
                 "not nearly as simply as",
                 "not nearly as simpler as",
@@ -723,7 +723,7 @@ export const WEEK = {
             },
             {
               "n": 21,
-              "q": "In some locations, trees need to be planted to allow air to circulate. ______",
+              "q": "In some locations, trees need to be planted ______ ",
               "options": [
                 "sufficient far apart",
                 "sufficiently far apart",
@@ -742,7 +742,7 @@ export const WEEK = {
             },
             {
               "n": 22,
-              "q": "Simply planting is therefore not always the best solution. ______",
+              "q": "Simply planting ______ is therefore not always the best solution.",
               "options": [
                 "as many trees as possible",
                 "as much trees as possible",
@@ -761,7 +761,7 @@ export const WEEK = {
             },
             {
               "n": 23,
-              "q": "The aim of the study is to identify how trees can provide cooling benefit , ______",
+              "q": "The aim of the study is to identify how trees can provide ______ cooling benefit\u0002,",
               "options": [
                 "the greatest possibly",
                 "the most greatest",
@@ -784,59 +784,59 @@ export const WEEK = {
       "drills": [
         {
           "title": "A. 形容词与副词的位置 —— 选出最合适的一项。",
-          "prompt": "1. The soup ____ .\nA. tastes wellB. tastes delicious C. is tasting well  D. tastes deliciously\n2.  This exercise is ____ for beginners.\nA. enough easy B. easy enough C. easily enough D. enough easily\n3.  My grandmother lives in ____ house.\nA. an  old  small B. old a small  C. a small olde rD. a small old\n4.  The noise outside kept me ____ all night.\nA. wake B. awake C. wakefully D. waking\n5.  He can spell the new words ____.\nA. correctB. correctlyC. correctedlyD. correctiv e\n6.  ____,  the  bus  came  on  time.\nA. LuckyB. Luck C. Luckil yD. Luckly\n7. It was ____ cold outside. You'd better put on your coat.\nA. extreme B. extremely C. extremity D. extremeness\n8.  The train arrived ____ at the station.\nA. safeB. safly C. safet yD. safely",
+          "prompt": "1. The soup ____.\nA. tastes wellB. tastes delicious C. is tasting well ______ D. tastes deliciously\n2. This exercise is ____ for beginners.\nA. enough easy B. easy enough C. easily enough D. enough easily\n3. My grandmother lives in ____ house.\nA. an ______ old ______ small B. old a small ______ C. a small olde rD. a small old\n4. The noise outside kept me ____ all night.\nA. wake B. awake C. wakefully D. waking\n5. He can spell the new words ____.\nA. correctB. correctlyC. correctedlyD. correctiv e\n6. ____, ______ the ______ bus ______ came ______ on ______ time.\nA. LuckyB. Luck\nC. Luckil yD. Luckly\n7. It was ____ cold outside. You'd better put on your coat.\nA. extreme B. extremely C. extremity D. extremeness\n8. The train arrived ____ at the station.\nA. safeB. safly C. safet yD. safely",
           "answer": "形容词与副词1 B 　2 B 　3 D 　4 B 　5 B 　6 C 　7 B 　8 D",
           "note": "形容词放在名词前或系动词后；副词修饰动词、形容词或整句；enough 修饰形容词时必须后置（easy enough，不是 enough easy）。"
         },
         {
           "title": "B. 形容词与副词的变换 —— 用括号内词的正确形式填空。",
-          "prompt": "5. He was  hurt in the accident. (bad)\n1. She answered the question .\n(happy)6. She sings  than anyone in our class.\n(beautiful)\n2. He  finished the race. (final)\n7. It was raining  all afternoon.\n3. The novel is     great. (true)\n(heavy)\n4. Our teacher is very  to us.\n8. The child played the violin very    .\n(friendly)\n(good)",
+          "prompt": "1. She answered the question. (happy)\n2. He ______ finished the race. (final)\n3. The novel is ______ great. (true) (heavy)\n4. Our teacher is very ______ to us.\n5. He was ______ hurt in the accident. (bad)\n6. She sings ______ than anyone in our class. (beautiful)\n7. It was raining ______ all afternoon.\n8. The child played the violin very ______. (friendly) (good)",
           "answer": "形容词与副词1 happily 　2 finally 　3 truly 　4 friendly 　5 badly 　6 more beautifully  　7 heavily 　8 well",
           "note": "修饰名词用形容词，修饰动词或形容词用副词（多数加 -ly）。注意 friendly 是形容词不是副词；hard、high、late、near 本身既可作形容词也可作副词。"
         },
         {
           "title": "C. 易混淆的形容词与副词 —— 使用括号内词的适当形式填空。",
-          "prompt": "6. The book is  praised by teachers.\n1. It was raining , so we stayed inside.\n(high)\n(hard)\n7. It is  five o'clock; we should go\n2. He  ever goes to the cinema. (hard)\nhome. (near)\n3. I haven't seen him . (late)\n8. Don't stand so  to the river. (near)\n4. We arrived  because the bus was\n9. He works  and never gives up.\nslow. (late)\n(hard)\n5. The bird flew  above the trees.\n10. You must dig    so that you can find\n(high)\nthe treasure underground. (deep)\n7",
+          "prompt": "1. It was raining , so we stayed inside. (high) (hard) 0. You must dig ______ so that you can find (high) the treasure underground. (deep)\n2. He ______ ever goes to the cinema. (hard) home. (near)\n3. I haven't seen him. (late)\n4. We arrived ______ because the bus was\n5. The bird flew ______ above the trees.\n6. The book is ______ praised by teachers.\n7. It is ______ five o'clock; we should go\n8. Don't stand so ______ to the river. (near)\n9. He works ______ and never gives up. slow. (late) (hard)",
           "answer": "易混淆的形容1 hard 　2 hardly 　3 lately 　4 late 　5 high 　6 highly 　7 nearly 　8 near 　9 hard 　10 deep",
           "note": "hard 是「努力地」、hardly 是「几乎不」；late 是「晚」、lately 是「最近」；high 指具体高度、highly 指抽象「高度地」；near 是「近」、nearly 是「几乎」。"
         },
         {
           "title": "D. 比较级与最高级的词形变化 —— 用括号内词的正确形式填空。",
-          "prompt": "6. His handwriting is  than his\n1. This box is  than that one. (heavy)\nbrother's. (bad)\n2. A car is  than a bike. (fast)\n7. There are  students in Class Two\n3. Today is  than yesterday. (hot)\nthan in Class One. (many)\n4. This is the  building in the city.\n8. Of all the students in our class, Tom runs\n(old)\n. (fast)\n5. This is the  film of the three. (good)",
+          "prompt": "1. This box is ______ than that one. (heavy) brother's. (bad)\n2. A car is ______ than a bike. (fast)\n3. Today is ______ than yesterday. (hot) than in Class One. (many)\n4. This is the ______ building in the city.\n5. This is the ______ film of the three. (good)\n6. His handwriting is ______ than his\n7. There are ______ students in Class Two\n8. Of all the students in our class, Tom runs (old). (fast)",
           "answer": "比较级与最高1 heavier 　2 faster 　3 hotter 　4 oldest 　5 best 　6 worse 　7 more 　8  (the) fastest",
           "note": "单音节和部分双音节加 -er / -est；辅音字母 + y 结尾变 y 为 i 再加 -er / -est；重读闭音节双写末尾辅音；good → better → best、bad → worse → worst 为不规则变化。"
         },
         {
           "title": "E. 比较结构与句型 —— 选出最合适的一项。",
-          "prompt": "1.  She is ____ her sister.\nA. as tall as B. as taller as C. so tall than D. as tall than\n2.  The new machine is ____ more efficient than the old one.\nA. very B. much C. more D. too\n3.  He is ____ confident than he was last year.\nA. littleB. few C. leas tD. less\n4.  ____ you read, the more you know.\nA. MoreB. The most  C. The more D. Muc h\n5.  He is the tallest student ____ our class.\nA. of B. in C. than D. at\n6.  This book is ____ interesting than that one.\nA. very B. much more C. more much D. too more\n7.  It is ____ today than it was yesterday.\nA. much colder B. more colder C. very colder D. colder much\n8.  This box is ____ that one.\nA. not as heavy than B. not so heavy than C. not as heavy as D. not heavy as as",
+          "prompt": "1. She is ____ her sister.\nA. as tall as B. as taller as C. so tall than D. as tall than\n2. The new machine is ____ more efficient than the old one.\nA. very B. much C. more D. too\n3. He is ____ confident than he was last year.\nA. littleB. few C. leas tD. less\n4. ____ you read, the more you know.\nA. MoreB. The most\nC. The more\nD. Muc h\n5. He is the tallest student ____ our class.\nA. of B. in C. than D. at\n6. This book is ____ interesting than that one.\nA. very B. much more C. more much D. too more\n7. It is ____ today than it was yesterday.\nA. much colder B. more colder C. very colder D. colder much\n8. This box is ____ that one.\nA. not as heavy than B. not so heavy than C. not as heavy as D. not heavy as as",
           "answer": "比较结构与句1 A 　2 B 　3 D 　4 C 　5 B 　6 B 　7 A 　8 C",
           "note": "同级比较用 as + 原级 + as；两者比较用比较级 + than；三者以上用 the + 最高级；much / far / a lot 可以修饰比较级表示程度，more 不能再叠加在 -er 形式前。"
         },
         {
           "title": "F. 形容词的顺序 —— 把括号内的形容词按正确顺序填入空格。",
-          "prompt": "5. There is a  box on the shelf. (metal,\n1. She has a  bag. (leather, small,\nsmall, black)\nbrown)\n6. She was wearing a  scarf. (silk,\n2. They live in a  house. (wooden,\nlong, red)\nold, lovely)\n7. He is a  engineer. (young, brilliant,\n3. He is a  player. (young, talented,\nJapanese)\nChinese)\n8. I'd like to buy a  chair. (wooden,\n4. I bought two  tables. (wooden,\ncomfortable, small)\nround, small)",
+          "prompt": "1. She has a ______ bag. (leather, small, small, black) brown)\n2. They live in a ______ house. (wooden, long, red) old, lovely)\n3. He is a ______ player. (young, talented, Japanese) Chinese)\n4. I bought two ______ tables. (wooden, comfortable, small) round, small)\n5. There is a ______ box on the shelf. (metal,\n6. She was wearing a ______ scarf. (silk,\n7. He is a ______ engineer. (young, brilliant,\n8. I'd like to buy a ______ chair. (wooden,",
           "answer": "形容词的顺序1 a small brown leather bag　2 a lovely old wooden house　3 a talented young Chinese player",
           "note": "多个形容词修饰名词的顺序是：限定词 → 观点 → 尺寸 → 形状 → 年龄 → 颜色 → 国籍 → 材料 → 名词，如 a lovely small old round brown wooden table。"
         },
         {
           "title": "G. 形容词辨析（-ed 与 -ing） —— 使用括号内词的适当形式填空。",
-          "prompt": "3. The story is very  to children.\n1. The film was , and we all laughed.\n(interest)\n(amuse)\n4. We were  to hear that the trip was\n2. I was  to hear the news. (surprise)\ncancelled. (disappoint)\n8\n5. The instructions were , so nobody6. The good news was very . (excite)\nknew what to do. (confuse)",
+          "prompt": "1. The film was , and we all laughed. (interest) (amuse)\n2. I was ______ to hear the news. (surprise) cancelled. (disappoint)\n3. The story is very ______ to children.\n4. We were ______ to hear that the trip was\n5. The instructions were , so nobody\n6. The good news was very. (excite) knew what to do. (confuse)\n8.",
           "answer": "形容词辨析（-1 amusing　2 surprised　3 interesting　4 disappointed　5 confusing　6 exciting",
           "note": "-ed 形容词描述人的感受（interested、surprised、excited），-ing 形容词描述事物给人的感觉（interesting、surprising、exciting）。"
         },
         {
           "title": "H. so / such 的用法 —— 选出最合适的一项。",
-          "prompt": "1.  It was ____ a hot day that we stayed inside.\nA. so B. such C. such a D. so a\n2.  The soup was ____ hot that I could not drink it.\nA. so B. such C. such a D. very a\n3.  There were ____ many people that we could not get in.\nA. such B. so C. so a D. such a\n4.  She is ____ a kind person that everyone likes her.\nA. soB. very C. much  D. such\n5.  The weather was ____ bad that we stayed at home.\nA. suchB. such aC. so  D. so  a\n6.  He made ____ a loud noise that the baby woke up.\nA. so B. such C. so a D. very\n7.  There was ____ much traffic that we were late.\nA. such B. so C. so a D. such a\n8.  It was ____ an interesting film that I watched it twice.\nA. such B. soC. so  a D. very\n1.  The soup is ____ hot to drink.\nA. too B. enough C. very D. so\n2.  He is old ____ to go to school by himself.\nA. too B. enough C. very D. so\n3.  There isn't ____ time to finish the test.\nA. manyB. very C. enoughD. such\n4.  This box is ____ heavy for me to carry.\nA. enough B. too C. so D. very\n5.  He wasn't ____ to answer the last question.\nA. quick enough B. enough quick C. too quick D. so quick\n6.  He is strong ____ to lift that box.\nA. too B. enough C. so D. very",
+          "prompt": "1. It was ____ a hot day that we stayed inside.\nA. so B. such C. such a D. so a The soup is ____ hot to drink.\nA. too B. enough C. very D. so\n2. The soup was ____ hot that I could not drink it.\nA. so B. such C. such a D. very a He is old ____ to go to school by himself.\nA. too B. enough C. very D. so\n3. There were ____ many people that we could not get in.\nA. such B. so C. so a D. such a There isn't ____ time to finish the test.\nA. manyB. very C. enoughD. such\n4. She is ____ a kind person that everyone likes her.\nA. soB. very C. much ______ D. such This box is ____ heavy for me to carry.\nA. enough B. too C. so D. very\n5. The weather was ____ bad that we stayed at home.\nA. suchB. such aC. so ______ D. so ______ a He wasn't ____ to answer the last question.\nA. quick enough B. enough quick C. too quick D. so quick\n6. He made ____ a loud noise that the baby woke up.\nA. so B. such C. so a D. very He is strong ____ to lift that box.\nA. too B. enough C. so D. very\n7. There was ____ much traffic that we were late.\nA. such B. so C. so a D. such a\n8. It was ____ an interesting film that I watched it twice.\nA. such B. soC. so ______ a D. very",
           "answer": "so / such 的用1 B 　2 A 　3 B 　4 D 　5 C 　6 B 　7 B 　8 A",
           "note": "so 后面接形容词或副词；such 后面接（a / an）+ 形容词 + 名词。引导结果从句都用 that。"
         },
         {
           "title": "J. yet / already / still / any more —— 使用 yet / already / still / any more 填空。",
-          "prompt": "4. He hasn't come back .\n1. Have you finished your homework\n?5. The shop is  closed; it's only six\no'clock in the morning.\n2. She has  read three books this\nmonth.6. I have  seen that film three times.\n3. I don't live there .\n9",
+          "prompt": "1. Have you finished your homework ?\n2. She has ______ read three books this month.\n3. I don't live there.\n4. He hasn't come back.\n5. The shop is ______ closed; it's only six o'clock in the morning.\n6. I have ______ seen that film three times.\n9.",
           "answer": "yet / already /1 yet 　2 already 　3 any more  　4 yet 　5 still 　6 already",
           "note": "yet 用于否定句和疑问句表示「尚未」；already 用于肯定句表示「已经」；still 表示「仍然」；not ... any more 表示「不再」。"
         }
       ]
     }
   ]
-}
+};

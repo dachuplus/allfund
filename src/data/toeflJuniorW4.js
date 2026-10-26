@@ -259,7 +259,7 @@ export const WEEK = {
       "drills": [
         {
           "title": "专项练习（Passage 短文题）",
-          "prompt": "PART A · 阅读 —— 目的题（Purpose）\nI. Training 专项精讲\n题型指南\n目的题考查考生是否理解作者的写作意图，也就是回答“作者为什么写这篇文章或这段话”（Why），而不\n是“文章讲了哪些事实”（What）。\n1. 考查范围\n全篇目的：整篇文章要做什么，比如通知、提醒、倡议、介绍。\n局部/段落目的：作者在某一段提到某个事实、例子或对比，是为了说明什么。\n2. 常见提问方式\nWhat is the main purpose of this notice/letter/article?\nWhy did the author write this text?\nWhy does the author mention ... in paragraph X?\nWhat is the main purpose of the second paragraph?\n3. 选项开头的常见动词\n说明信息类：To inform（告知）, To explain（解释）, To describe（描述）, To introduce（介绍）\n号召行动类：To invite（邀请）, To remind（提醒）, To encourage（鼓励）, To warn（警告）\n举例论证类：To provide an example of（举例说明）, To compare ... with ...（对比）, To show that\n（表明）\n4. 解题步骤\n第一步：确定范围。 先看题目问的是全篇目的，还是某一句、某一段的作用。\n第二步：找关键位置。 问全篇目的，重点看首段背景和尾段总结；问局部目的，重点看相关内容前后\n的中心句和连接词。\n第三步：核对动词和对象。 选项的动词要符合作者意图，宾语也要符合文章讲的对象。注意排除“内\n容本身正确，但不是写作目的”的干扰项。\n1\n专项练习 —— 目的理解\nPassage 1\nThe North Campus Environmental Club is welcoming new members for the fall semester. Our first meeting\nwill take place this Thursday at 4:15 p.m. in Science Room 204. Throughout this semester, our group will\norganize weekly paper-recycling drives and help plant native shrubs around the sports field. If you care about\nprotecting nature and want to work with classmates on practical green projects, please sign your name on the\nsheet outside Room 204 before Wednesday afternoon.\nWhat is the main purpose of this notice?\nA. To introduce the new science teacher in Room 204\nB. To invite students to join the environmental club\nC. To explain how to recycle paper at home\nD. To announce the winners of a campus planting contest\nPassage 2\nDear Students, Before our chemistry lab session tomorrow morning, please take note of two important safety\nrequirements. First, every student must wear closed-toe shoes; anyone wearing sandals or other open-toed\nshoes will not be allowed to enter the laboratory. Second, long hair must be tied back before you take your seat\nat the worktable. We will be handling hot glassware, and these rules are necessary to keep everyone safe\nduring the experiment. Sincerely, Mr. Bennett\nWhy did Mr. Bennett write this email?\nA. To remind students of safety rules for an upcoming experiment\nB. To change the meeting time of the chemistry class\nC. To ask students to purchase new laboratory glassware\nD. To explain the scientific results of a recent test\nPassage 3\nThe annual Maplewood Middle School Book Fair ended yesterday afternoon, and the results exceeded our\ninitial expectations. Over four hundred students and parents visited the library during the three-day event. In\ntotal, the school sold 620 books and raised 1,850 dollars. As planned, the entire sum will go toward buying\nnew audiobooks and science magazines for our media center next month. We would like to thank all the\nstudent volunteers who managed the payment counters each afternoon.\nWhat is the main purpose of the report?\nA. To teach students how to select good audiobooks\nB. To report on the outcomes of the school book fair\nC. To encourage parents to donate old books to the library\nD. To",
+          "prompt": "PART A · 阅读 —— 目的题（Purpose） I. Training 专项精讲 题型指南 目的题考查考生是否理解作者的写作意图，也就是回答“作者为什么写这篇文章或这段话”（Why），而不 是“文章讲了哪些事实”（What）。\n1. 考查范围 全篇目的：整篇文章要做什么，比如通知、提醒、倡议、介绍。 局部/段落目的：作者在某一段提到某个事实、例子或对比，是为了说明什么。 专项练习 —— 目的理解 Passage 1 The North Campus Environmental Club is welcoming new members for the fall semester. Our first meeting will take place this Thursday at 4:15 p.m. in Science Room 2\n2. 常见提问方式 What is the main purpose of this notice/letter/article? Why did the author write this text? Why does the author mention... in paragraph X? What is the main purpose of the second paragraph?\n3. 选项开头的常见动词 说明信息类：To inform（告知）, To explain（解释）, To describe（描述）, To introduce（介绍） 号召行动类：To invite（邀请）, To remind（提醒）, To encourage（鼓励）, To warn（警告） 举例论证类：To provide an example of（举例说明）, To compare... with...（对比）, To show that （表明）\n4. 解题步骤 第一步：确定范围。 先看题目问的是全篇目的，还是某一句、某一段的作用。 第二步：找关键位置。 问全篇目的，重点看首段背景和尾段总结；问局部目的，重点看相关内容前后 的中心句和连接词。 第三步：核对动词和对象。 选项的动词要符合作者意图，宾语也要符合文章讲的对象。注意排除“内 容本身正确，但不是写作目的”的干扰项。 Throughout this semester, our group will organize weekly paper-recycling drives and help plant native shrubs around the sports field. If you care about protecting nature and want to work with classmates on practical green projects, please sign your name on the sheet outside Room 204 before Wednesday afternoon. What is the main purpose of this notice?\nA. To introduce the new science teacher in Room 204\nB. To invite students to join the environmental club\nC. To explain how to recycle paper at home\nD. To announce the winners of a campus planting contest Passage 2 Dear Students, Before our chemistry lab session tomorrow morning, please take note of two important safety requirements. First, every student must wear closed-toe shoes; anyone wearing sandals or other open-toed shoes will not be allowed to enter the laboratory. Second, long hair must be tied back before you take your seat at the worktable. We will be handling hot glassware, and these rules are necessary to keep everyone safe during the experiment. Sincerely, Mr. Bennett Why did Mr. Bennett write this email?\nA. To remind students of safety rules for an upcoming experiment\nB. To change the meeting time of the chemistry class\nC. To ask students to purchase new laboratory glassware\nD. To explain the scientific results of a recent test Passage 3 The annual Maplewood Middle School Book Fair ended yesterday afternoon, and the results exceeded our initial expectations. Over four hundred students and parents visited the library during the three-day event. In total, the school sold 620 books and raised 1,850 dollars. As planned, the entire sum will go toward buying new audiobooks and science magazines for our media center next month. We would like to thank all the student volunteers who managed the payment counters each afternoon. What is the main purpose of the report?\nA. To teach students how to select good audiobooks\nB. To report on the outcomes of the school book fair\nC. To encourage parents to donate old books to the library\nD. To",
           "answer": "1 B 开头说俱乐部欢迎新成员（welcoming new members），结尾请学生签名报名（sign your；2 A 信中提到 two important safety requirements 和 to keep everyone safe，目的是提醒安全规；3 B 全文讲书展的结果：参加人数、卖出书数、筹款金额和用途。D 中的“下周”与原文不符。；4 C 血管是散热机制的一环（heat escapes），目的是说明身体结构如何帮助散热。；5 A 第 2 段第一句 To measure this change 点明了段落功能：介绍数据怎么收集。；1 B 四段依次是起因、校内募集、商家合作、成果，完整描述了一个学生项目。",
           "note": "目的题问「作者为什么写这段文字」，答案是写作意图（邀请参加、提醒规则、通知安排、解释现象），而不是文中的某个细节；注意 This notice is to... / We are writing to... 这类直接点明目的的句子。"
         }
@@ -276,7 +276,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 1,
-              "q": "Last semester, our soccer and track teams the outdoor sports field every Tuesday ______",
+              "q": "Last semester, our soccer and track teams ______ the outdoor sports field every Tuesday",
               "options": [
                 "share",
                 "shared",
@@ -295,7 +295,7 @@ export const WEEK = {
             },
             {
               "n": 2,
-              "q": "To solve this problem, the school recently the construction of two new indoor ______",
+              "q": "To solve this problem, the school recently ______ the construction of two new indoor",
               "options": [
                 "completes",
                 "was completing",
@@ -314,7 +314,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "Right now, the coaching staff the new equipment inside both halls so that ______",
+              "q": "Right now, the coaching staff ______ the new equipment inside both halls so that",
               "options": [
                 "tests",
                 "is testing",
@@ -333,7 +333,7 @@ export const WEEK = {
             },
             {
               "n": 4,
-              "q": "all indoor training sessions at 4:30 p.m. instead of 4:00 p.m. ______",
+              "q": "all indoor training sessions ______ at 4:30 p.m. instead of 4:00 p.m.",
               "options": [
                 "will begin",
                 "began",
@@ -352,7 +352,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "This new schedule everyone enough time to change into proper sports shoes ______",
+              "q": "This new schedule ______ everyone enough time to change into proper sports shoes",
               "options": [
                 "gave",
                 "was giving",
@@ -369,7 +369,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "If a student to miss a training session, he or she must inform Mr. Miller before noon. ______",
+              "q": "If a student ______ to miss a training session, he or she must inform Mr. Miller before noon.",
               "options": [
                 "needs",
                 "needed",
@@ -388,7 +388,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "At the end of this semester, Mr. Miller all attendance records carefully to decide ______",
+              "q": "At the end of this semester, Mr. Miller ______ all attendance records carefully to decide",
               "options": [
                 "checked",
                 "was checking",
@@ -407,7 +407,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "these improvements our athletes prepare much better for next month's competitions. ______",
+              "q": "these improvements ______ our athletes prepare much better for next month's competitions.",
               "options": [
                 "have helped",
                 "helped",
@@ -432,7 +432,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 9,
-              "q": "When he was sixteen years old, he diving during a summer vacation in Greece. ______",
+              "q": "When he was sixteen years old, he ______ diving during a summer vacation in Greece.",
               "options": [
                 "goes",
                 "went",
@@ -451,7 +451,7 @@ export const WEEK = {
             },
             {
               "n": 10,
-              "q": "he suddenly that there were more plastic bags than fish around him. ______",
+              "q": "he suddenly ______ that there were more plastic bags than fish around him.",
               "options": [
                 "notices",
                 "was noticing",
@@ -470,7 +470,7 @@ export const WEEK = {
             },
             {
               "n": 11,
-              "q": "While he was still in high school, Slat his evenings researching ocean currents ______",
+              "q": "While he was still in high school, Slat ______ his evenings researching ocean currents",
               "options": [
                 "was spending",
                 "spends",
@@ -489,7 +489,7 @@ export const WEEK = {
             },
             {
               "n": 12,
-              "q": "Since then, the organization millions of dollars from supporters around the world. ______",
+              "q": "Since then, the organization ______ millions of dollars from supporters around the world.",
               "options": [
                 "raises",
                 "has raised",
@@ -508,7 +508,7 @@ export const WEEK = {
             },
             {
               "n": 13,
-              "q": "Today, the organization's cleanup systems in the Great Pacific Garbage Patch, ______",
+              "q": "Today, the organization's cleanup systems ______ in the Great Pacific Garbage Patch,",
               "options": [
                 "operate",
                 "operated",
@@ -527,7 +527,7 @@ export const WEEK = {
             },
             {
               "n": 14,
-              "q": "The engineering team constantly the design to make the systems work better ______",
+              "q": "The engineering team constantly ______ the design to make the systems work better",
               "options": [
                 "improved",
                 "was improving",
@@ -546,7 +546,7 @@ export const WEEK = {
             },
             {
               "n": 15,
-              "q": "the project large amounts of plastic from the Pacific Ocean. ______",
+              "q": "the project ______ large amounts of plastic from the Pacific Ocean.",
               "options": [
                 "collects",
                 "will collect",
@@ -565,7 +565,7 @@ export const WEEK = {
             },
             {
               "n": 16,
-              "q": "When he was sixteen years old, he diving during a summer vacation in Greece. ______",
+              "q": "Slat hopes that his organization ______ 90 percent of floating ocean plastic by 2040.",
               "options": [
                 "removed",
                 "was removing",
@@ -590,7 +590,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 17,
-              "q": "it anywhere near Earth again for tens of thousands of years. ______",
+              "q": "of Chile ______ in the outer regions of our solar system.",
               "options": [
                 "detected a faint celestial object moving",
                 "detect a faint celestial object moving",
@@ -608,7 +608,7 @@ export const WEEK = {
             },
             {
               "n": 18,
-              "q": "Like most comets, this icy visitor of frozen gases, rock fragments, and dust. ______",
+              "q": "Like most comets, this icy visitor ______ of frozen gases, rock fragments, and dust.",
               "options": [
                 "consist mainly",
                 "consists mainly",
@@ -627,7 +627,7 @@ export const WEEK = {
             },
             {
               "n": 19,
-              "q": "Over the past few months, international research teams hundreds of ______",
+              "q": "Over the past few months, international research teams ______ hundreds of",
               "options": [
                 "successfully collected have",
                 "have successfully collected",
@@ -645,7 +645,7 @@ export const WEEK = {
             },
             {
               "n": 20,
-              "q": "Right now, scientists at the national space agency of ______",
+              "q": "Right now, scientists at the national space agency ______ of",
               "options": [
                 "are actively analyzing the chemical composition",
                 "actively analyze the chemical composition",
@@ -662,7 +662,7 @@ export const WEEK = {
             },
             {
               "n": 21,
-              "q": "while most people in Chile , the comet reached its closest point ______",
+              "q": "while most people in Chile ______, the comet reached its closest point",
               "options": [
                 "sleep soundly in their beds",
                 "were sleeping soundly in their beds",
@@ -681,7 +681,7 @@ export const WEEK = {
             },
             {
               "n": 22,
-              "q": "In the coming weeks, the comet as it heads back toward the outer ______",
+              "q": "In the coming weeks, the comet ______ as it heads back toward the outer",
               "options": [
                 "will gradually fade from view",
                 "gradually faded from view",
@@ -700,7 +700,7 @@ export const WEEK = {
             },
             {
               "n": 23,
-              "q": "it anywhere near Earth again for tens of thousands of years. ______",
+              "q": "it ______ anywhere near Earth again for tens of thousands of years.",
               "options": [
                 "will not return probably",
                 "did not probably return",
@@ -717,7 +717,7 @@ export const WEEK = {
             },
             {
               "n": 24,
-              "q": "the newly gathered data how the planets formed ______",
+              "q": "the newly gathered data ______ how the planets formed",
               "options": [
                 "will help future researchers understand",
                 "helps future researchers to understanding",
@@ -739,41 +739,41 @@ export const WEEK = {
       "drills": [
         {
           "title": "A. 一般时态辨析（一般现在时 / 一般过去时 / 一般将来时）",
-          "prompt": "时态 肯定 否定 疑问 标志词\n一般do / doesdon't / doesn't + 原形Do / Does + 主语 + 原形?always, usually,\n现在am / is / aream not / isn't / aren'tAm / Is / Are + 主语 + ...?often, every day\n一般did（过去式）didn't + 原形Did + 主语 + 原形?yesterday, last ..., ...\n过去was / werewasn't / weren'tWas / Were + 主语 + ...?ago, in 2021\n一般will + 原形won't + 原形Will + 主语 + 原形?tomorrow, next ...,\n将来am/is/are going to +am/is/are not going to +Am/Is/Are + 主语 + going to +in the future\n原形原形原形?\n第三人称单数 -s / -es\n词尾 规则 例\n一般情况 +s arrive → arrives\ns, x, ch, sh, o +es teach → teaches, go → goes\n辅音字母 + y 变 y 为 i，+es carry → carries\n元音字母 + y +s play → plays\n特殊 — have → has\n规则动词过去式/过去分词\n词尾 规则 例\n一般情况 +ed clean → cleaned\ne +d move → moved\n辅音字母 + y 变 y 为 i，+ed carry → carried\n重读闭音节，末尾一个辅音字母 双写，+ed stop → stopped, plan → planned\n不规则动词表见讲义末尾\n练习：根据句中的时间状语或语境，用括号内动词的一般现在/一般过去/一般将来形式填空。\n1. Our school bus usually  (arrive) at the main gate at 7:45 every morning.\n7\n2. Two years ago, my family  (move) from London to a small town in Canada.\n3. The science teacher  (give) us a short quiz on plants tomorrow morning.\n4. Mr. Davis  (teach) history at this middle school every Wednesday and Friday.\n5. Last weekend, Kevin  (write) a full report about his science experiment.\n6. The students  (visit) the natural history museum next Friday afternoon.\n7. She always  (carry) an extra notebook in her schoolbag.\n8. We  (see) a very interesting documentary about polar bears yesterday.",
+          "prompt": "时态 肯定 否定 疑问 标志词 一般do / doesdon't / doesn't + 原形Do / Does + 主语 + 原形?always, usually, 现在am / is / aream not / isn't / aren'tAm / Is / Are + 主语 +...?often, every day 一般did（过去式）didn't + 原形Did + 主语 + 原形?yesterday, last...,... 过去was / werewasn't / weren'tWas / Were + 主语 +...?ago, in 2021 一般will + 原形won't + 原形Will + 主语 + 原形?tomorrow, next..., 将来am/is/are going to +am/is/are not going to +Am/Is/Are + 主语 + going to +in the future 原形原形原形? 第三人称单数 -s / -es 词尾 规则 例 一般情况 +s arrive → arrives s, x, ch, sh, o +es teach → teaches, go → goes 辅音字母 + y 变 y 为 i，+es carry → carries 元音字母 + y +s play → plays 特殊 — have → has 规则动词过去式/过去分词 词尾 规则 例 一般情况 +ed clean → cleaned e +d move → moved 辅音字母 + y 变 y 为 i，+ed carry → carried 重读闭音节，末尾一个辅音字母 双写，+ed stop → stopped, plan → planned 不规则动词表见讲义末尾 练习：根据句中的时间状语或语境，用括号内动词的一般现在/一般过去/一般将来形式填空。\n1. Our school bus usually ______ (arrive) at the main gate at 7:45 every morning.\n2. Two years ago, my family ______ (move) from London to a small town in Canada.\n3. The science teacher ______ (give) us a short quiz on plants tomorrow morning.\n4. Mr. Davis ______ (teach) history at this middle school every Wednesday and Friday.\n5. Last weekend, Kevin ______ (write) a full report about his science experiment.\n6. The students ______ (visit) the natural history museum next Friday afternoon.\n7. ______ She always ______ (carry) an extra notebook in her schoolbag.\n8. We ______ (see) a very interesting documentary about polar bears yesterday.",
           "answer": "1 arrives usually，主语为第三人称单数　2 moved two years ago　3 will give / is going totomorrow morning　give　4 teaches every Wednesday and Friday；以 -ch 结尾，加 -es　5 wrote last weekend；write → wrote　6 will visit / are going tonext Friday　visit　7 carries always；辅音字母 + y 结尾，变 y 为 i 再加 -es　8 saw yesterday；see → saw",
           "note": "always / usually / every day 用一般现在时（第三人称单数加 -s / -es）；yesterday / last weekend / ... ago 用一般过去时；tomorrow / next ... 用一般将来时。先看时间状语再定时态。"
         },
         {
           "title": "B. 一般现在时 vs 现在进行时",
-          "prompt": "一般现在时 现在进行时\n结构 do / does am / is / are + doing\n用法 习惯、经常性动作；客观事实；长期状态 说话时正在发生；临时情况\n标志词 always, usually, every ... now, right now, at the moment, Look! Listen!\n例 Water freezes at 0 °C. Look! They are running.\n一般现在时 重复动作 / 客观规律 / 长期状态\n过去 现在 未来\n现在进行时 此刻正在进行\n过去 现在 未来\n动词现在分词（-ing形式） 变化\n词尾 规则 例\n一般情况 +ing play → playing\n不发音的 e 去 e，+ing ride → riding\n重读闭音节 双写，+ing run → running\nie 变 ie 为 y，+ing lie → lying\n状态动词（一般不用进行时）：know, own, like, love, want, need, belong, seem, consist\n8\n练习：用括号内动词的一般现在时或现在进行时填空。\n1. Look! The two boys  (run) across the playground toward the gym.\n2. Water  (freeze) when the temperature drops below zero degrees Celsius.\n3. Quiet, please! The principal  (speak) on the stage right now.\n4. Sophie usually walks to school, but today she  (ride) her bicycle.\n5. My brother  (play) the violin for thirty minutes every evening.\n6. Listen! Someone  (knock) on our classroom door.\n7. Mr. Miller  (own) a small bookstore near the town library.\n8. At the moment, the students  (prepare) posters for the art festival.",
+          "prompt": "一般现在时 现在进行时 结构 do / does am / is / are + doing 用法 习惯、经常性动作；客观事实；长期状态 说话时正在发生；临时情况 标志词 always, usually, every... now, right now, at the moment, Look! Listen! 例 Water freezes at 0 °C. Look! They are running. 一般现在时 重复动作 / 客观规律 / 长期状态 过去 现在 未来 现在进行时 此刻正在进行 过去 现在 未来 动词现在分词（-ing形式） 变化 词尾 规则 例 一般情况 +ing play → playing 不发音的 e 去 e，+ing ride → riding 重读闭音节 双写，+ing run → running ie 变 ie 为 y，+ing lie → lying 状态动词（一般不用进行时）：know, own, like, love, want, need, belong, seem, consist\n1. Look! The two boys ______ (run) across the playground toward the gym.\n2. Water ______ (freeze) when the temperature drops below zero degrees Celsius.\n3. Quiet, please! The principal ______ (speak) on the stage right now.\n4. Sophie usually walks to school, but today she ______ (ride) her bicycle.\n5. My brother ______ (play) the violin for thirty minutes every evening.\n6. Listen! Someone ______ (knock) on our classroom door.\n7. Mr. Miller ______ (own) a small bookstore near the town library.\n8. 练习：用括号内动词的一般现在时或现在进行时填空。 At the moment, the students ______ (prepare) posters for the art festival.",
           "answer": "一般现在时 vs 现在进行时　1 are running Look!；run 双写 n　2 freezes 客观规律　3 is speaking right now　4 is riding today（与 usually 对比，是今天的临时情况）；ride 去 e 加 -ing　5 plays every evening　6 is knocking Listen!　7 owns own 是状态动词，不用进行时　8 are preparing at the moment",
           "note": "习惯、常态、客观事实用一般现在时；此刻正在发生（Look! / Listen! / right now / at the moment）或与平时不同的临时情况用现在进行时；know、own、belong 这类状态动词不用进行时。"
         },
         {
           "title": "C. 一般过去时 vs 现在完成时",
-          "prompt": "一般过去时 现在完成时\n结构 did have / has + done\n用法 过去某个时间发生、已经结束 过去的动作影响现在；从过去持续到现在\n标志词 yesterday, ago, last ..., in + 过去年份 already, yet, just, ever, never, so far, since, for,\nrecently, over the past ...\n例 I lost it yesterday. I have lost it.（现在还没找到）\n一般过去时 过去已结束\n过去 现在 未来\n现在完成时 动作已完成，对现在有影响\n影响\n过去 现在 未来\n从过去持续到现在\n过去 现在 未来\nsince vs for 后接 例\nsince 时间点 / 过去时从句 since 2020, since we met\n9\nsince vs for 后接 例\nfor 时间段 for three years\n⚠ 现在完成时不能与 ago、yesterday、last ...、in 2021 这类确定的过去时间连用。\n练习：用括号内动词的一般过去时或现在完成时填空。\n1. We  (clean) the laboratory three hours ago.\n2. Emma  already  (finish) all her math homework for today.\n3. In 2021, the school  (build) a new indoor swimming pool.\n4. I  (know) Daniel since we started elementary school together.\n5. They  (not see) each other since last month's soccer game.\n6. Oliver  (lose) his library card yesterday, and he cannot find it anywhere.\n7. So far, our class  (raise) five hundred dollars for the animal shelter.\n8. The train  (leave) the platform ten minutes ago.",
+          "prompt": "一般过去时 现在完成时 结构 did have / has + done 用法 过去某个时间发生、已经结束 过去的动作影响现在；从过去持续到现在 标志词 yesterday, ago, last..., in + 过去年份 already, yet, just, ever, never, so far, since, for, recently, over the past... 例 I lost it yesterday. I have lost it.（现在还没找到） 一般过去时 过去已结束 过去 现在 未来 现在完成时 动作已完成，对现在有影响 影响 过去 现在 未来 从过去持续到现在 过去 现在 未来 since vs for 后接 例 since 时间点 / 过去时从句 since 2020, since we met\n1. We ______ (clean) the laboratory three hours ago.\n2. Emma ______ already ______ (finish) all her math homework for today.\n3. In 2021, the school ______ (build) a new indoor swimming pool.\n4. I ______ (know) Daniel since we started elementary school together.\n5. They ______ (not see) each other since last month's soccer game.\n6. Oliver ______ (lose) his library card yesterday, and he cannot find it anywhere.\n7. So far, our class ______ (raise) five hundred dollars for the animal shelter.\n8. The train ______ (leave) the platform ten minutes ago.\n9. since vs for 后接 例 for 时间段 for three years ⚠ 现在完成时不能与 ago、yesterday、last...、in 2021 这类确定的过去时间连用。 练习：用括号内动词的一般过去时或现在完成时填空。",
           "answer": "一般过去时 vs 现在完成时　1 cleaned three hours ago　2 has ... finished already　3 built in 2021；build → built　4 have known since + 过去时从句　5 haven't seen / havesince + 过去时间点　not seen　6 lost yesterday；与 ago、yesterday 这类过去时间状语连用时，不能用现在完成时　7 has raised so far　8 left ten minutes ago；leave → left",
           "note": "句中有明确的过去时间点（yesterday、last week、ago、in 2021）用一般过去时；强调过去的事对现在的影响或一直持续到现在（since、for、already、yet、so far）用现在完成时。"
         },
         {
           "title": "D. 一般过去时 vs 过去进行时",
-          "prompt": "情形 时间轴 时态 句型 例\n长动作做背景───A───A: was doingWhen/While A, B.I was sleeping when the phone rang.\n短动作做焦点▲ BB: didA when B.\n两个长动作同───A───A: was doingWhile A, B.She was cooking while I was reading.\n时进行───B───B: was doingA while B.\n两个短动作接A ──▶ B A: didA when B.He opened the door and walked in.\n连发生B: didA and B.\n口诀：长动作，做背景，用进行，短动作，做焦点，用过去。\n练习：用括号内动词的一般过去时或过去进行时填空。\n1. While the teacher was explaining the rules, a bird  (fly) into the classroom.\n2. I  (read) an adventure story when the lights suddenly went out.\n3. When the bell rang, the students  (write) their final essays, so the teacher gave them two\nmore minutes.\n4. We  (walk) along the riverbank when it suddenly began to rain heavily.\n10\n5. Daniel  (hurt) his knee while he was playing basketball yesterday afternoon.\n6. The phone  (ring) three times while Mrs. Green was cooking dinner in the kitchen.\n7. When the coach entered the locker room, the players  (discuss) their tactics, so they did\nnot notice him.\n8. It  (snow) hard when we stepped out of the train station last night.",
+          "prompt": "情形 时间轴 时态 句型 例 长动作做背景───A───A: was doingWhen/While A, B.I was sleeping when the phone rang. 短动作做焦点▲ BB: didA when B. 两个长动作同───A───A: was doingWhile A, B.She was cooking while I was reading. 时进行───B───B: was doingA while B. 两个短动作接A ──▶ B A: didA when B.He opened the door and walked in. 连发生B: didA and B. 口诀：长动作，做背景，用进行，短动作，做焦点，用过去。 练习：用括号内动词的一般过去时或过去进行时填空。\n1. While the teacher was explaining the rules, a bird ______ (fly) into the classroom.\n2. I ______ (read) an adventure story when the lights suddenly went out.\n3. When the bell rang, the students ______ (write) their final essays, so the teacher gave them two more minutes.\n4. We ______ (walk) along the riverbank when it suddenly began to rain heavily.\n5. Daniel ______ (hurt) his knee while he was playing basketball yesterday afternoon.\n6. The phone ______ (ring) three times while Mrs. Green was cooking dinner in the kitchen.\n7. When the coach entered the locker room, the players ______ (discuss) their tactics, so they did not notice him.\n8. It ______ (snow) hard when we stepped out of the train station last night.\n10.",
           "answer": "一般过去时 vs 过去进行时　1 flew 短动作打断 while 引导的背景动作；fly → flew　2 was reading 背景动作被 when 引导的短动作打断　3 were writing 铃响时学生还在写，所以老师多给了两分钟　4 were walking 背景动作被 when 引导的短动作打断　5 hurt 短动作；hurt 的三种形式相同　6 rang 发生在背景动作中的短动作；ring → rang　7 were discussing 教练进门时，球员正在讨论，所以没注意到他　8 was snowing 天气作背景",
           "note": "过去某个时刻正在进行的背景动作用过去进行时（常由 when 引导的短动作打断）；打断它的那个短动作用一般过去时。"
         },
         {
           "title": "E. 一般将来时辨析（will do / be going to do）",
-          "prompt": "用法 will be going to\n说话时临时决定 ✔ I'll answer it.\n主动提供帮助、承诺 ✔ I'll lend you mine. / I'll call you.\n表达个人看法的预测 ✔ I think / I don't think ... will\n事先计划、已下决心 ✔ We're going to travel ...\n有眼前迹象、马上要发生 ✔ It's going to rain!\n练习：根据上下文，圈出括号内正确的动词形式。\n1. Look at those thick dark clouds in the sky! It ( will rain / is going to rain ) very soon.\n2. The phone is ringing on the desk. — Don't get up; I ( will answer / am going to answer ) it.\n3. We bought our train tickets yesterday. We ( will travel / are going to travel ) to Boston this Saturday.\n4. I don't think humans ( will live / are going to live ) on Mars within the next twenty years.\n5. Be careful with that heavy ladder! It ( will fall / is going to fall ) over!\n6. Oh, I forgot to bring my ruler today. — That's fine; I ( will lend / am going to lend ) you mine.\n7. My sister has made up her mind; she ( will study / is going to study ) medicine in college.\n8. Don't worry, Mom. I promise I ( will call / am going to call ) you as soon as I arrive.",
+          "prompt": "用法 will be going to 说话时临时决定 ✔ I'll answer it. 主动提供帮助、承诺 ✔ I'll lend you mine. / I'll call you. 表达个人看法的预测 ✔ I think / I don't think... will 事先计划、已下决心 ✔ We're going to travel... 有眼前迹象、马上要发生 ✔ It's going to rain! 练习：根据上下文，圈出括号内正确的动词形式。\n1. Look at those thick dark clouds in the sky! It ( will rain / is going to rain ) very soon.\n2. The phone is ringing on the desk. — Don't get up; I ( will answer / am going to answer ) it.\n3. We bought our train tickets yesterday. We ( will travel / are going to travel ) to Boston this Saturday.\n4. I don't think humans ( will live / are going to live ) on Mars within the next twenty years.\n5. Be careful with that heavy ladder! It ( will fall / is going to fall ) over!\n6. Oh, I forgot to bring my ruler today. — That's fine; I ( will lend / am going to lend ) you mine.\n7. My sister has made up her mind; she ( will study / is going to study ) medicine in college.\n8. Don't worry, Mom. I promise I ( will call / am going to call ) you as soon as I arrive.",
           "answer": "will vs be going to　1 is going to rain 有眼前迹象（乌云）　2 will answer 说话时临时决定　3 are going to travel 已有计划（票已买）　4 will live 表达看法的预测（I don't think）　5 is going to fall 有眼前迹象，马上要发生　6 will lend 临时决定或主动提供帮助　7 is going to study 早已决定的打算（has made up her mind）　8 will call 承诺（I promise）",
           "note": "说话当下临时决定、主动承诺用 will；事先已有计划、或有迹象马上发生用 be going to。"
         },
         {
           "title": "F. 时态一致以及特定结构中的时态要求",
-          "prompt": "规则 要点 例\n并列谓语一致 同一时间背景下的并列动作通常保持时态一致；时间背opened ..., took ..., and locked\n景改变时，应按实际时间选择时态。\n11\n规则 要点 例\n宾语从句：主句从句按实际时间选时态 She says she will visit ...\n是现在时\n宾语从句：主句从句用过去范围的时态 Tom said he was tired.\n是过去时\n时间状语从句 表示将来时，主句用一般将来时，as soon as 等引导的As soon as the bell rings, we will\n时间状语从句用一般现在时hand in our papers.\n条件句 第零条件句：主现从现If it rains tomorrow, we will stay\n第一条件句：主将从现/主情从现/主祈从现indoors.\n第二条件句：主过将从过（第一条件句：主将从现）\n第三条件句：主过将完从过完\n表述客观真理、使用一般现在时 He said light travels faster than\n科学事实sound.\n注：关于条件句的时态要求、用法和含义等，后续小托福加油站中将会专题讲解。\n练习：根据主从句或并列结构的时间逻辑，选出括号中正确的动词形式。\n1. When my father arrived home yesterday evening, he ( washes / washed ) his hands first.\n2. She says that she ( visit / will visit ) her grandparents next Sunday.\n3. The students painted the banner in the morning and ( hang / hung ) it on the wall in the afternoon.\n4. The boy opened his locker, took out his coat, and ( locks / locked ) the door.\n5. As soon as the bell rings tomorrow morning, the students ( hand / will hand ) in their papers.\n6. Tom said that he ( is / was ) too tired to play soccer that afternoon.\n7. My mother was cooking dinner when the doorbell ( rings / rang ).\n8. Last semester, our class planted ten trees, and each student ( waters / watered ) them every afternoon.\n12",
+          "prompt": "规则 要点 例 并列谓语一致 同一时间背景下的并列动作通常保持时态一致；时间背opened..., took..., and locked 景改变时，应按实际时间选择时态。\n1. When my father arrived home yesterday evening, he ( washes / washed ) his hands first.\n2. She says that she ( visit / will visit ) her grandparents next Sunday.\n3. The students painted the banner in the morning and ( hang / hung ) it on the wall in the afternoon.\n4. The boy opened his locker, took out his coat, and ( locks / locked ) the door.\n5. As soon as the bell rings tomorrow morning, the students ( hand / will hand ) in their papers.\n6. Tom said that he ( is / was ) too tired to play soccer that afternoon.\n7. My mother was cooking dinner when the doorbell ( rings / rang ).\n8. Last semester, our class planted ten trees, and each student ( waters / watered ) them every afternoon.\n11. 规则 要点 例 宾语从句：主句从句按实际时间选时态 She says she will visit... 是现在时 宾语从句：主句从句用过去范围的时态 Tom said he was tired. 是过去时 时间状语从句 表示将来时，主句用一般将来时，as soon as 等引导的As soon as the bell rings, we will 时间状语从句用一般现在时hand in our papers. 条件句 第零条件句：主现从现If it rains tomorrow, we will stay 第一条件句：主将从现/主情从现/主祈从现indoors. 第二条件句：主过将从过（第一条件句：主将从现） 第三条件句：主过将完从过完 表述客观真理、使用一般现在时 He said light travels faster than 科学事实sound. 注：关于条件句的时态要求、用法和含义等，后续小托福加油站中将会专题讲解。 练习：根据主从句或并列结构的时间逻辑，选出括号中正确的动词形式。\n12.",
           "answer": "时态一致以及特定结构中的时态要求　1 washed 时间状语从句用了过去时 arrived，而且时间是 yesterday evening，所以主句也　用一般过去时。　2 will visit 主句是现在时，从句按实际时间 next Sunday 用将来时　3 hung and 连接的并列谓语时态一致；hang（悬挂）→ hung　4 locked 并列谓语时态一致　5 will hand 主将从现：从句 rings 用现在时，主句用将来时　6 was 主句用过去时 said，that afternoon 也指过去　7 rang 背景动作用过去进行时，打断的短动作用一般过去时　8 watered last semester，并列谓语时态一致",
           "note": "由 and 连接的并列谓语时态要一致；if / when 引导的时间或条件从句用现在时表示将来；宾语从句的时态要与主句呼应。"
         }
       ]
     }
   ]
-}
+};

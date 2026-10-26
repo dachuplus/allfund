@@ -259,7 +259,7 @@ export const WEEK = {
       "drills": [
         {
           "title": "专项练习（Passage 短文题）",
-          "prompt": "PART A ·阅读 —— 主旨题（Main idea）\nI. Training 专项精讲\n题型指南\n小托福阅读共约 42 题 / 50分钟，文章分非学术类（邮件、通知、新闻故事，120–200 词，每篇 4–6\n题）与学术类（天文、生物、考古、体育等，200–420 词，每篇 5–9 题）。\n主旨题通常出现在各阅读篇目的第  1 题， 考查 学生对篇目主旨的理解和总结概括能力；作答时需要\n把握整体，切忌仅关注某个具体细节。\n常见问法：\nWhat is themain topicof the article?\nWhat is the passagemainly about?\nWhich title best summarizes the main idea of the passage?\nWhat is themain purposeof the article?\n专项练习 —— 短文主旨\nPassage 1 ｜ Library News\nThe Westside School Library will have new weekend hours starting next month. From September, the library will\nopen at ten o’clock on Saturday morning and close at four in the afternoon. On Sunday it will open at ten and close\nat two. Students can borrow up to three books at a time, and books must be returned within two weeks. The reading\nroom on the second floor will stay open during all library hours. Please remember to bring your student card.\nWhat  is  the  main  topic  of  the  notice?\nA. How to get a student card\nB. New weekend hours at the school library\nC. Where to find the reading room\nD.  How  many  books  students  can  borrow\nPassage 2｜ An E-mail\nHi Daniel,\nThanks for asking about my science project. I have been working on it for three weeks, and I have finally finished it.\nMy project is about how plants grow in different kinds of light. I put six small bean plants on my desk. Two of them\nstood near the window, two stayed in a dark cupboard, and two sat under a desk lamp. Every morning, I wrote\ndown how tall each plant was and took a photo of its leaves.\nThe plants near the window grew the fastest. The ones in the cupboard turned yellow and stopped growing after\nfour days. The plants under the lamp grew more slowly than the window plants, but they were still healthy.\nI learned that light is very important for plants, but not all light is the same. Next time, I want to test how water\nchanges plant growth.\nSophie\nWhat is the e-mail mainly about?\nA. Why Sophie enjoys science lessons\nB. How to take care of a bean plant at home\nC. What Sophie did and learned in her science project\nD. Why Daniel should start a science project\nPassage 3 ｜ A School Newspaper Story\nLast Saturday, more than forty students from Northgate Middle School spent their morning at Sandy Bay Beach.\nThey were not there to swim or play volleyball. They came to pick up rubbish.\nThe idea came from a class project on ocean pollution. When the students learned that plastic bags and bottles can\nhurt fish and seabirds, they decided to do something about it. They asked their teacher, Ms. Hayes, for help, and she\ncontacted the local environment office for gloves, bags, and a truck to carry the rubbish away.\nBy noon, the group had collected 27 bags of rubbish, including bottle caps, fishing nets, and pieces of broken\nplastic. One student, Kevin, found a shoe, which made everyone laugh.\nMs. Hayes said the trip was more than a cleaning activity. “The students now understand that small actions add up,”\nshe said. “They have already asked to come back next month.”\nWhic",
+          "prompt": "PART A ·阅读 —— 主旨题（Main idea） I. Training 专项精讲 题型指南 小托福阅读共约 42 题 / 50分钟，文章分非学术类（邮件、通知、新闻故事，120–200 词，每篇 4–6 题）与学术类（天文、生物、考古、体育等，200–420 词，每篇 5–9 题）。 主旨题通常出现在各阅读篇目的第 ______ 1 题， 考查 学生对篇目主旨的理解和总结概括能力；作答时需要 把握整体，切忌仅关注某个具体细节。 常见问法： What is themain topicof the article? What is the passagemainly about? Which title best summarizes the main idea of the passage? What is themain purposeof the article? 专项练习 —— 短文主旨 Passage 1 ｜ Library News The Westside School Library will have new weekend hours starting next month. From September, the library will open at ten o’clock on Saturday morning and close at four in the afternoon. On Sunday it will open at ten and close at two. Students can borrow up to three books at a time, and books must be returned within two weeks. The reading room on the second floor will stay open during all library hours. Please remember to bring your student card. What ______ is ______ the ______ main ______ topic ______ of ______ the ______ notice?\nA. How to get a student card\nB. New weekend hours at the school library\nC. Where to find the reading room\nD. ______ How ______ many ______ books ______ students ______ can ______ borrow Passage 2｜ An E-mail Hi Daniel, Thanks for asking about my science project. I have been working on it for three weeks, and I have finally finished it. My project is about how plants grow in different kinds of light. I put six small bean plants on my desk. Two of them stood near the window, two stayed in a dark cupboard, and two sat under a desk lamp. Every morning, I wrote down how tall each plant was and took a photo of its leaves. The plants near the window grew the fastest. The ones in the cupboard turned yellow and stopped growing after four days. The plants under the lamp grew more slowly than the window plants, but they were still healthy. I learned that light is very important for plants, but not all light is the same. Next time, I want to test how water changes plant growth. Sophie What is the e-mail mainly about?\nA. Why Sophie enjoys science lessons\nB. How to take care of a bean plant at home\nC. What Sophie did and learned in her science project\nD. Why Daniel should start a science project Passage 3 ｜ A School Newspaper Story Last Saturday, more than forty students from Northgate Middle School spent their morning at Sandy Bay Beach. They were not there to swim or play volleyball. They came to pick up rubbish. The idea came from a class project on ocean pollution. When the students learned that plastic bags and bottles can hurt fish and seabirds, they decided to do something about it. They asked their teacher, Ms. Hayes, for help, and she contacted the local environment office for gloves, bags, and a truck to carry the rubbish away. By noon, the group had collected 27 bags of rubbish, including bottle caps, fishing nets, and pieces of broken plastic. One student, Kevin, found a shoe, which made everyone laugh. Ms. Hayes said the trip was more than a cleaning activity. “The students now understand that small actions add up,” she said. “They have already asked to come back next month.” Whic",
           "answer": "答案 B C D C C",
           "note": "主旨题要能概括全篇：先读首尾段抓主题，再看选项覆盖面 —— 只讲某一段细节的选项、或加入了文中没有的内容的选项都要排除。"
         }
@@ -276,7 +276,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 1,
-              "q": "Our photo cluba class photo competition this spring, ______",
+              "q": "Our photo club ______ a class photo competition this spring,",
               "options": [
                 "is holding",
                 "has held",
@@ -313,7 +313,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "will look at every picture carefully, and only the best photos will win a prize. ______",
+              "q": "will look at every picture carefully, and ______ only the best photos will win a prize.",
               "options": [
                 "that means",
                 "which mean",
@@ -351,7 +351,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "Amy and Ben won second prize last year. The photo on the wall now is. ______",
+              "q": "Amy and Ben won second prize last year. The photo on the wall now is ______.",
               "options": [
                 "theirs",
                 "they",
@@ -368,7 +368,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "Please look after them carefully, because a few of may need to borrow one. ______",
+              "q": "Please look after them carefully, because a few of ______ may need to borrow one.",
               "options": [
                 "other classes",
                 "others classes",
@@ -386,7 +386,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "The competitionevery spring, and every class joins in. ______",
+              "q": "The competition ______ every spring, and every class joins in.",
               "options": [
                 "holds",
                 "takes place",
@@ -404,7 +404,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "This year the older students are teaching how to use the new camera. ______",
+              "q": "This year the older students are teaching ______ how to use the new camera.\u0002",
               "options": [
                 "the younger ones",
                 "young one",
@@ -429,7 +429,7 @@ export const WEEK = {
           "questions": [
             {
               "n": 9,
-              "q": "Please return the two books that are notby Friday. Thank you. ______",
+              "q": "Please return the two books that are not ______ by Friday. Thank you.",
               "options": [
                 "yours",
                 "your",
@@ -447,7 +447,7 @@ export const WEEK = {
             },
             {
               "n": 10,
-              "q": "One of the missing books is called Stars and Planets, andis about the moon. ______",
+              "q": "One of the missing books is called Stars and Planets, and ______ is about the moon.",
               "options": [
                 "other",
                 "the other",
@@ -465,7 +465,7 @@ export const WEEK = {
             },
             {
               "n": 11,
-              "q": "The book about stars has no pictures, so please return it first. ______",
+              "q": "The book about stars has no pictures ______, so please return it first.",
               "options": [
                 "in all",
                 "of all",
@@ -483,7 +483,7 @@ export const WEEK = {
             },
             {
               "n": 12,
-              "q": "Two books are still missing from the library, andhas come back yet. ______",
+              "q": "Two books are still missing from the library, and ______ has come back yet.",
               "options": [
                 "neither the two books",
                 "either of the two books",
@@ -500,7 +500,7 @@ export const WEEK = {
             },
             {
               "n": 13,
-              "q": "I will put your names on the list myself, so you need not writeagain. ______",
+              "q": "I will put your names on the list myself, so you need not write ______ again.",
               "options": [
                 "they",
                 "their",
@@ -518,7 +518,7 @@ export const WEEK = {
             },
             {
               "n": 14,
-              "q": "so you may have to wait until the student in front of you . ______",
+              "q": "so you may have to wait until the student in front of you ______.",
               "options": [
                 "gives it back",
                 "gives back it",
@@ -535,7 +535,7 @@ export const WEEK = {
             },
             {
               "n": 15,
-              "q": "If you would like to borrow a book, please writeon the list on my desk. ______",
+              "q": "If you would like to borrow a book, please write ______ on the list on my desk.",
               "options": [
                 "your name",
                 "you name",
@@ -554,7 +554,7 @@ export const WEEK = {
             },
             {
               "n": 16,
-              "q": "Ia few students how to find the book they want. ______",
+              "q": "I ______ a few students how to find the book they want.",
               "options": [
                 "have already shown",
                 "has already shown",
@@ -613,7 +613,7 @@ export const WEEK = {
             },
             {
               "n": 3,
-              "q": "The judges askedwhether we had built the robot ourselves. ______",
+              "q": "The judges asked ______ whether we had built the robot ourselves.",
               "options": [
                 "we",
                 "ourselves",
@@ -631,7 +631,7 @@ export const WEEK = {
             },
             {
               "n": 4,
-              "q": "The other team 's robot had practised. ______",
+              "q": "The other team ______ 's robot had practised\u0002.",
               "options": [
                 "a year longer than we",
                 "a year longer than ours did",
@@ -650,7 +650,7 @@ export const WEEK = {
             },
             {
               "n": 5,
-              "q": "Neither the two pilots nor the coach ______",
+              "q": "Neither the two pilots nor the coach ______ ",
               "options": [
                 "were able to explain why the robot had stopped",
                 "was able to explain why the robot had stopped",
@@ -668,7 +668,7 @@ export const WEEK = {
             },
             {
               "n": 6,
-              "q": "The camera, together with four small magnets,find its way around the table. ______",
+              "q": "The camera, together with four small magnets, ______ find its way around the table.",
               "options": [
                 "help the robot",
                 "help them",
@@ -685,7 +685,7 @@ export const WEEK = {
             },
             {
               "n": 7,
-              "q": "The members were so pleased with the result that they could not help . ______",
+              "q": "The members were so pleased with the result that they could not help ______.",
               "options": [
                 "feel proud of themselves",
                 "feeling proud of them",
@@ -702,7 +702,7 @@ export const WEEK = {
             },
             {
               "n": 8,
-              "q": "Our next robot will be lighter, and it should travel. ______",
+              "q": "Our next robot will be lighter, and it should travel ______.",
               "options": [
                 "twice as faster as this one does",
                 "twice as fast as this one does",
@@ -723,41 +723,41 @@ export const WEEK = {
       "drills": [
         {
           "title": "A. 主格与宾格 —— 用括号内代词的主格或宾格形式填空。",
-          "prompt": "1.  (I) am in Class Two. 5.  (They) are my new classmates.\n2. Please give the book to  (he). 6. This present is for  (you) and\n(I).\n3. Ms. Hayes teaches  (we) English. 7. The teacher asked  (he) a question.\n4. Can you help  (she) with the poster? 8. My brother and  (I) walk to school\ntogether.",
+          "prompt": "1. (I) am in Class Two.\n2. Please give the book to ______ (he).\n3. Ms. Hayes teaches ______ (we) English.\n4. Can you help ______ (she) with the poster?\n5. (They) are my new classmates.\n6. This present is for ______ (you) and (I).\n7. The teacher asked ______ (he) a question.\n8. My brother and ______ (I) walk to school together.",
           "answer": "主格与宾格 1 I　2 him　3 us　4 her　5 They　6 you；me　7 him　8 I",
           "note": "主语位置用主格（I、he、they）；动词或介词之后作宾语用宾格（me、him、us、her）。先判断这个词在句里是「做」还是「被作用」。"
         },
         {
           "title": "B. 形容词性  vs 名词性物主代词 —— 用括号内词语的正确形式填空。",
-          "prompt": "1. This is  (I) schoolbag. 5. Their classroom is bigger than  (we).\n2. This schoolbag is  (I). 6.  (She) homework is always neat.\n3. Is that  (you) bike? — No, 7. Is this pen  (he) or  (she)?\n(I) is blue.\n4. The team has  (it) own bus. 8. The students brought  (they) own\nlunches.",
+          "prompt": "1. This is ______ (I) schoolbag.\n2. This schoolbag is ______ (I).\n3. Is that ______ (you) bike? — No,\n4. The team has ______ (it) own bus.\n5. Their classroom is bigger than ______ (we).\n6. (She) homework is always neat.\n7. Is this pen ______ (he) or ______ (she)? (I) is blue.\n8. The students brought ______ (they) own lunches.",
           "answer": "物主代词 1 my　2 mine　3 your；mine　4 its　5 ours　6 Her　7 his；",
           "note": "后面跟着名词时用形容词性物主代词（my、your、its、our）；后面没有名词、单独使用时代替「某人的东西」用名词性物主代词（mine、yours、ours、hers）。"
         },
         {
           "title": "C. one / ones 与  it —— 用  one 、 ones 或  it 填空。",
-          "prompt": "1. I lost my dictionary. I need to buy a new . 4. This pen does not work. Please give me another\n.\n2. Where is my dictionary? I need  now. 5. I like the blue T-shirt more than the red .\n3. These shoes are too small. Do you have bigger6. The two bags are heavy. Please carry  for\n?me.",
+          "prompt": "1. I lost my dictionary. I need to buy a new.\n2. Where is my dictionary? I need ______ now.\n3. These shoes are too small. Do you have bigger\n4. This pen does not work. Please give me another.\n5. I like the blue T-shirt more than the red.\n6. The two bags are heavy. Please carry ______ for ?me.",
           "answer": "one / ones 与 it 1 one　2 it　3 ones　4 one　5 one　6 it",
           "note": "it 指上文提到的同一个东西；one 指同类中的另一个单数，ones 指复数。区分「同一个」还是「同一类」。"
         },
         {
           "title": "D. other 的各种形式 —— 用框内的正确单词或词组填空。",
-          "prompt": "other others the other the others another each other every other\n1. I have two brothers. One is a doctor, and 5. This cake is delicious. May I have  one?\nis a teacher.\n2. Some students walk to school, and  take6. We need  twenty chairs for the meeting.\nthe bus.\n3. Ten of the thirty students stayed home. 7. We have an English test  week.\nwent to the museum.\n4. Do you have  questions about the lesson? 8. They often help  with their homework.",
+          "prompt": "other others the other the others another each other every other\n1. I have two brothers. One is a doctor, and\n2. Some students walk to school, and ______ take\n3. Ten of the thirty students stayed home.\n4. Do you have ______ questions about the lesson?\n5. This cake is delicious. May I have ______ one? is a teacher.\n6. We need ______ twenty chairs for the meeting. the bus.\n7. We have an English test ______ week. went to the museum.\n8. They often help ______ with their homework.",
           "answer": "other 的各种形式 1 the other　2 others　3 The others　4 other　5 another　6",
           "note": "other 后面接复数名词；the other 指两者中的另一个；others / the others 单独使用、不再接名词；another 接单数名词。"
         },
         {
           "title": "E. 反身代词 —— 用括号内词语的正确形式填空。",
-          "prompt": "1.I made this cake     . (I)   6. I will ask     to come earlier. (she)\n2. He is old enough to look after       . (he) 7. I will ask     to help us. (he)\n3. Please help to some fruit. (you)8. The old man could not look after. (he)\n4. We enjoyedat the party. (we) 9. You should be proud of, Tom. (you)\n5. I will take to the park this afternoon.\n(she)",
+          "prompt": "1. I made this cake ______. (I)\n2. He is old enough to look after ______. (he)\n3. Please help to some fruit. (you)\n4. We enjoyedat the party. (we)\n5. I will take to the park this afternoon. (she)\n6. I will ask ______ to come earlier. (she)\n7. I will ask ______ to help us. (he)\n8. The old man could not look after. (he)\n9. You should be proud of, Tom. (you)",
           "answer": "反身代词1 2 3 4 5 6 7 8 9",
           "note": "主语和宾语是同一个人时用反身代词（myself、himself、ourselves）；by oneself 表示「独自」。注意人称和单复数要与主语一致。"
         },
         {
           "title": "F. 主谓一致 —— 从括号中选出正确的形式。",
-          "prompt": "1. There (is / are) a book and two pens on8. Either the students or the teacher (is /\nthe desk.         are) coming.\n2. There   (is / are) two pens and a book on    9. Neither of the answers       (is / are) correct.\nthe desk.\n3.   (Is / Are) there any milk in the fridge?      10. The box of old books(is / are) heavy.\n4. The teacher, together with her students,11. Our team (is / are) ready for the\n(is / are) in the hall.match.\n5. Tom, as well as his brothers,(like /12. The number of students (is / are)\nlikes) swimming.thirty.\n6. Both Lucy and Lily (is / are) good at13. A number of students (is / are) waiting\nChinese.outside.\n7. Not only the students but also the teacher14. Many a student (has / have) asked that\n(is / are) coming.question.",
+          "prompt": "1. There (is / are) a book and two pens on\n2. There ______ (is / are) two pens and a book on\n3. (Is / Are) there any milk in the fridge?\n4. The teacher, together with her students,\n5. Tom, as well as his brothers,(like /\n6. Both Lucy and Lily (is / are) good at\n7. Not only the students but also the teacher\n8. Either the students or the teacher (is / the desk. ______ are) coming.\n9. Neither of the answers ______ (is / are) correct. the desk.\n10. The box of old books(is / are) heavy.\n11. Our team (is / are) ready for the (is / are) in the hall.match.\n12. The number of students (is / are) likes) swimming.thirty.\n13. A number of students (is / are) waiting Chinese.outside.\n14. Many a student (has / have) asked that (is / are) coming.question.",
           "answer": "主谓一致 1 2 3 4 5 6 7",
           "note": "主语是单数或不可数、以及 each / every / everyone 作主语时谓语用单数；主语是复数或用 and 连接的多个事物时用复数。先找准真正的主语，不要被靠近谓语的名词干扰。"
         }
       ]
     }
   ]
-}
+};
