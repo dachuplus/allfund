@@ -150,7 +150,8 @@
           @click="engTab = t.key"
         >{{ t.label }}</div>
       </div>
-      <EngPanel :inst="engTab" />
+      <ToeflJuniorPanel v-if="engTab === 'toefl'" />
+      <EngPanel v-else :inst="engTab" />
     </div>
 
     <!-- 信奥二级 Tab：下辖 ASCII码表 三级 Tab -->
@@ -235,6 +236,7 @@ import { useAuth, ADMIN_EMAIL } from '../../composables/useAuth'
 import GamesPanel from '../../components/games/GamesPanel.vue'
 import Grade5Panel from '../../components/math/Grade5Panel.vue'
 import EngPanel from '../../components/english/EngPanel.vue'
+import ToeflJuniorPanel from '../../components/english/ToeflJuniorPanel.vue'
 import JuniorPanel from '../../components/math/JuniorPanel.vue'
 import YuwenPanel from '../../components/math/YuwenPanel.vue'
 import YuwenGushiwenPanel from '../../components/math/YuwenGushiwenPanel.vue'
@@ -334,12 +336,13 @@ const mathTabs = [
 const visibleMathTabs = computed(() => (isAdminEmail.value || isOwner.value) ? mathTabs : mathTabs.filter(t => featureEnabled(t.feature)))
 const mathTab = ref('gaosi')
 
-// 英文下辖课程 Tab：Unlock / Reading Explorer / 乐读 / 新概念
+// 英文下辖课程 Tab：Unlock / Reading Explorer / 乐读 / 新概念 / 小托福加油站
 const engTabs = [
   { key: 'unlock', label: 'Unlock', feature: 'eng-unlock' },
   { key: 're', label: 'Reading Explorer', feature: 'eng-re' },
   { key: 'ledu', label: '乐读', feature: 'eng-ledu' },
   { key: 'nce', label: '新概念', feature: 'eng-nce' },
+  { key: 'toefl', label: '小托福', feature: 'eng-toefl' },
 ]
 // 按功能开关（含父级 content-eng / content）过滤可见的英文课程 tab；管理员始终可见
 const visibleEngTabs = computed(() => (isAdminEmail.value || isOwner.value) ? engTabs : engTabs.filter(t => featureEnabled(t.feature)))

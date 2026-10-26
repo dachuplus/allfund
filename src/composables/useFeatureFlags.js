@@ -67,6 +67,7 @@ const DEFAULT_FLAGS = {
   'eng-re': true,
   'eng-ledu': true,
   'eng-nce': true,
+  'eng-toefl': true,
   // 娱乐 · 美食 · 三级
   'food-chef': true,
   'food-musteat': true,
@@ -122,6 +123,7 @@ export const SUB_FEATURE_PARENTS = {
   'eng-re': 'content-eng',
   'eng-ledu': 'content-eng',
   'eng-nce': 'content-eng',
+  'eng-toefl': 'content-eng',
   // 娱乐 · 美食 · 三级
   'food-chef': 'content-food',
   'food-musteat': 'content-food',
@@ -206,6 +208,7 @@ export const FEATURE_GROUPS = [
       { key: 'eng-re', label: 'Reading Explorer', desc: '英文下的 Reading Explorer（国家地理非虚构阅读）' },
       { key: 'eng-ledu', label: '乐读', desc: '英文下的乐读（分级原版阅读）' },
       { key: 'eng-nce', label: '新概念', desc: '英文下的新概念英语' },
+      { key: 'eng-toefl', label: '小托福', desc: '英文下的小托福加油站（Week1-5 听力/阅读/语用）' },
     ],
   },
   {
