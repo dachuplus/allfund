@@ -74,10 +74,17 @@ def fetch_hb_all():
     req = urllib.request.Request(
         'https://fund.eastmoney.com/data/rankhandler.aspx',
         data=encoded, headers=HEADERS)
-    try:
-        text = urllib.request.urlopen(req, timeout=30).read().decode('utf-8')
-    except Exception as e:
-        print(f'  [ERR] 初始请求失败: {e}', flush=True)
+    text = None
+    for _attempt in range(1, 4):
+        try:
+            text = urllib.request.urlopen(req, timeout=30).read().decode('utf-8')
+            if text and 'datas' in text:
+                break
+        except Exception as e:
+            print(f'  [WARN] 初始请求第{_attempt}/3次失败: {e}', flush=True)
+            time.sleep(3)
+    if not text:
+        print('  [ERR] 初始请求 3 次重试仍失败，退出', flush=True)
         return all_data
 
     pages_m = re.search(r'allPages:"(\d+)"', text)

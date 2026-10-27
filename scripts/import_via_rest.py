@@ -271,39 +271,80 @@ else:
     print('  ⚠ 无基金基本概况文件，跳过', flush=True)
 
 # 2e. [STAGING] 种子货币型（主管道 fetch_and_import_funds 仅含 5 大类，不含 hb）
-#     从 fund_combined 取货币型基础信息（c/name/t0/t1/company/scale/fee/manager），
-#     阶段收益在 2f 由 currency_output.ndjson 填充。
+#
+# 【根因修复 2026-10-27】此前货币型基础记录【仅】从 fund_combined 倒读，而 fund_combined
+# 本身由 promote 从 fund_scores 重建（循环依赖）。一旦 步骤2e 的 DB 读取因 Supabase 连接
+# 池超时（ECHECKOUTTIMEOUT / 503，CI 高频抖动点）失败，异常被静默吞掉、seed=0、staging
+# 货币型=0、promote 整批拒绝 —— 这正是「货币型多次为 0」反复发生的根因（run#82 实证：
+# 「[WARN] 读取 fund_combined 货币型失败 ... ECHECKOUTTIMEOUT」「种子货币型 0 只」）。
+#
+# 新方案：货币型基础记录【优先】从 步骤2d 的 currency_output.ndjson 播种（本地文件，
+# 独立数据源，零 DB 依赖）；fund_combined 仅作【可选】补充，用于补全 company/scale/
+# fee/manager 等基础信息。无论 DB 是否抖动，货币型都能稳定进 staging。
+_HB_RET_KEYS = ['r0w', 'r1m', 'r3m', 'r6m', 'r1y', 'r2y', 'r3y', 'r5y', 'ytd', 'return_all']
 if STAGING:
     t0e = time.time()
-    try:
-        hb_rows = pg("SELECT c, name, t0, t1, company, fund_scale, manage_fee, fund_manager "
-                     "FROM fund_combined WHERE t0 = '货币型'")
-    except Exception as e:
-        hb_rows = []
-        print(f'  [WARN] 读取 fund_combined 货币型失败: {str(e)[:160]}', flush=True)
+    cur_path = os.path.join(SCRIPT_DIR, 'currency_output.ndjson')
+    hb_seed = []
+    if os.path.exists(cur_path):
+        with open(cur_path, 'r') as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if not _line:
+                    continue
+                try:
+                    _r = json.loads(_line)
+                except Exception:
+                    continue
+                _c = (_r.get('c') or '').replace('.OF', '')
+                if _c and _r.get('t0') == '货币型':
+                    hb_seed.append(_r)
+        print(f'  ✓ 从 currency_output.ndjson 读取货币型候选 {len(hb_seed)} 只（本地文件，无 DB 依赖）', flush=True)
+    else:
+        print('  ⚠ 无 currency_output.ndjson（步骤2d 未产出），将仅依赖 fund_combined 兜底播种', flush=True)
+
+    # 可选补充：用 fund_combined 补全 company/scale/fee/manager（DB 不可达时跳过，不致命）
+    hb_extra = {}
+    if hb_seed:
+        try:
+            _rows = pg("SELECT c, company, fund_scale, manage_fee, fund_manager "
+                       "FROM fund_combined WHERE t0 = '货币型'")
+            for _r in _rows:
+                hb_extra[(_r.get('c') or '').replace('.OF', '')] = _r
+        except Exception as e:
+            print(f'  [WARN] 读取 fund_combined 补充信息失败（不影响货币型播种）: {str(e)[:120]}', flush=True)
+
     seeded = 0
-    if hb_rows:
-        existing_codes = {f.get('c', '').replace('.OF', '') for f in funds}
-        for r in hb_rows:
-            c = (r.get('c') or '').replace('.OF', '')
-            if c in existing_codes:
-                continue
-            funds.append({
-                'c': f'{c}.OF',
-                'n': r.get('name') or '',
-                't0': r.get('t0') or '货币型',
-                't1': r.get('t1') or '货币型-普通货币',
-                't1_tt': r.get('t1') or '货币型-普通货币',
-                'company': r.get('company'),
-                'fund_scale': r.get('fund_scale'),
-                'manage_fee': r.get('manage_fee'),
-                'fund_manager': r.get('fund_manager'),
-            })
-            seeded += 1
-    print(f'  ✓ 种子货币型 {seeded} 只（来自 fund_combined）({time.time()-t0e:.1f}s)', flush=True)
+    existing_codes = {f.get('c', '').replace('.OF', '') for f in funds}
+    for _r in hb_seed:
+        _c = (_r.get('c') or '').replace('.OF', '')
+        if not _c or _c in existing_codes:
+            continue
+        _rec = {
+            'c': f'{_c}.OF',
+            'n': _r.get('n') or '',
+            't0': _r.get('t0') or '货币型',
+            't1': _r.get('t1') or '货币型-普通货币',
+            't1_tt': _r.get('t1_tt') or _r.get('t1') or '货币型-普通货币',
+        }
+        # 阶段收益（currency_output 已含，步骤2d 抓全）
+        for _k in _HB_RET_KEYS:
+            if _r.get(_k) is not None:
+                _rec[_k] = _r[_k]
+        # 用 fund_combined 补全公司/规模/费率/经理（可选）
+        _ex = hb_extra.get(_c)
+        if _ex:
+            for _k in ('company', 'fund_scale', 'manage_fee', 'fund_manager'):
+                if _ex.get(_k) is not None:
+                    _rec[_k] = _ex[_k]
+        funds.append(_rec)
+        seeded += 1
+    print(f'  ✓ 种子货币型 {seeded} 只（来自 currency_output.ndjson）({time.time()-t0e:.1f}s)', flush=True)
 
 # 2f. [STAGING] 合并货币基金阶段收益（currency_output.ndjson，hb rankhandler）
-#     填充 r0w~r3y / ytd / return_all；r5y 在 hb 排名页不存在，保持 NULL。
+#     步骤2e 已把 r0w~r3y/ytd/return_all 一并播种，此处为冗余安全合并：
+#     覆盖「2e 走了 fund_combined 兜底分支」的极端情况，确保阶段收益不缺失。
+#     r5y 在 hb 排名页不存在，保持 NULL。
 if STAGING:
     cur_path = os.path.join(SCRIPT_DIR, 'currency_output.ndjson')
     if os.path.exists(cur_path):
@@ -322,7 +363,7 @@ if STAGING:
             c = fund.get('c', '').replace('.OF', '')
             if c in cur_map:
                 r = cur_map[c]
-                for k in ['r0w', 'r1m', 'r3m', 'r6m', 'r1y', 'r2y', 'r3y', 'r5y', 'ytd', 'return_all']:
+                for k in _HB_RET_KEYS:
                     v = r.get(k)
                     if v is not None:
                         fund[k] = v
