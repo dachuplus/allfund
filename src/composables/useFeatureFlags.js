@@ -28,6 +28,7 @@ const DEFAULT_FLAGS = {
   'tools-stock': true,
   'tools-index': true,
   'tools-fund-index': true,
+  'fund-manager': true,
   'tools-tougu': true,
   // 策略 · 二级
   'signal-macro': true,
@@ -86,6 +87,7 @@ export const SUB_FEATURE_PARENTS = {
   'tools-stock': 'fund-rank',
   'tools-index': 'fund-rank',
   'tools-fund-index': 'fund-rank',
+  'fund-manager': 'fund-rank',
   'tools-tougu': 'fund-rank',
   // 策略 · 二级
   'signal-macro': 'signal',
@@ -153,7 +155,8 @@ export const FEATURE_GROUPS = [
       { key: 'tools-stock', label: '股票', desc: '选品下的股票筛选 / 排序 / 对比' },
       { key: 'tools-index', label: '指数', desc: '选品下的指数评分与筛选' },
       { key: 'tools-fund-index', label: '基金指数', desc: '选品下的基金指数行情与分类指数' },
-      { key: 'tools-tougu', label: '投顾产品', desc: '选品下的投顾产品公开数据' },
+      { key: 'fund-manager', label: '经理', desc: '选品下的基金经理图鉴（东方财富在线数据，不落库）' },
+      { key: 'tools-tougu', label: '投顾', desc: '选品下的投顾产品公开数据' },
     ],
   },
   {

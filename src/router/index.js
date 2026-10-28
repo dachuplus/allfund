@@ -93,9 +93,21 @@ const routes = [
         meta: {
           tab: 'tools',
           feature: 'tools-tougu',
-          title: '选品 · 投顾产品',
+          title: '选品 · 投顾',
           description: '公开披露高收益、稳健、养老三类投顾产品的近3月、近1年收益与最大回撤等历史数据，供客观查阅。',
           keywords: '投顾产品,公开信息,稳健理财,养老储蓄'
+        }
+      },
+      {
+        path: 'manager',
+        name: 'tools-manager',
+        component: () => import('../pages/tools/ManagerPage.vue'),
+        meta: {
+          tab: 'tools',
+          feature: 'fund-manager',
+          title: '选品 · 基金经理图鉴',
+          description: '基金经理图鉴：在线拉取东方财富公开基金经理数据（不落库），覆盖全部/股票型/混合型/债券型/收益型，支持按公司、姓名、产品数量、管理规模、最佳回报等 10 个维度筛选。',
+          keywords: '基金经理,经理图鉴,基金经理筛选,基金从业'
         }
       }
     ]

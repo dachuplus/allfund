@@ -1,6 +1,6 @@
 <template>
   <div class="page-selection">
-    <!-- 二级 tab：基金 / 股票 / 指数（按功能开关过滤显示） -->
+    <!-- 二级 tab：基金 / 股票 / 指数 / 投顾 / 经理（按功能开关过滤显示） -->
     <nav class="selection-tabs" aria-label="选品分类">
       <router-link
         v-for="t in visibleToolTabs"
@@ -32,8 +32,8 @@ const toolTabs = [
   { to: '/tools/fund',       name: 'tools-fund',       label: '基金',     feature: 'fund-rank' },
   { to: '/tools/stock',      name: 'tools-stock',      label: '股票',     feature: 'tools-stock' },
   { to: '/tools/index',      name: 'tools-index',      label: '指数',     feature: 'tools-index' },
-  { to: '/tools/fund-index', name: 'tools-fund-index', label: '基金指数', feature: 'tools-fund-index' },
-  { to: '/tools/tougu',      name: 'tools-tougu',      label: '投顾产品', feature: 'tools-tougu' },
+  { to: '/tools/tougu',      name: 'tools-tougu',      label: '投顾',     feature: 'tools-tougu' },
+  { to: '/tools/manager',    name: 'tools-manager',    label: '经理',     feature: 'fund-manager' },
 ]
 const visibleToolTabs = computed(() => toolTabs.filter(t => featureEnabled(t.feature)))
 </script>

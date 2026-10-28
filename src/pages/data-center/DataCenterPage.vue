@@ -1362,6 +1362,7 @@
           <tr><td>指数估值补充</td><td>蛋卷 danjuan index_eva/dj</td><td>⚠️ 仅 3/7</td><td>沪深300 / 中证500 / 中证1000，不作主源；需 /api/danjuan-eva 代理</td></tr>
             <tr><td>宏观 / 策略 / 风格因子</td><td>macro_history（落地表）</td><td>✅ 合理落地</td><td>被 SignalPage 图表、build_style_factors、fetch_jqr_indicators 共用，后端计算须落地，非浪费</td></tr>
             <tr><td>QDII 全量名单</td><td>天天基金 fundcode_search.js（主列表）+ pingzhongdata（逐只）</td><td>✅ 成熟</td><td>东财批量排行对 QDII 取数被砍，QDII 名单改由 fundcode_search.js 主列表取（约 742 只），逐只 pingzhongdata 取净值/收益</td></tr>
+          <tr><td>基金经理图鉴</td><td>东方财富 FundDataPortfolio_Interface（经 /api/fund-managers 边缘函数）</td><td>✅ 成熟</td><td>在线拉取不落库；覆盖全部/股票型/混合型/债券型/收益型，10 维度筛选；带 Referer+UA 代取</td></tr>
           </tbody>
       </table>
 
@@ -2075,6 +2076,51 @@
         <p class="api-note">⚠️ 万得公共 API 对「逐指数」数据为会话态钉死：未携带浏览器会话时固定返回默认指数（万得全A），无头环境难取明细，故本站 <code>fund_indices</code> 主用东财 push2his（第 22 项），Wind 为元数据兜底。</p>
       </div>
 
+      <div class="api-item">
+        <h3 class="api-name">26. FundDataPortfolio_Interface — 基金经理列表（基金经理图鉴）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">原始 URL</td><td><code>https://fund.eastmoney.com/Data/FundDataPortfolio_Interface.aspx</code></td></tr>
+          <tr><td class="meta-label">本站代理</td><td><code>/api/fund-managers</code>（EdgeOne 海外节点代取，剥离 JSONP 前缀并归一化）</td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">用途</td><td>基金经理图鉴（<code>/tools/manager</code>）在线拉取东方财富公开基金经理数据，<b>不落库</b>；覆盖全部 / 股票型 / 混合型 / 债券型 / 收益型，支持按公司、姓名、产品数量、管理规模、最佳回报等 10 维度筛选</td></tr>
+          <tr><td class="meta-label">可达性</td><td>前端 CORS 不可直连东方财富，改由边缘函数 <code>/api/fund-managers</code>（EdgeOne 海外节点）同源代取；需带 <code>Referer: https://fund.eastmoney.com/manager/</code> + UA，否则易 403</td></tr>
+          <tr><td class="meta-label">使用文件</td><td><code>functions/api/fund-managers.js</code> / <code>src/pages/tools/ManagerPage.vue</code></td></tr>
+        </table>
+        <p class="api-subtitle">请求参数</p>
+        <table class="field-table">
+          <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>dt</code></td><td>string</td><td>固定 <code>14</code></td></tr>
+            <tr><td><code>ft</code></td><td>string</td><td>经理类型：<code>all</code>（全部）/ <code>gp</code>（股票型）/ <code>hh</code>（混合型）/ <code>zq</code>（债券型）/ <code>sy</code>（收益型）</td></tr>
+            <tr><td><code>pn</code></td><td>int</td><td>每页条数（本图鉴固定 <code>10000</code>，单页拉全部）</td></tr>
+            <tr><td><code>pi</code></td><td>int</td><td>页码（默认 1）</td></tr>
+            <tr><td><code>mc</code></td><td>string</td><td>固定 <code>returnjson</code></td></tr>
+            <tr><td><code>com</code></td><td>string</td><td>公司名（服务端模糊过滤，URLEncode）</td></tr>
+            <tr><td><code>input</code></td><td>string</td><td>姓名 / 拼音（服务端模糊搜索）</td></tr>
+            <tr><td><code>ini</code></td><td>string</td><td>字母索引 A-Z</td></tr>
+            <tr><td><code>sc</code> / <code>st</code></td><td>string</td><td>排序列 / 方向（已知可用 <code>abbname</code> + <code>asc|desc</code>）</td></tr>
+            <tr><td><code>id</code></td><td>string</td><td>经理 ID（精确）</td></tr>
+          </tbody>
+        </table>
+        <p class="api-subtitle">返回字段（data[] 每行 12 字段，归一化为对象）</p>
+        <table class="field-table">
+          <thead><tr><th>索引</th><th>字段</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>d[0]</td><td>经理ID</td><td>链接 <code>/manager/{id}.html</code></td></tr>
+            <tr><td>d[1]</td><td>姓名</td><td>经理姓名</td></tr>
+            <tr><td>d[2]</td><td>公司ID</td><td>链接 <code>/company/{id}.html</code></td></tr>
+            <tr><td>d[3]</td><td>所属公司</td><td>公司名称</td></tr>
+            <tr><td>d[4]</td><td>现任基金代码</td><td>逗号串，<b>产品数量 = split 长度</b></td></tr>
+            <tr><td>d[5]</td><td>现任基金名称</td><td>逗号串</td></tr>
+            <tr><td>d[6]</td><td>管理时间</td><td>天数（整数，前端转「X年Y天」）</td></tr>
+            <tr><td>d[7]</td><td>最佳回报</td><td>如 <code>22.44%</code>（着色：红涨绿跌）</td></tr>
+            <tr><td>d[9]</td><td>最佳回报基金</td><td>对应基金名（title）</td></tr>
+            <tr><td>d[10]</td><td>管理总规模</td><td>如 <code>2.48亿元</code></td></tr>
+          </tbody>
+        </table>
+        <p class="api-note">⚠️ 原始返回为 JSONP 包装 <code>var returnjson= {...};</code>，边缘函数先剥离前缀再 <code>JSON.parse</code>；总量全部约 4373 位经理（record 字段），单页 pn=10000 可一次拉全。图鉴采用「拉全部 → 客户端即时筛选 → 点确认按公司/姓名向服务端再精确拉取」闭环，确保结果准确。</p>
+      </div>
+
       <!-- 接口汇总 -->
       <h2 class="api-group-title">接口汇总</h2>
       <table class="field-table summary-table">
@@ -2105,6 +2151,7 @@
           <tr><td>23</td><td>新浪 / 腾讯 K线</td><td>指数历史收盘（定投回测 dtip）</td><td>GET</td></tr>
           <tr><td>24</td><td>datacenter-web RPT_INDEX_CONSTITUENT</td><td>指数成分股（经 /api/em-constituents 代理）</td><td>GET</td></tr>
           <tr><td>25</td><td>windindices</td><td>万得基金指数（fund_indices 元数据兜底）</td><td>GET</td></tr>
+          <tr><td>26</td><td>FundDataPortfolio_Interface（经 /api/fund-managers 边缘函数）</td><td>基金经理图鉴列表（全部/股票型/混合型/债券型/收益型，10 维度筛选，在线不落库）</td><td>GET</td></tr>
         </tbody>
       </table>
     </div>
