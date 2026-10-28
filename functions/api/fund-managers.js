@@ -142,7 +142,8 @@ export async function onRequest(context) {
     let record = 0, pages = 1, curpage = 1
 
     if (full) {
-      // 内部翻页拉全量（pn 封顶 2000）
+      // 内部翻页拉全量（pn 封顶 2000）。注意：东方财富对同 IP 并发请求有限流，
+      // 故顺序拉取（实测并发反而更慢，58s vs 顺序 17s），3 页约 17s，配合前端 loading 可接受。
       let pageNo = 1
       while (pageNo <= MAX_PAGES) {
         const page = await fetchOne(pageNo, MAX_PN)
