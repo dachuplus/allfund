@@ -140,7 +140,10 @@ MAIN_CHUNK=$(grep -oE '/assets/index-[a-zA-Z0-9_.-]+\.js' dist/index.html 2>/dev
 if [ -n "$MAIN_CHUNK" ]; then
   BUILD_TS=$(date +%s)
   PKG_VER=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
-  GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+  # commit 优先取外部显式传入的 DEPLOY_COMMIT（= 本次已推送到 GitHub main 的 commit）。
+  # 正确顺序是「先 push_files_explicit.py 推送拿到 commit → 再带 DEPLOY_COMMIT 部署」，
+  # 否则这里取到的是本地 HEAD，与本��推送产生的 commit 不一致（本地与 GitHub 分支可能不同步）。
+  GIT_COMMIT="${DEPLOY_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo '')}"
   printf '{"h":"%s","t":%s,"bv":"%s","commit":"%s"}\n' "$MAIN_CHUNK" "$BUILD_TS" "$PKG_VER" "$GIT_COMMIT" > dist/version.json
   echo "已写入 version.json (hash=$MAIN_CHUNK, t=$BUILD_TS, bv=$PKG_VER, commit=$GIT_COMMIT)"
 else
