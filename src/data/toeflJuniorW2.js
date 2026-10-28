@@ -730,7 +730,7 @@ export const WEEK = {
         {
           "title": "B. 形容词性  vs 名词性物主代词 —— 用括号内词语的正确形式填空。",
           "prompt": "1. This is ______ (I) schoolbag.\n2. This schoolbag is ______ (I).\n3. Is that ______ (you) bike? — No,\n4. The team has ______ (it) own bus.\n5. Their classroom is bigger than ______ (we).\n6. (She) homework is always neat.\n7. Is this pen ______ (he) or ______ (she)? (I) is blue.\n8. The students brought ______ (they) own lunches.",
-          "answer": "物主代词 1 my　2 mine　3 your；mine　4 its　5 ours　6 Her　7 his；",
+          "answer": "物主代词 1 my　2 mine　3 your；mine　4 its　5 ours　6 Her　7 his；hers　8 their",
           "note": "后面跟着名词时用形容词性物主代词（my、your、its、our）；后面没有名词、单独使用时代替「某人的东西」用名词性物主代词（mine、yours、ours、hers）。"
         },
         {
@@ -742,19 +742,19 @@ export const WEEK = {
         {
           "title": "D. other 的各种形式 —— 用框内的正确单词或词组填空。",
           "prompt": "other others the other the others another each other every other\n1. I have two brothers. One is a doctor, and\n2. Some students walk to school, and ______ take\n3. Ten of the thirty students stayed home.\n4. Do you have ______ questions about the lesson?\n5. This cake is delicious. May I have ______ one? is a teacher.\n6. We need ______ twenty chairs for the meeting. the bus.\n7. We have an English test ______ week. went to the museum.\n8. They often help ______ with their homework.",
-          "answer": "other 的各种形式 1 the other　2 others　3 The others　4 other　5 another　6",
+          "answer": "other 的各种形式 1 the other　2 others　3 The others　4 other　5 another　6 another　7 every other　8 each other",
           "note": "other 后面接复数名词；the other 指两者中的另一个；others / the others 单独使用、不再接名词；another 接单数名词。"
         },
         {
           "title": "E. 反身代词 —— 用括号内词语的正确形式填空。",
           "prompt": "1. I made this cake ______. (I)\n2. He is old enough to look after ______. (he)\n3. Please help to some fruit. (you)\n4. We enjoyedat the party. (we)\n5. I will take to the park this afternoon. (she)\n6. I will ask ______ to come earlier. (she)\n7. I will ask ______ to help us. (he)\n8. The old man could not look after. (he)\n9. You should be proud of, Tom. (you)",
-          "answer": "反身代词1 2 3 4 5 6 7 8 9",
+          "answer": "反身代词 1 myself　2 himself　3 yourself　4 ourselves　5 her　6 her　7 him　8 himself　9 yourself",
           "note": "主语和宾语是同一个人时用反身代词（myself、himself、ourselves）；by oneself 表示「独自」。注意人称和单复数要与主语一致。"
         },
         {
           "title": "F. 主谓一致 —— 从括号中选出正确的形式。",
           "prompt": "1. There (is / are) a book and two pens on\n2. There ______ (is / are) two pens and a book on\n3. (Is / Are) there any milk in the fridge?\n4. The teacher, together with her students,\n5. Tom, as well as his brothers,(like /\n6. Both Lucy and Lily (is / are) good at\n7. Not only the students but also the teacher\n8. Either the students or the teacher (is / the desk. ______ are) coming.\n9. Neither of the answers ______ (is / are) correct. the desk.\n10. The box of old books(is / are) heavy.\n11. Our team (is / are) ready for the (is / are) in the hall.match.\n12. The number of students (is / are) likes) swimming.thirty.\n13. A number of students (is / are) waiting Chinese.outside.\n14. Many a student (has / have) asked that (is / are) coming.question.",
-          "answer": "主谓一致 1 2 3 4 5 6 7",
+          "answer": "主谓一致 1 is　2 are　3 Is　4 is　5 likes　6 are　7 is　8 is　9 is　10 is　11 is　12 is　13 are　14 has",
           "note": "主语是单数或不可数、以及 each / every / everyone 作主语时谓语用单数；主语是复数或用 and 连接的多个事物时用复数。先找准真正的主语，不要被靠近谓语的名词干扰。"
         }
       ]
