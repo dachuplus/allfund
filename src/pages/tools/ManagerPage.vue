@@ -15,7 +15,7 @@
     <div class="filter-card">
       <div class="filter-head">
         <span class="filter-title">筛选维度（10 项）</span>
-        <span class="filter-hint">拉全部数据后即时筛选；点「确认筛选」会按公司/姓名向服务端再次精确拉取。</span>
+        <span class="filter-hint">首次加载已拉取全量（东方财富单页上限 2000，已自动翻页合并）；点「确认筛选」会向服务端重新拉取全量并叠加 10 维度筛选（结果基于服务端最新全量，而非仅筛内存）。</span>
       </div>
 
       <div class="filter-grid">
@@ -212,14 +212,14 @@ function fmtYears(days) {
   return y + '年' + rem + '天'
 }
 
-function fetchManagers({ ft, com = '', input = '' }) {
+function fetchManagers({ ft, com = '', input = '', id = '', full = true }) {
   const params = new URLSearchParams()
   params.set('ft', ft)
-  params.set('pn', '10000')   // 单页最大 10000 条，一次拉全部
-  params.set('pi', '1')
   params.set('mc', 'returnjson')
-  if (com) params.set('com', com)
-  if (input) params.set('input', input)
+  if (full) params.set('full', '1')   // 边缘函数内部翻页拉全量（sn 封顶 2000/页）
+  if (com) params.set('com', com)      // 服务端：公司名模糊过滤
+  if (input) params.set('input', input) // 服务端：姓名/拼音模糊搜索
+  if (id) params.set('id', id)          // 服务端：经理 ID 精确
   return fetch('/api/fund-managers?' + params.toString())
     .then(r => r.json())
     .then(json => {
@@ -315,14 +315,17 @@ async function loadAll() {
   }
 }
 
-// 点确认：按公司/姓名向服务端再次精确拉取，再叠加其余 8 维客户端过滤
+// 点确认：向服务端重新拉取全量（full=1，边缘函数内部翻页合并），
+// 再在客户端叠加全部 10 维度筛选。保证结果基于服务端最新全量，而非仅筛内存已显示部分。
+// 注：东方财富 com/input 为精确/全名匹配（如"易方达基金"而非"易方达"），与界面"包含"语义不符，
+// 故此处统一走 full=1 全量拉取 + 客户端 contains 过滤，避免服务端精确匹配导致漏筛。
 async function confirmFilter() {
   loading.value = true
   error.value = ''
   try {
-    rawAll.value = await fetchManagers({ ft: type.value, com: f.company.trim(), input: f.name.trim() })
+    rawAll.value = await fetchManagers({ ft: type.value })
     currentPage.value = 1
-    toast(`已重新拉取并筛选，共 ${filtered.value.length} 位经理`)
+    toast(`已重新拉取全量并筛选，共 ${filtered.value.length} 位经理`)
   } catch (e) {
     error.value = (e && e.message) || String(e)
   } finally {

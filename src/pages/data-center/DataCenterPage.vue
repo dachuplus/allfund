@@ -2092,8 +2092,9 @@
           <tbody>
             <tr><td><code>dt</code></td><td>string</td><td>固定 <code>14</code></td></tr>
             <tr><td><code>ft</code></td><td>string</td><td>经理类型：<code>all</code>（全部）/ <code>gp</code>（股票型）/ <code>hh</code>（混合型）/ <code>zq</code>（债券型）/ <code>sy</code>（收益型）</td></tr>
-            <tr><td><code>pn</code></td><td>int</td><td>每页条数（本图鉴固定 <code>10000</code>，单页拉全部）</td></tr>
-            <tr><td><code>pi</code></td><td>int</td><td>页码（默认 1）</td></tr>
+            <tr><td><code>full</code></td><td>string</td><td>本站扩展参数：传 <code>1</code> 时边缘函数内部翻页拉全量（忽略 pi），返回完整数据集。推荐用法</td></tr>
+            <tr><td><code>pn</code></td><td>int</td><td>每页条数。<b>注意：东方财富对单页大小有硬上限 2000，pn&gt;2000 会被忽略并回退默认页大小（约 50/页）</b>；故拉全量须依赖 <code>full=1</code> 由边缘函数循环 pi=1..pages（all 约 3 页合并为 4373 条）</td></tr>
+            <tr><td><code>pi</code></td><td>int</td><td>页码（默认 1；单页模式用）</td></tr>
             <tr><td><code>mc</code></td><td>string</td><td>固定 <code>returnjson</code></td></tr>
             <tr><td><code>com</code></td><td>string</td><td>公司名（服务端模糊过滤，URLEncode）</td></tr>
             <tr><td><code>input</code></td><td>string</td><td>姓名 / 拼音（服务端模糊搜索）</td></tr>
@@ -2118,7 +2119,7 @@
             <tr><td>d[10]</td><td>管理总规模</td><td>如 <code>2.48亿元</code></td></tr>
           </tbody>
         </table>
-        <p class="api-note">⚠️ 原始返回为 JSONP 包装 <code>var returnjson= {...};</code>，边缘函数先剥离前缀再 <code>JSON.parse</code>；总量全部约 4373 位经理（record 字段），单页 pn=10000 可一次拉全。图鉴采用「拉全部 → 客户端即时筛选 → 点确认按公司/姓名向服务端再精确拉取」闭环，确保结果准确。</p>
+        <p class="api-note">⚠️ 原始返回为 JSONP 包装的「JavaScript 对象字面量」<code>var returnjson= {data:[...],record:4373,...};</code>：<b>键名不带引号</b>（<code>data:</code> 而非 <code>"data":</code>），不是合法 JSON，边缘函数须先给键名加引号再 <code>JSON.parse</code>。总量全部约 4373 位经理（<code>record</code> 字段），单页上限 2000，故本站用 <code>full=1</code> 让边缘函数内部翻页合并。图鉴采用「拉全部 → 客户端即时筛选 → 点确认按公司/姓名/ID 向服务端再精确拉取」闭环，确保结果准确（非仅筛内存已显示部分）。</p>
       </div>
 
       <!-- 接口汇总 -->

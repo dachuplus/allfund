@@ -1,30 +1,36 @@
 /**
  * EdgeOne Pages Function — 东方财富基金经理列表代取
- * 路由：GET /api/fund-managers?ft=all&pn=10000&pi=1&mc=returnjson[&com=&input=&ini=&sc=&st=&id=]
+ * 路由：GET /api/fund-managers?ft=all&full=1[&com=&input=&ini=&id=&sc=&st=]
  *
  * 用途：基金经理图鉴（/tools/manager）在线拉取东方财富真实基金经理数据，不落库。
  * 东方财富页面 https://fund.eastmoney.com/manager/ 通过该端点取数，前端直接 CORS 不可达，
  * 故由本边缘函数（EdgeOne 海外节点）代取并归一化后返回。
  *
- * 原始返回为 JSONP 包装：var returnjson= {...}; 须剥离前缀再 JSON.parse。
+ * 重要约束（实测 2026-10-28）：
+ *   1) 返回为 JSONP 包装的「JavaScript 对象字面量」：var returnjson= {data:[...],record:4373,...}
+ *      —— 键名不带引号（data: / record:），不是合法 JSON，须先给键名加引号再 JSON.parse。
+ *   2) 东方财富对单页大小 pn 有硬上限 2000：pn>2000 会被忽略并回退默认页大小（~50/页）。
+ *      因此「拉全部」必须内部翻页：pn=2000 循环 pi=1..pages 累加，最多 3 页拉完 4373 条。
+ *
  * 每行 data[i] 为 12 字段数组，本函数归一化为可读对象：
  *   id, name, companyId, company, fundCodes[], fundNames[],
  *   fundCount, manageDays, bestReturn, bestReturnFund, scale
  *
  * 参数：
  *   ft   类型 all/gp/hh/zq/sy（全部/股票型/混合型/债券型/收益型）
- *   pn   每页条数（默认 10000，单页拉全部）
- *   pi   页码（默认 1）
+ *   full 传 "1" 时内部翻页拉全量（忽略 pi），返回完整数据集
  *   com  公司名（服务端模糊过滤，需 URLEncode）
  *   input 姓名/拼音（服务端模糊搜索）
  *   ini  字母索引（A-Z）
- *   sc   排序列（已知可用 abbname=姓名）
- *   st   排序方向 asc/desc
  *   id   经理 ID（精确）
+ *   sc   排序列；st 排序方向 asc/desc
+ *   pn/pi 可选：单页模式下的页大小/页码（默认 pn=2000, pi=1）
  */
 
 const EM_BASE = 'https://fund.eastmoney.com/Data/FundDataPortfolio_Interface.aspx'
 const TIMEOUT_MS = 12000
+const MAX_PN = 2000          // 东方财富单页硬上限
+const MAX_PAGES = 50         // 翻页安全护栏
 
 function normalize(raw) {
   if (!Array.isArray(raw)) return null
@@ -45,6 +51,13 @@ function normalize(raw) {
   }
 }
 
+/** 把「键名无引号的 JS 对象字面量」转成合法 JSON 字符串。 */
+function quoteKeys(text) {
+  // 仅匹配对象键位置上的裸标识符后跟冒号：{data:  ,record:  ",record:"
+  // 注意：键前的字符可能是 {（首键）或 , 或空白，必须都纳入前缀字符类。
+  return text.replace(/(^|[\s,{])(\w+)\s*:/g, '$1"$2":')
+}
+
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
     status,
@@ -56,11 +69,27 @@ function jsonResponse(body, status) {
   })
 }
 
+/** 解析单页 JSONP 文本 → { record, pages, curpage, data[] } */
+function parsePayload(text) {
+  const m = text.match(/returnjson\s*=\s*(\{[\s\S]*\})\s*;?\s*$/)
+  if (!m) throw new Error('unexpected upstream payload (jsonp parse failed)')
+  const obj = JSON.parse(quoteKeys(m[1].trim()))
+  const rawList = Array.isArray(obj.data) ? obj.data : []
+  const data = rawList.map(normalize).filter(Boolean)
+  return {
+    record: obj.record || data.length,
+    pages: obj.pages || 1,
+    curpage: obj.curpage || 1,
+    data,
+  }
+}
+
 export async function onRequest(context) {
   const url = new URL(context.request.url)
   const ft = (url.searchParams.get('ft') || 'all').trim()
+  const full = url.searchParams.get('full') === '1'
   const pi = (url.searchParams.get('pi') || '1').trim()
-  const pn = (url.searchParams.get('pn') || '10000').trim()
+  const pn = (url.searchParams.get('pn') || String(MAX_PN)).trim()
   const sc = (url.searchParams.get('sc') || '').trim()
   const st = (url.searchParams.get('st') || '').trim()
   const com = (url.searchParams.get('com') || '').trim()
@@ -72,57 +101,78 @@ export async function onRequest(context) {
     return jsonResponse({ ok: false, error: 'ft must be one of all|gp|hh|zq|sy' }, 400)
   }
 
-  const params = new URLSearchParams()
-  params.set('dt', '14')
-  params.set('ft', ft)
-  params.set('pn', pn)
-  params.set('pi', pi)
-  params.set('mc', 'returnjson')
-  if (sc) params.set('sc', sc)
-  if (st) params.set('st', st)
-  if (com) params.set('com', com)
-  if (input) params.set('input', input)
-  if (ini) params.set('ini', ini)
-  if (id) params.set('id', id)
+  // 公共查询参数
+  const base = new URLSearchParams()
+  base.set('dt', '14')
+  base.set('ft', ft)
+  base.set('mc', 'returnjson')
+  if (sc) base.set('sc', sc)
+  if (st) base.set('st', st)
+  if (com) base.set('com', com)
+  if (input) base.set('input', input)
+  if (ini) base.set('ini', ini)
+  if (id) base.set('id', id)
 
-  const target = `${EM_BASE}?${params.toString()}`
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const fetchOne = async (pageNo, pageSize) => {
+    const params = new URLSearchParams(base)
+    params.set('pn', String(pageSize))
+    params.set('pi', String(pageNo))
+    const target = `${EM_BASE}?${params.toString()}`
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    try {
+      const res = await fetch(target, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
+          'Referer': 'https://fund.eastmoney.com/manager/',
+          'Accept': '*/*',
+        },
+      })
+      if (!res.ok) throw new Error(`upstream http ${res.status}`)
+      const text = (await res.text()).trim()
+      return parsePayload(text)
+    } finally {
+      clearTimeout(timer)
+    }
+  }
 
   try {
-    const res = await fetch(target, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
-        'Referer': 'https://fund.eastmoney.com/manager/',
-        'Accept': '*/*',
-      },
-    })
-    if (!res.ok) {
-      return jsonResponse({ ok: false, error: `upstream http ${res.status}` }, 502)
+    const allData = []
+    let record = 0, pages = 1, curpage = 1
+
+    if (full) {
+      // 内部翻页拉全量（pn 封顶 2000）
+      let pageNo = 1
+      while (pageNo <= MAX_PAGES) {
+        const page = await fetchOne(pageNo, MAX_PN)
+        allData.push(...page.data)
+        record = page.record
+        pages = page.pages
+        curpage = page.curpage
+        if (pageNo >= page.pages) break
+        pageNo++
+      }
+    } else {
+      const pageSize = Math.min(parseInt(pn, 10) || MAX_PN, MAX_PN)
+      const page = await fetchOne(parseInt(pi, 10) || 1, pageSize)
+      allData.push(...page.data)
+      record = page.record
+      pages = page.pages
+      curpage = page.curpage
     }
-    const text = await res.text()
-    // 剥离 JSONP 前缀：var returnjson= {...};
-    const m = text.match(/returnjson\s*=\s*(\{[\s\S]*\})\s*;?\s*$/)
-    if (!m) {
-      return jsonResponse({ ok: false, error: 'unexpected upstream payload (jsonp parse failed)' }, 502)
-    }
-    const obj = JSON.parse(m[1])
-    const rawList = Array.isArray(obj.data) ? obj.data : []
-    const data = rawList.map(normalize).filter(Boolean)
 
     return jsonResponse({
       ok: true,
       ft,
-      record: obj.record || data.length,
-      pages: obj.pages || 1,
-      curpage: obj.curpage || 1,
-      count: data.length,
-      data,
+      full,
+      record,
+      pages,
+      curpage,
+      count: allData.length,
+      data: allData,
     }, 200)
   } catch (e) {
     return jsonResponse({ ok: false, error: String((e && e.message) || e) }, 502)
-  } finally {
-    clearTimeout(timer)
   }
 }
