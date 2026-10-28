@@ -265,7 +265,7 @@ export async function fetchStyleFactors(category) {
  *   pe=最新交易日 PE(TTM)；pct_* = 该 PE 在对应历史窗口中的百分位(0-100)；n=历史样本数
  */
 export async function fetchCsiPe(codes) {
-  const list = (codes || []).filter(c => /^\d{6}$/.test(c))
+  const list = (codes || []).filter(c => /^[A-Za-z0-9]{6}$/.test(c))
   if (!list.length) return []
   const res = await fetch(`/api/csi-pe?codes=${list.join(',')}`, {
     signal: AbortSignal.timeout(20000)
@@ -296,7 +296,7 @@ export async function fetchCsiPe(codes) {
  * @returns {Promise<Object>} { source, weeks, ok, total, summary, data:[{...}], ts }
  */
 export async function fetchDtipBacktest(codes, weeks = 52) {
-  const list = (codes || []).filter(c => /^\d{6}$/.test(c))
+  const list = (codes || []).filter(c => /^[A-Za-z0-9]{6}$/.test(c))
   if (!list.length) return { weeks, ok: 0, total: 0, summary: null, data: [] }
 
   const fetchOne = async (code, idx) => {

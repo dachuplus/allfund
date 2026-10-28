@@ -19,8 +19,15 @@
 const CSI_BASE = 'https://www.csindex.com.cn/csindex-home/perf/indexCsiDsPe'
 const TIMEOUT_MS = 11000
 
-// 定投助手默认指数全集（国证3000 不存在，见交付说明；第 7 个以 000985 中证全指占位，可改）
-const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
+// 定投助手默认指数全集（与 DtipPanel.vue / dtip-pe-sync.js / dtip-backtest.js 保持一致；2026-10-23 扩充至 34 支）
+const DEFAULT_CODES = [
+  '000510', '000300', '000905', '000906', '000852', '932000', '000985',
+  '000001', '000016', '000010', '000688', '931643',
+  '000919', '000920', '930855', '931155', '000922',
+  '000928', '000929', '000930', '000931', '000932', '000933', '000934',
+  '000935', '000936', '000937', '930997', 'H30184', '399997', '399986', '399967',
+  '930931', 'H30455',
+]
 
 // ===== 缓存层（方案 A）：优先读 dtip_pe_history，csindex 实时仅兜底 =====
 // anon key 为 publishable（前端 bundle 已用），嵌于边缘函数无保密风险。
@@ -158,7 +165,7 @@ export async function onRequest(context) {
   const url = new URL(context.request.url)
   const raw = (url.searchParams.get('codes') || '').trim()
   let codes = raw
-    ? raw.split(',').map(s => s.trim()).filter(s => /^\d{6}$/.test(s))
+    ? raw.split(',').map(s => s.trim()).filter(s => /^[A-Za-z0-9]{6}$/.test(s))
     : DEFAULT_CODES
   if (!codes.length) codes = DEFAULT_CODES
   if (codes.length > 12) codes = codes.slice(0, 12)

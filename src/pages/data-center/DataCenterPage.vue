@@ -184,6 +184,47 @@
       <hr class="intro-divider" />
 
       <div class="version-block">
+        <div class="version-block-title">当前线上部署 · Live Deployment</div>
+        <p class="section-desc">
+          以下四项由页面运行时读取线上 <code>/version.json</code> 自动生成，随每次部署刷新，无需手工维护。
+          部署版本号即本次 EdgeOne Pages 部署的入口 chunk 哈希；将其与<b>最新一次推送的 commit</b> 一并记录，即可完整追溯线上代码来源。
+        </p>
+        <div class="intro-grid">
+          <div class="intro-row">
+            <div class="intro-key">部署版本号</div>
+            <div class="intro-val">
+              <code>{{ liveVersion.h || '读取中…' }}</code>
+              <span v-if="liveVersion.h">（EdgeOne Pages 本次部署产物标识，变化即代表线上已换新构建）</span>
+            </div>
+          </div>
+          <div class="intro-row">
+            <div class="intro-key">构建时间</div>
+            <div class="intro-val">
+              {{ liveVersion.buildTime || '--' }}
+              <span v-if="liveVersion.buildTime">（北京时间，来自 <code>version.json</code> 的 <code>t</code> 时间戳）</span>
+            </div>
+          </div>
+          <div class="intro-row">
+            <div class="intro-key">package.json 版本</div>
+            <div class="intro-val"><code>{{ liveVersion.bv || '--' }}</code></div>
+          </div>
+          <div class="intro-row">
+            <div class="intro-key">构建时 Git Commit</div>
+            <div class="intro-val">
+              <code>{{ liveVersion.commit || '--' }}</code>
+              <span v-if="liveVersion.commit">（打包时仓库 HEAD，对应 <code>github.com/dachuplus/allfund</code> 该 commit 的源码快照）</span>
+            </div>
+          </div>
+          <div class="intro-row">
+            <div class="intro-key">部署位置</div>
+            <div class="intro-val">https://www.dachu.me —— EdgeOne Pages 海外节点，云项目名 <code>dachu</code>，部署区域 <code>overseas</code>。</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="intro-divider" />
+
+      <div class="version-block">
         <div class="version-block-title">稳定版本 · Stable Releases</div>
         <p class="section-desc">每次发版同步更新 package.json、GitHub tag、EdgeOne Pages 部署。本节作为版本锚点，供回滚与比对参考。</p>
 
@@ -193,10 +234,16 @@
           </thead>
           <tbody>
             <tr>
+              <td><strong>v4.0.57</strong></td>
+              <td>2026-10-28</td>
+              <td><code>见下方发版日志</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
               <td><strong>v4.0.49</strong></td>
               <td>2026-10-14</td>
               <td><code>fc8089a</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td><strong>v4.0.48</strong></td>
@@ -2216,6 +2263,31 @@ async function setFeatureState(key, state) {
 // 管理中心 tab：'users' 用户管理 / 'download' 数据下载 / 'intro' 项目简介 / 'scoring' 评分模型
 const activeTab = ref('users')
 
+/**
+ * 当前线上部署信息（项目简介 →「当前线上部署」区块）。
+ * 运行时读取线上 /version.json（由 scripts/deploy_pages.sh 在每次构建时写入：
+ * h=入口 chunk 哈希即部署版本号、t=构建时间戳、bv=package.json 版本、commit=构建时仓库 HEAD）。
+ * 这样「部署版本号 + 推送 commit」始终与线上产物一致，无需每次手工改文档。
+ */
+const liveVersion = ref({ h: '', buildTime: '', bv: '', commit: '' })
+async function loadLiveVersion() {
+  try {
+    const resp = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+    if (!resp.ok) return
+    const d = await resp.json()
+    liveVersion.value = {
+      h: d.h || '',
+      buildTime: d.t
+        ? new Date(Number(d.t) * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
+        : '',
+      bv: d.bv || '',
+      commit: d.commit || '',
+    }
+  } catch (_) {
+    /* 读取失败保持 '--'，不阻断页面 */
+  }
+}
+
 // 权限申请（陌生人 → 管理员审批）
 const { requests, loading: permReqLoading, loadRequests, approveRequest, rejectRequest } = usePermissionRequests()
 
@@ -3207,6 +3279,7 @@ onMounted(() => {
   loadRequests()
   loadPasswordInfo()
   loadFeatureFlags()
+  loadLiveVersion()
 })
 
 // 保底：auth 初始化时序可能导致 onMounted 时 isOwner 尚未为 true

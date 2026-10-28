@@ -43,7 +43,9 @@ if [ ! -x "$PY_BIN" ]; then
 fi
 
 echo "==> 1/4 构建前端 (vite build)"
-npm run build
+# 沙箱里 npm 会向上解析到工作区根 package.json 导致 Missing script: build，改用 vite 二进制直调
+unset NODE_OPTIONS
+node node_modules/vite/bin/vite.js build
 
 echo "==> 1.5/4 导出已发布文章静态列表 (public/articles-list.json)"
 # 部署时把已发布文章烘焙成静态 JSON，CDN 毫秒级返回，绕开 EdgeOne→Supabase 偶发慢链。
@@ -130,11 +132,17 @@ echo "==> 3.8/4 写入 dist/version.json（SPA 自动检测新版 → reload 拉
 # （而非 ls 第一个，因为 vite 可能生成多个 index-*.js，如 legacy / 动态 import 分片）。
 # 浏览器加载 index.html 时（无论 chunk 是否已缓存），inline script 会 fetch 此 json 与
 # localStorage 比对，hash 变了就 window.location.reload() 拉新 chunk。
+#
+# 2026-10-28 扩展：额外写入 bv（package.json 版本号）与 commit（构建时仓库 HEAD）。
+# 用途：管理 → 项目简介 的「当前线上部署」区块在运行时读取本文件并展示，
+# 实现「部署版本号 + 推送 commit」自动同步，无需每次手工维护文档。
 MAIN_CHUNK=$(grep -oE '/assets/index-[a-zA-Z0-9_.-]+\.js' dist/index.html 2>/dev/null | head -1 | sed -E 's|.*/index-([^.]+)\.js$|\1|')
 if [ -n "$MAIN_CHUNK" ]; then
   BUILD_TS=$(date +%s)
-  printf '{"h":"%s","t":%s}\n' "$MAIN_CHUNK" "$BUILD_TS" > dist/version.json
-  echo "已写入 version.json (hash=$MAIN_CHUNK, t=$BUILD_TS)"
+  PKG_VER=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
+  GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+  printf '{"h":"%s","t":%s,"bv":"%s","commit":"%s"}\n' "$MAIN_CHUNK" "$BUILD_TS" "$PKG_VER" "$GIT_COMMIT" > dist/version.json
+  echo "已写入 version.json (hash=$MAIN_CHUNK, t=$BUILD_TS, bv=$PKG_VER, commit=$GIT_COMMIT)"
 else
   echo "⚠️ dist/index.html 中未找到 index-*.js，跳过 version.json"
 fi

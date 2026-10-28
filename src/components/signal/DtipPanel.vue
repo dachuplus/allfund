@@ -204,6 +204,27 @@
           </p>
         </div>
       </div>
+
+      <!-- ============ 新增：落袋现金说明（第 7 节）============ -->
+      <div class="study-step">
+        <div class="study-idx">7</div>
+        <div class="study-body">
+          <div class="study-h">「落袋现金」是什么：高位兑现的钱，不再自动投回去</div>
+          <p class="study-p">
+            当指数估值分位 <b>≥ 90%（极度高估）</b>的周，系统按<b>当时持仓市值的 10%</b> 卖出一部分，把这部分钱从持仓里拿出来。
+            这笔钱<b>不会自动复投</b>回下一笔定投，而是单独计入「落袋现金」池子，在整个回测周期内长期累计。
+          </p>
+          <p class="study-p">
+            期末 <b>组合现值 = 持仓市值（仍留在场内的份额）+ 落袋现金（已经兑现、离开市场的部分）</b>。
+            它解决的是「只买不卖、本金越投越多却从不兑现」的问题：低位把便宜筹码攒进来，高位把部分利润兑现出来，
+            兑现出来的钱就是真实收益的一部分，<b>不依赖未来市场涨跌来变成「纸面盈利」</b>。
+          </p>
+          <p class="study-p">
+            看交易流水表的「落袋现金」列：<b>买入周该列数字不变</b>（这周没卖），<b>极度高估卖出周会跳增</b>（落袋了一笔）；
+            对比表里的「赎回现金」就是同一个数——整个回测周期累计落袋的总额。两者越大，说明该指数历史上高位兑现越充分。
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- ============ 2. 指数估值看板（实时）============ -->
@@ -382,6 +403,7 @@
               </tbody>
             </table>
           </div>
+          <p class="data-source"><b>落袋现金</b>列：本周之前累计兑现、已离开市场的现金；买入周不变，极度高估卖出周跳增。组合现值 = 持仓市值 + 落袋现金。</p>
           <p class="data-source" v-if="activeBt.startDate">回测区间：{{ activeBt.startDate }} 至 {{ activeBt.endDate }}（每周一）；最新行情日 {{ activeBt.latestDate }}，最新价 {{ fmt(activeBt.priceLast, 2) }}，最新 PE(TTM) {{ fmt(activeBt.peLast, 2) }}（滚动5年分位 {{ fmt(activeBt.pctLast, 2) }}%）。</p>
         </div>
         <div class="empty-note" v-else-if="activeBt && !activeBt.ok">
@@ -446,6 +468,7 @@
         </div>
         <p class="data-source">
           注：XIRR 为按每周实际投入现金流计算的资金加权年化收益率，衡量已投入资金的真实效率；「收益率」= (期末市值 − 累计投入) ÷ 累计投入。
+          「赎回现金」即整个回测周期内累计落袋、已离开市场的现金（交易流水表同名列的合计），数值越大代表高位兑现越充分。
           本对比为样本内历史模拟（2015 年起点的不利窗口），未计交易费用与冲击成本；不同指数风险收益特征不同，历史收益不代表未来。
         </p>
       </div>
@@ -561,8 +584,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { fetchCsiPe, fetchDtipBacktest, fetchDtipAutoRecords, fetchIndexCloses } from '../../utils/api'
 
-// ===== 定投目标指数 =====
+// ===== 定投目标指数（主回测宇宙 + 估值看板）=====
+// 2026-10-23 扩充：在原有 7 支宽基核心基础上，新增宽基扩展 / 风格(价值·成长·质量·红利) /
+// 行业(中证行业系列+主题) / 境外(港股通·沪港深) 共 27 支「csindex PE 实测可靠」指数。
+// 注：全部经 csindex PE 接口「请求名=返回名 + PE 数值合理」双重核对；中证500/800 的价值·成长
+// 及多数境外指数 csindex 返回张冠李戴的 PE，已剔除（见项目 MEMORY.md 指数估值数据源段）。
 const DCA_INDICES = [
+  // —— 宽基核心 ——
   { code: '000510', name: '中证A500' },
   { code: '000300', name: '沪深300' },
   { code: '000905', name: '中证500' },
@@ -570,6 +598,37 @@ const DCA_INDICES = [
   { code: '000852', name: '中证1000' },
   { code: '932000', name: '中证2000' },
   { code: '000985', name: '中证全指' },
+  // —— 宽基扩展 ——
+  { code: '000001', name: '上证指数' },
+  { code: '000016', name: '上证50' },
+  { code: '000010', name: '上证180' },
+  { code: '000688', name: '科创50' },
+  { code: '931643', name: '科创创业50' },
+  // —— 风格：价值 / 成长 / 质量 / 红利 ——
+  { code: '000919', name: '沪深300价值' },
+  { code: '000920', name: '沪深300成长' },
+  { code: '930855', name: '中证质量' },
+  { code: '931155', name: '沪深300质量成长' },
+  { code: '000922', name: '中证红利' },
+  // —— 行业（中证行业系列 + 主题）——
+  { code: '000928', name: '中证能源' },
+  { code: '000929', name: '中证材料' },
+  { code: '000930', name: '中证工业' },
+  { code: '000931', name: '中证可选消费' },
+  { code: '000932', name: '中证主要消费' },
+  { code: '000933', name: '中证医药' },
+  { code: '000934', name: '中证金融地产' },
+  { code: '000935', name: '中证信息' },
+  { code: '000936', name: '中证通信' },
+  { code: '000937', name: '中证公用事业' },
+  { code: '930997', name: '新能源车' },
+  { code: 'H30184', name: '半导体' },
+  { code: '399997', name: '中证白酒' },
+  { code: '399986', name: '中证银行' },
+  { code: '399967', name: '中证军工' },
+  // —— 境外 / 港股通 ——
+  { code: '930931', name: '港股通50' },
+  { code: 'H30455', name: '沪港深500' },
 ]
 
 // ===== 标的对比集（独立，不进入自动定投宇宙，避免改变 Part2 实盘标的）=====
@@ -695,13 +754,19 @@ async function loadEva() {
   loadingEva.value = true
   evaError.value = ''
   try {
-    const rows = await fetchCsiPe(DCA_INDICES.map(i => i.code))
+    const codes = DCA_INDICES.map(i => i.code)
     const map = {}
     let date = ''
-    for (const r of rows) {
-      if (r && r.ok) {
-        map[r.code] = r
-        if (r.date && r.date > date) date = r.date
+    // 分块请求：边缘函数 /api/csi-pe 单次最多处理 12 个指数，超出会被截断。
+    // 这里每 12 个一组分别请求并合并，避免指数扩充后看板只显示前 12 支。
+    for (let i = 0; i < codes.length; i += 12) {
+      const chunk = codes.slice(i, i + 12)
+      const rows = await fetchCsiPe(chunk)
+      for (const r of rows) {
+        if (r && r.ok) {
+          map[r.code] = r
+          if (r.date && r.date > date) date = r.date
+        }
       }
     }
     evaByCode.value = map

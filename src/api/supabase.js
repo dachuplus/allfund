@@ -128,9 +128,21 @@ function urlOf(input) {
 }
 
 /**
- * 对 /auth/v1/* 同时打到「直接 Supabase」和「sb-proxy」两条路，
- * 谁先返回 (resolve) 响应用谁的，另一条请求会在浏览器层继续跑完（fetch 无法中途取消），
- * 但 Promise.any 会忽略它的结果。
+ * 对 /auth/v1/* 同时打到「直接 Supabase」和「sb-proxy」两条路。
+ *
+ * ⚠️ 2026-10-28 修复（登录一直失败的真凶之一）：
+ * 原实现用 Promise.any —— 而 fetch 只在「网络层失败」时才 reject，
+ * **HTTP 502 也算 fulfilled**。于是 sb-proxy 那个
+ * `{"error":"upstream timeout after 14000ms"}` 的 502 响应会在第 15 秒"胜出"，
+ * 抢在更慢但真正成功的浏览器直连之前被采纳 → supabase-js 拿到 502，
+ * 解析出空错误 → UI 显示「登录服务暂时不可用」。
+ * 实测：POST /auth/v1/token 经代理 5/5 全部 502；GET /auth/v1/settings（不查库）却 200。
+ *
+ * 现改为「可用响应优先」：
+ *   1. 任一条路返回 status < 500（含 400 密码错误这类业务错误）→ 立即采纳；
+ *   2. 5xx（代理超时 / 网关错误）**不采纳**，继续等另一条；
+ *   3. 两条都 settle 后仍无可用响应 → 退回第一个到达的响应（让上层看到真实错误），
+ *      若两条都是网络层失败则 reject。
  *
  * 两条路的 fetch 共享同一个 AbortSignal：上游 controller 超时或被 abort 时两条同时终止。
  */
@@ -139,11 +151,44 @@ function raceAuthFetch(input, init, signal) {
   const proxyUrl = rewriteToProxy(input)
   const raceInit = { ...init, signal }
   if (!proxyUrl || proxyUrl === directUrl) return baseFetch(directUrl || input, raceInit)
-  // 双路并行：direct + proxy
-  return Promise.any([
-    baseFetch(directUrl, raceInit),
-    baseFetch(proxyUrl, raceInit),
-  ])
+
+  return new Promise((resolve, reject) => {
+    let done = false
+    let pending = 2
+    const responses = [] // 已到达但不可用（5xx）的响应，按到达顺序
+    let firstNetErr = null
+
+    const finish = (res) => {
+      if (done) return
+      done = true
+      resolve(res)
+    }
+    const onResponse = (res) => {
+      if (done) return
+      if (res && typeof res.status === 'number' && res.status < 500) {
+        finish(res) // 真正的业务响应（200 成功 / 400 密码错等）
+        return
+      }
+      responses.push(res)
+      settled()
+    }
+    const onError = (err) => {
+      if (done) return
+      if (!firstNetErr) firstNetErr = err
+      settled()
+    }
+    const settled = () => {
+      pending -= 1
+      if (pending > 0 || done) return
+      // 两条路都结束且没有可用响应：优先把真实 HTTP 响应交给上层解析，
+      // 全都是网络层失败才 reject（supabase-js 会包装成 AuthApiError）
+      if (responses.length) finish(responses[0])
+      else reject(firstNetErr || new Error('auth request failed on both routes'))
+    }
+
+    baseFetch(directUrl, raceInit).then(onResponse, onError)
+    baseFetch(proxyUrl, raceInit).then(onResponse, onError)
+  })
 }
 
 function timeoutFetch(input, init = {}) {

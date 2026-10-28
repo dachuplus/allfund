@@ -38,8 +38,15 @@ const KLINE_COUNT = 3200
 // 2000 日线 ≈ 7.7 年，叠加新浪（更长历史）按日期合并取并集后可覆盖 10 年窗口。
 const TENCENT_MAX = 2000
 
-// 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js 保持一致）
-const DEFAULT_CODES = ['000300', '000905', '000906', '000852', '000510', '932000', '000985']
+// 定投助手默认指数全集（与 DtipPanel.vue / csi-pe.js / dtip-pe-sync.js 保持一致；2026-10-23 扩充至 34 支）
+const DEFAULT_CODES = [
+  '000510', '000300', '000905', '000906', '000852', '932000', '000985',
+  '000001', '000016', '000010', '000688', '931643',
+  '000919', '000920', '930855', '931155', '000922',
+  '000928', '000929', '000930', '000931', '000932', '000933', '000934',
+  '000935', '000936', '000937', '930997', 'H30184', '399997', '399986', '399967',
+  '930931', 'H30455',
+]
 
 // ===== 缓存层（方案 A）：优先读 dtip_pe_history 全量序列，csindex 实时仅兜底 =====
 // anon key 为 publishable（前端 bundle 已用），嵌于边缘函数无保密风险。
@@ -557,7 +564,7 @@ export async function onRequest(context) {
   const url = new URL(context.request.url)
   const raw = (url.searchParams.get('codes') || '').trim()
   let codes = raw
-    ? raw.split(',').map(s => s.trim()).filter(s => /^\d{6}$/.test(s))
+    ? raw.split(',').map(s => s.trim()).filter(s => /^[A-Za-z0-9]{6}$/.test(s))
     : DEFAULT_CODES.slice()
   if (!codes.length) codes = DEFAULT_CODES.slice()
   if (codes.length > 12) codes = codes.slice(0, 12)

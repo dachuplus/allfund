@@ -17,10 +17,14 @@
       </div>
     </div>
 
-    <!-- 登录墙：未登录 + 非公开路由 +（登录墙已开启 或 开关尚未加载完=状态未知）时直接显示；
-         后台并行跑 init()/loadFeatureFlags() 验证，登录成功即进入首页，失败（未登录）则保持墙。
-         不再显示「正在验证登录状态」中间页，避免「验证页→墙」的两段式闪烁。 -->
-    <LoginDialog v-else-if="!isLoggedIn && !isPublicContentRoute && (featureEnabled('login-wall') || !flagsLoaded)" :wall="true" @logged-in="onLoggedIn" />
+    <!-- 登录墙：仅在「开关已加载完 且 登录墙确实开启」时显示。
+         重要：此前条件是 (featureEnabled('login-wall') || !flagsLoaded)，即开关尚未加载完（状态未知）也弹墙。
+         而 loadFeatureFlags() 要等一次跨境 Supabase 查询（EdgeOne→新加坡，客户端超时上限 45s，
+         实测链路抖动时 upstream timeout 14s 才返回），于是首屏会被登录墙遮挡数十秒~近 1 分钟，
+         期间登录请求也因同一条慢链路失败（「登录服务暂时不可用」）。
+         改为：开关未知时按 DEFAULT_FLAGS 兜底（login-wall 默认 false＝不锁门）直接放行渲染首页，
+         权限校验仍由 routeState 在点开各栏目 tab 时执行（它本身在初始化未完成时已乐观放行）。 -->
+    <LoginDialog v-else-if="!isLoggedIn && !isPublicContentRoute && flagsLoaded && featureEnabled('login-wall')" :wall="true" @logged-in="onLoggedIn" />
 
     <!-- 已登录但权限申请被驳回：驳回提示（优先于陌生人提示） -->
     <div v-else-if="!authLoading && isLoggedIn && permissionsReady && rejected" class="stranger-screen">
