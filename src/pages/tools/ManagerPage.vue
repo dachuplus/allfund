@@ -1,5 +1,17 @@
 <template>
   <div class="manager-page">
+    <!-- 页面说明行：标题 / 数据来源 / 截止时间 / 覆盖范围（gov.uk 风格，与基金评分页一致） -->
+    <div class="mgr-summary">
+      <h2 class="mgr-summary-title">基金经理图鉴</h2>
+      <div class="mgr-summary-meta">
+        <span>数据来源：东方财富基金经理接口（在线实时）</span>
+        <span class="mgr-summary-sep">·</span>
+        <span v-if="lastLoadedAt">截止时间：{{ lastLoadedAt }}</span>
+        <span class="mgr-summary-sep">·</span>
+        <span>覆盖 {{ rawAll.length }} 位基金经理</span>
+      </div>
+    </div>
+
     <!-- 类型 tab：全部 / 股票型 / 混合型 / 债券型 / 收益型 -->
     <nav class="type-tabs" aria-label="基金经理类型">
       <button
@@ -194,6 +206,7 @@ const f = reactive({
 const rawAll = ref([])        // 当前类型已加载的全部数据
 const loading = ref(false)
 const error = ref('')
+const lastLoadedAt = ref('')   // 当次数据拉取时刻（东方财富在线实时接口，无固定快照日，以拉取时间作为有效截止点）
 const sortKey = ref('bestReturn')
 const sortDir = ref('desc')       // 'desc' | 'asc'
 const showMore = ref(false)       // 更多筛选抽屉是否展开
@@ -222,6 +235,16 @@ function fmtYears(days) {
   const rem = d - y * 365
   if (y <= 0) return rem + '天'
   return y + '年' + rem + '天'
+}
+// 北京时间格式化（用于说明行的「截止时间」）
+function fmtNow() {
+  const d = new Date()
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(d)
+  const get = (t) => parts.find(x => x.type === t)?.value || ''
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`
 }
 
 function fetchManagers({ ft, com = '', input = '', id = '', full = true }) {
@@ -391,6 +414,7 @@ async function loadAll() {
   error.value = ''
   try {
     rawAll.value = await fetchManagers({ ft: type.value })
+    lastLoadedAt.value = fmtNow()
     currentPage.value = 1
   } catch (e) {
     error.value = (e && e.message) || String(e)
@@ -409,6 +433,7 @@ async function confirmFilter() {
   error.value = ''
   try {
     rawAll.value = await fetchManagers({ ft: type.value })
+    lastLoadedAt.value = fmtNow()
     currentPage.value = 1
     toast(`已重新拉取全量并筛选，共 ${filtered.value.length} 位经理`)
   } catch (e) {
@@ -536,4 +561,10 @@ onMounted(() => { loadAll(); loadRepMeta() })
   .filter-grid { grid-template-columns: 1fr 1fr; }
   .sort-wrap { margin-left: 0; }
 }
+
+/* 页面说明行（与基金评分页一致，gov.uk 风格） */
+.mgr-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.mgr-summary-title { font-size: 24px; font-weight: 700; color: var(--text-primary, #0b0c0c); margin: 0; }
+.mgr-summary-meta { font-size: 13px; color: var(--text-secondary, #505a5f); }
+.mgr-summary-sep { color: var(--text-muted, #b1b4b6); }
 </style>
