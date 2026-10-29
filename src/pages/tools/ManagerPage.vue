@@ -11,40 +11,45 @@
       >{{ t.label }}</button>
     </nav>
 
-    <!-- 筛选区：10 个维度 -->
-    <div class="filter-card">
-      <div class="filter-head">
-        <span class="filter-title">筛选维度（10 项）</span>
-        <span class="filter-hint">数据来自东方财富基金经理在线接口，实时拉取、不落库。调整条件后点「确认筛选」会重新向服务端拉取全量并叠加筛选。</span>
+    <!-- 操作条：搜索框 + 更多筛选 -->
+    <div class="toolbar">
+      <div class="search-box">
+        <input v-model.trim="f.search" type="text" placeholder="搜索经理 / 公司 / 基金 / ID" aria-label="搜索" />
       </div>
+      <button class="btn-ghost" :class="{ 'is-active': showMore }" @click="showMore = !showMore">
+        更多筛选<span v-if="activeFilterCount">（{{ activeFilterCount }}）</span>
+      </button>
+      <span class="result-count">共 <b>{{ filtered.length }}</b> 位经理</span>
+    </div>
 
+    <!-- 更多筛选（默认收起） -->
+    <div v-show="showMore" class="filter-card">
+      <div class="filter-head">
+        <span class="filter-title">筛选条件</span>
+        <span class="filter-hint">数据来自东方财富基金经理在线接口，实时拉取、不落库。点「确认筛选」按条件重新拉取全量。</span>
+      </div>
       <div class="filter-grid">
-        <!-- 1. 类型（只读，由上方 tab 决定） -->
-        <div class="field">
-          <label>类型</label>
-          <div class="readonly-val">{{ currentTypeLabel }}</div>
-        </div>
-        <!-- 2. 公司 -->
+        <!-- 公司 -->
         <div class="field">
           <label>公司</label>
           <input v-model.trim="f.company" type="text" placeholder="如 易方达 / 华夏" />
         </div>
-        <!-- 3. 姓名 -->
+        <!-- 姓名 -->
         <div class="field">
           <label>姓名</label>
           <input v-model.trim="f.name" type="text" placeholder="经理姓名 / 拼音" />
         </div>
-        <!-- 4. 经理ID -->
+        <!-- 经理ID -->
         <div class="field">
           <label>经理ID</label>
           <input v-model.trim="f.managerId" type="text" placeholder="如 300015" />
         </div>
-        <!-- 5. 现任基金 -->
+        <!-- 现任基金 -->
         <div class="field">
           <label>现任基金</label>
           <input v-model.trim="f.fund" type="text" placeholder="基金代码 / 名称" />
         </div>
-        <!-- 6. 产品数量 -->
+        <!-- 产品数量 -->
         <div class="field">
           <label>产品数量（只）</label>
           <div class="range">
@@ -53,7 +58,7 @@
             <input v-model.trim="f.countMax" type="number" min="0" placeholder="最大" />
           </div>
         </div>
-        <!-- 7. 管理时间 -->
+        <!-- 管理时间 -->
         <div class="field">
           <label>管理时间（年）</label>
           <div class="range">
@@ -62,7 +67,7 @@
             <input v-model.trim="f.yearsMax" type="number" min="0" placeholder="最大" />
           </div>
         </div>
-        <!-- 8. 管理总规模 -->
+        <!-- 管理总规模 -->
         <div class="field">
           <label>管理总规模（亿元）</label>
           <div class="range">
@@ -71,7 +76,7 @@
             <input v-model.trim="f.scaleMax" type="number" min="0" placeholder="最大" />
           </div>
         </div>
-        <!-- 9. 最佳回报 -->
+        <!-- 最佳回报 -->
         <div class="field">
           <label>最佳回报（%）</label>
           <div class="range">
@@ -80,7 +85,7 @@
             <input v-model.trim="f.retMax" type="number" placeholder="最大" />
           </div>
         </div>
-        <!-- 10. 最佳回报基金 -->
+        <!-- 最佳回报基金 -->
         <div class="field">
           <label>最佳回报基金</label>
           <input v-model.trim="f.bestFund" type="text" placeholder="基金名称关键词" />
@@ -90,15 +95,6 @@
       <div class="filter-actions">
         <button class="btn-primary" :disabled="loading" @click="confirmFilter">确认筛选（重新拉取）</button>
         <button class="btn-ghost" :disabled="loading" @click="resetFilters">重置</button>
-        <span class="sort-wrap">
-          排序：
-          <select v-model="sortKey">
-            <option value="bestReturn">最佳回报 ↓</option>
-            <option value="scale">管理规模 ↓</option>
-            <option value="fundCount">产品数量 ↓</option>
-            <option value="manageDays">管理时间 ↓</option>
-          </select>
-        </span>
       </div>
     </div>
 
@@ -106,10 +102,6 @@
     <div class="status-bar">
       <template v-if="loading"><span class="loading">数据加载中…</span></template>
       <template v-else-if="error"><span class="error">加载失败：{{ error }}</span></template>
-      <template v-else>
-        <span>共 <b>{{ filtered.length }}</b> 位经理（已加载 {{ rawAll.length }} 条）</span>
-        <span class="muted">数据来源：东方财富（在线实时）</span>
-      </template>
     </div>
 
     <!-- 结果表 -->
@@ -117,13 +109,13 @@
       <table class="result-table">
         <thead>
           <tr>
-            <th>经理</th>
-            <th>所属公司</th>
-            <th class="num">现任产品</th>
-            <th>管理时间</th>
-            <th class="num">管理总规模</th>
-            <th class="num">最佳回报</th>
-            <th>最佳回报基金</th>
+            <th @click="sortBy('name')" :class="sortClass('name')">经理<span class="arrow" v-if="sortKey==='name'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th @click="sortBy('company')" :class="sortClass('company')">所属公司<span class="arrow" v-if="sortKey==='company'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th class="num" @click="sortBy('fundCount')" :class="sortClass('fundCount')">现任产品<span class="arrow" v-if="sortKey==='fundCount'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th @click="sortBy('manageDays')" :class="sortClass('manageDays')">管理时间<span class="arrow" v-if="sortKey==='manageDays'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th class="num" @click="sortBy('scale')" :class="sortClass('scale')">管理总规模<span class="arrow" v-if="sortKey==='scale'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th class="num" @click="sortBy('bestReturn')" :class="sortClass('bestReturn')">最佳回报<span class="arrow" v-if="sortKey==='bestReturn'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th @click="sortBy('bestReturnFund')" :class="sortClass('bestReturnFund')">最佳回报基金<span class="arrow" v-if="sortKey==='bestReturnFund'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -172,8 +164,9 @@ const typeTabs = [
 const type = ref('all')
 const currentTypeLabel = computed(() => (typeTabs.find(t => t.key === type.value) || {}).label || '')
 
-// 10 个筛选维度
+// 筛选维度
 const f = reactive({
+  search: '',          // 顶部统一搜索框（经理 / 公司 / 基金 / ID）
   company: '', name: '', managerId: '', fund: '',
   countMin: '', countMax: '',
   yearsMin: '', yearsMax: '',
@@ -186,6 +179,8 @@ const rawAll = ref([])        // 当前类型已加载的全部数据
 const loading = ref(false)
 const error = ref('')
 const sortKey = ref('bestReturn')
+const sortDir = ref('desc')       // 'desc' | 'asc'
+const showMore = ref(false)       // 更多筛选抽屉是否展开
 const currentPage = ref(1)
 const pageSize = 100
 
@@ -233,8 +228,13 @@ function applyFilters(list) {
   const name = f.name.trim()
   const mid = f.managerId.trim()
   const fund = f.fund.trim()
-  const bestFund = f.bestFund.trim()
-  const countMin = toNum(f.countMin), countMax = toNum(f.countMax)
+    const bestFund = f.bestFund.trim()
+    const q = (f.search || '').trim().toLowerCase()
+    if (q) {
+      const hay = [m.name, m.company, m.id, m.bestReturnFund, ...(m.fundNames || []), ...(m.fundCodes || [])].join(' ').toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    const countMin = toNum(f.countMin), countMax = toNum(f.countMax)
   const yearsMin = toNum(f.yearsMin), yearsMax = toNum(f.yearsMax)
   const scaleMin = toNum(f.scaleMin), scaleMax = toNum(f.scaleMax)
   const retMin = toNum(f.retMin), retMax = toNum(f.retMax)
@@ -270,22 +270,62 @@ function inRange(val, min, max) {
   return true
 }
 
+const NUMERIC_KEYS = ['bestReturn', 'scale', 'fundCount', 'manageDays']
+
 function sortList(list) {
   const arr = list.slice()
+  const dir = sortDir.value === 'asc' ? 1 : -1
   arr.sort((a, b) => {
-    let va, vb
-    switch (sortKey.value) {
-      case 'scale': va = parseScale(a.scale); vb = parseScale(b.scale); break
-      case 'fundCount': va = a.fundCount; vb = b.fundCount; break
-      case 'manageDays': va = a.manageDays; vb = b.manageDays; break
-      case 'bestReturn':
-      default: va = parsePct(a.bestReturn); vb = parsePct(b.bestReturn); break
+    let cmp
+    if (NUMERIC_KEYS.includes(sortKey.value)) {
+      let va, vb
+      switch (sortKey.value) {
+        case 'scale': va = parseScale(a.scale); vb = parseScale(b.scale); break
+        case 'fundCount': va = a.fundCount; vb = b.fundCount; break
+        case 'manageDays': va = a.manageDays; vb = b.manageDays; break
+        default: va = parsePct(a.bestReturn); vb = parsePct(b.bestReturn); break
+      }
+      if (isNaN(va)) va = -Infinity
+      if (isNaN(vb)) vb = -Infinity
+      cmp = va - vb
+    } else {
+      const va = String(a[sortKey.value] || '')
+      const vb = String(b[sortKey.value] || '')
+      cmp = va.localeCompare(vb, 'zh')
     }
-    if (isNaN(va)) va = -Infinity
-    if (isNaN(vb)) vb = -Infinity
-    return vb - va
+    return cmp * dir
   })
   return arr
+}
+
+// 已激活的筛选条件数量（用于「更多筛选」按钮角标）
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (f.company) n++
+  if (f.name) n++
+  if (f.managerId) n++
+  if (f.fund) n++
+  if (f.countMin || f.countMax) n++
+  if (f.yearsMin || f.yearsMax) n++
+  if (f.scaleMin || f.scaleMax) n++
+  if (f.retMin || f.retMax) n++
+  if (f.bestFund) n++
+  return n
+})
+
+// 点击表头排序：同列切换升/降序，不同列按字段类型给默认方向
+function sortBy(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'
+  } else {
+    sortKey.value = key
+    sortDir.value = NUMERIC_KEYS.includes(key) ? 'desc' : 'asc'
+  }
+  currentPage.value = 1
+}
+function sortClass(key) {
+  if (sortKey.value !== key) return ''
+  return sortDir.value === 'desc' ? 'sort-desc' : 'sort-asc'
 }
 
 const filtered = computed(() => sortList(applyFilters(rawAll.value)))
@@ -340,6 +380,7 @@ function switchType(key) {
 }
 
 function resetFilters() {
+  f.search = ''
   f.company = ''; f.name = ''; f.managerId = ''; f.fund = ''
   f.countMin = ''; f.countMax = ''
   f.yearsMin = ''; f.yearsMax = ''
@@ -351,9 +392,9 @@ function resetFilters() {
 
 // 输入即时筛选（基于已加载全量，结果准确）
 watch(() => [
-  f.company, f.name, f.managerId, f.fund, f.bestFund,
+  f.search, f.company, f.name, f.managerId, f.fund, f.bestFund,
   f.countMin, f.countMax, f.yearsMin, f.yearsMax, f.scaleMin, f.scaleMax, f.retMin, f.retMax,
-  sortKey.value,
+  sortKey.value, sortDir.value,
 ], () => { currentPage.value = 1 })
 
 onMounted(loadAll)
@@ -422,6 +463,21 @@ onMounted(loadAll)
 .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 14px; }
 .pager button { padding: 6px 14px; border: 1px solid var(--brand, #1d70b8); background: #fff; color: var(--brand, #1d70b8); cursor: pointer; }
 .pager button:disabled { opacity: 0.5; cursor: default; }
+
+/* 操作条：搜索框 + 更多筛选 */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.search-box { flex: 1 1 260px; min-width: 0; }
+.search-box input { width: 100%; padding: 10px 12px; border: 2px solid #b1b4b6; font-size: 15px; border-radius: 0; background: #fff; }
+.search-box input:focus { outline: 3px solid #ffdd00; outline-offset: 0; border-color: var(--brand, #1d70b8); }
+.result-count { font-size: 14px; color: var(--text-secondary, #505a5a); white-space: nowrap; margin-left: auto; }
+.result-count b { color: var(--brand, #1d70b8); }
+.btn-ghost.is-active { background: var(--brand, #1d70b8); color: #fff; }
+
+/* 可排序表头 */
+.result-table th { cursor: pointer; user-select: none; white-space: nowrap; }
+.result-table th:hover { color: var(--brand, #1d70b8); }
+.result-table th.sort-asc, .result-table th.sort-desc { color: var(--brand, #1d70b8); }
+.result-table th .arrow { font-size: 12px; margin-left: 3px; }
 
 @media (max-width: 768px) {
   .filter-grid { grid-template-columns: 1fr 1fr; }
