@@ -531,6 +531,22 @@ jobs:
           python scripts/sync_etfs_to_fund_scores.py --workers 6 --delay 0.25
           echo "ETF/LOF 补充完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
+      - name: 步骤5i — 全量主列表差集对账 + 补录（永久闸门）
+        timeout-minutes: 20
+        continue-on-error: true
+        env:
+          SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+        run: |
+          echo "============================================"
+          echo "  步骤5i: 全量主列表(fundcode_search.js)差集对账 + 补录"
+          echo "  说明: promote 仅重建 .OF + 标签关联 ETF/LOF，仍非全量；本步拉取权威主列表"
+          echo "        (约 28210 只) 与 fund_scores 做差集，缺失基金补录骨架行，确保经理图鉴"
+          echo "        「代表产品」100% 可解析。幂等，重跑安全。"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/reconcile_fund_universe.py
+          echo "主列表对账完成: $(date '+%Y-%m-%d %H:%M:%S')"
+
       - name: 数据更新通知
         if: ${{ failure() || cancelled() }}
         run: |
