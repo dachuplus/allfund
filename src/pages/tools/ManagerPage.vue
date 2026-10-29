@@ -90,6 +90,11 @@
           <label>最佳回报基金</label>
           <input v-model.trim="f.bestFund" type="text" placeholder="基金名称关键词" />
         </div>
+        <!-- 代表产品类型 -->
+        <div class="field">
+          <label>代表产品类型</label>
+          <input v-model.trim="f.prodType" type="text" placeholder="如 股票型 / 混合型 / 债券型" />
+        </div>
       </div>
 
       <div class="filter-actions">
@@ -115,7 +120,7 @@
             <th @click="sortBy('manageDays')" :class="sortClass('manageDays')">管理时间<span class="arrow" v-if="sortKey==='manageDays'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
             <th class="num" @click="sortBy('scale')" :class="sortClass('scale')">管理总规模<span class="arrow" v-if="sortKey==='scale'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
             <th class="num" @click="sortBy('bestReturn')" :class="sortClass('bestReturn')">最佳回报<span class="arrow" v-if="sortKey==='bestReturn'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
-            <th @click="sortBy('bestReturnFund')" :class="sortClass('bestReturnFund')">最佳回报基金<span class="arrow" v-if="sortKey==='bestReturnFund'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
+            <th class="rep-col" @click="sortBy('bestReturnFund')" :class="sortClass('bestReturnFund')">代表产品<span class="arrow" v-if="sortKey==='bestReturnFund'">{{ sortDir==='desc'?'↓':'↑' }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -132,7 +137,17 @@
             <td>{{ fmtYears(m.manageDays) }}</td>
             <td class="num">{{ m.scale || '—' }}</td>
             <td class="num" :class="retClass(m.bestReturn)">{{ m.bestReturn || '—' }}</td>
-            <td class="best-fund">{{ m.bestReturnFund || '—' }}</td>
+            <td class="rep">
+              <template v-if="repOf(m)">
+                <a class="rep-name" :href="'https://fund.eastmoney.com/' + repOf(m).code + '.html'" target="_blank" rel="noopener">{{ repOf(m).name || m.bestReturnFund }}</a>
+                <div class="rep-sub">
+                  <a :href="'https://fund.eastmoney.com/' + repOf(m).code + '.html'" target="_blank" rel="noopener">{{ repOf(m).code }}</a>
+                  <span v-if="repOf(m).type" class="rep-type">{{ repOf(m).type }}</span>
+                  <span v-if="repOf(m).scale" class="rep-scale">{{ repOf(m).scale }}</span>
+                </div>
+              </template>
+              <span v-else>{{ m.bestReturnFund || '—' }}</span>
+            </td>
           </tr>
           <tr v-if="paged.length === 0">
             <td colspan="7" class="empty">无匹配结果，请放宽筛选条件。</td>
@@ -173,6 +188,7 @@ const f = reactive({
   scaleMin: '', scaleMax: '',
   retMin: '', retMax: '',
   bestFund: '',
+  prodType: '',        // 代表产品类型（contains 匹配）
 })
 
 const rawAll = ref([])        // 当前类型已加载的全部数据
@@ -182,7 +198,8 @@ const sortKey = ref('bestReturn')
 const sortDir = ref('desc')       // 'desc' | 'asc'
 const showMore = ref(false)       // 更多筛选抽屉是否展开
 const currentPage = ref(1)
-const pageSize = 100
+const pageSize = 1000            // 单页 1000 行，减少翻页
+const managerRep = ref({})        // 经理ID -> 代表产品 {code,name,type,scale}，来自静态 manager_rep.json
 
 function toNum(v) {
   if (v === null || v === undefined || v === '') return null
@@ -233,6 +250,12 @@ function applyFilters(list) {
     if (q) {
       const hay = [m.name, m.company, m.id, m.bestReturnFund, ...(m.fundNames || []), ...(m.fundCodes || [])].join(' ').toLowerCase()
       if (!hay.includes(q)) return false
+    }
+    // 代表产品类型筛选（引用 managerRep 使 computed 在静态数据加载后重算）
+    const prodType = f.prodType.trim().toLowerCase()
+    if (prodType) {
+      const t = (repOf(m)?.type || '').toLowerCase()
+      if (!t.includes(prodType)) return false
     }
     const countMin = toNum(f.countMin), countMax = toNum(f.countMax)
   const yearsMin = toNum(f.yearsMin), yearsMax = toNum(f.yearsMax)
@@ -310,6 +333,7 @@ const activeFilterCount = computed(() => {
   if (f.scaleMin || f.scaleMax) n++
   if (f.retMin || f.retMax) n++
   if (f.bestFund) n++
+  if (f.prodType) n++
   return n
 })
 
@@ -339,6 +363,23 @@ function retClass(s) {
   const n = parsePct(s)
   if (isNaN(n)) return ''
   return n >= 0 ? 'pos' : 'neg'
+}
+
+// 代表产品：优先用实时接口返回的代码/名称，类型与规模来自静态 manager_rep.json（by 经理ID）
+function repOf(m) {
+  const meta = managerRep.value[m.id] || {}
+  const code = m.bestReturnFundCode || meta.code || ''
+  const name = m.bestReturnFund || meta.name || ''
+  if (!code && !name) return null
+  return { code, name, type: meta.type || '', scale: meta.scale || '' }
+}
+
+// 加载代表产品静态映射（基金代码 -> 类型/规模），一次加载后缓存
+function loadRepMeta() {
+  fetch('/manager_rep.json')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => { managerRep.value = d || {} })
+    .catch(() => { /* 静态映射缺失时降级：仅显示名称，类型/规模留空 */ })
 }
 
 async function loadAll() {
@@ -387,17 +428,18 @@ function resetFilters() {
   f.scaleMin = ''; f.scaleMax = ''
   f.retMin = ''; f.retMax = ''
   f.bestFund = ''
+  f.prodType = ''
   currentPage.value = 1
 }
 
 // 输入即时筛选（基于已加载全量，结果准确）
 watch(() => [
-  f.search, f.company, f.name, f.managerId, f.fund, f.bestFund,
+  f.search, f.company, f.name, f.managerId, f.fund, f.bestFund, f.prodType,
   f.countMin, f.countMax, f.yearsMin, f.yearsMax, f.scaleMin, f.scaleMax, f.retMin, f.retMax,
-  sortKey.value, sortDir.value,
+  sortKey.value, sortDir.value, managerRep.value,
 ], () => { currentPage.value = 1 })
 
-onMounted(loadAll)
+onMounted(() => { loadAll(); loadRepMeta() })
 </script>
 
 <style scoped>
@@ -445,16 +487,22 @@ onMounted(loadAll)
 
 /* 结果表 */
 .result-wrap { overflow-x: auto; }
-.result-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.result-table { width: 100%; min-width: 1040px; border-collapse: collapse; font-size: 14px; }
 /* 只保留横向分隔线，去掉竖线（gov.uk 风格：无网格边框，靠行线与留白分隔） */
-.result-table th, .result-table td { border: 0; border-bottom: 1px solid #b1b4b6; padding: 8px 16px 8px 0; text-align: left; vertical-align: top; }
-.result-table thead th { background: #f3f2f1; border-bottom: 2px solid #0b0c0c; font-weight: 700; }
+.result-table th, .result-table td { border: 0; border-bottom: 1px solid #b1b4b6; padding: 10px 20px 10px 0; text-align: left; vertical-align: top; }
+.result-table thead th { background: #f3f2f1; border-bottom: 2px solid #0b0c0c; font-weight: 700; white-space: nowrap; }
 .result-table tbody tr:last-child td { border-bottom: 0; }
 .result-table .num { text-align: right; white-space: nowrap; }
 .result-table a { color: var(--brand, #1d70b8); text-decoration: none; }
 .result-table a:hover { text-decoration: underline; }
 .sub-id { display: block; font-size: 12px; color: var(--text-secondary, #505a5a); }
-.best-fund { color: #0b0c0c; }
+.rep { vertical-align: top; }
+.rep-name { font-weight: 600; }
+.rep-sub { margin-top: 4px; font-size: 12px; color: var(--text-secondary, #505a5a); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.rep-sub a { color: var(--text-secondary, #505a5a); }
+.rep-sub a:hover { color: var(--brand, #1d70b8); }
+.rep-type { background: #f3f2f1; padding: 1px 7px; }
+.rep-scale { color: #0b0c0c; font-weight: 600; }
 .pos { color: #d4351c; font-weight: 700; }  /* 涨：红 */
 .neg { color: #00703c; font-weight: 700; }  /* 跌：绿 */
 .empty { text-align: center; color: var(--text-secondary, #505a5a); padding: 24px; }
@@ -476,6 +524,7 @@ onMounted(loadAll)
 /* 可排序表头 */
 .result-table th { cursor: pointer; user-select: none; white-space: nowrap; }
 .result-table th:hover { color: var(--brand, #1d70b8); }
+.result-table th.rep-col { min-width: 240px; }
 .result-table th.sort-asc, .result-table th.sort-desc { color: var(--brand, #1d70b8); }
 .result-table th .arrow { font-size: 12px; margin-left: 3px; }
 

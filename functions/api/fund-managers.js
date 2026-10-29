@@ -14,7 +14,7 @@
  *
  * 每行 data[i] 为 12 字段数组，本函数归一化为可读对象：
  *   id, name, companyId, company, fundCodes[], fundNames[],
- *   fundCount, manageDays, bestReturn, bestReturnFund, scale
+ *   fundCount, manageDays, bestReturn, bestReturnFund, bestReturnFundCode, scale
  *
  * 参数：
  *   ft   类型 all/gp/hh/zq/sy（全部/股票型/混合型/债券型/收益型）
@@ -47,6 +47,7 @@ function normalize(raw) {
     manageDays: parseInt(raw[6], 10) || 0,
     bestReturn: raw[7] || '',       // 如 "22.44%"
     bestReturnFund: raw[9] || '',   // 最佳回报对应基金名
+    bestReturnFundCode: raw[8] || '', // 最佳回报对应基金代码（代表产品代码，用于天天基金跳转）
     scale: raw[10] || '',           // 如 "2.48亿元"
   }
 }
