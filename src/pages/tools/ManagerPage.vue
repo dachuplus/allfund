@@ -405,8 +405,10 @@ onMounted(loadAll)
 /* 结果表 */
 .result-wrap { overflow-x: auto; }
 .result-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.result-table th, .result-table td { border: 1px solid var(--border, #ccc); padding: 8px 10px; text-align: left; vertical-align: top; }
-.result-table thead th { background: #f3f2f1; font-weight: 700; }
+/* 只保留横向分隔线，去掉竖线（gov.uk 风格：无网格边框，靠行线与留白分隔） */
+.result-table th, .result-table td { border: 0; border-bottom: 1px solid #b1b4b6; padding: 8px 16px 8px 0; text-align: left; vertical-align: top; }
+.result-table thead th { background: #f3f2f1; border-bottom: 2px solid #0b0c0c; font-weight: 700; }
+.result-table tbody tr:last-child td { border-bottom: 0; }
 .result-table .num { text-align: right; white-space: nowrap; }
 .result-table a { color: var(--brand, #1d70b8); text-decoration: none; }
 .result-table a:hover { text-decoration: underline; }
