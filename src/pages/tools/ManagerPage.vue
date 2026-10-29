@@ -4,7 +4,7 @@
     <div class="mgr-summary">
       <h2 class="mgr-summary-title">基金经理图鉴</h2>
       <div class="mgr-summary-meta">
-        <span>数据来源：东方财富基金经理接口（在线实时）</span>
+        <span>数据来源：公开网络</span>
         <span class="mgr-summary-sep">·</span>
         <span v-if="lastLoadedAt">截止时间：{{ lastLoadedAt }}</span>
         <span class="mgr-summary-sep">·</span>
