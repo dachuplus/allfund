@@ -245,29 +245,33 @@ function applyFilters(list) {
   const name = f.name.trim()
   const mid = f.managerId.trim()
   const fund = f.fund.trim()
-    const bestFund = f.bestFund.trim()
-    const q = (f.search || '').trim().toLowerCase()
-    if (q) {
-      const hay = [m.name, m.company, m.id, m.bestReturnFund, ...(m.fundNames || []), ...(m.fundCodes || [])].join(' ').toLowerCase()
-      if (!hay.includes(q)) return false
-    }
-    // 代表产品类型筛选（引用 managerRep 使 computed 在静态数据加载后重算）
-    const prodType = f.prodType.trim().toLowerCase()
-    if (prodType) {
-      const t = (repOf(m)?.type || '').toLowerCase()
-      if (!t.includes(prodType)) return false
-    }
-    const countMin = toNum(f.countMin), countMax = toNum(f.countMax)
+  const bestFund = f.bestFund.trim()
+  const q = (f.search || '').trim().toLowerCase()
+  // 代表产品类型筛选（引用 managerRep 使 computed 在静态数据加载后重算）
+  const prodType = f.prodType.trim().toLowerCase()
+  const countMin = toNum(f.countMin), countMax = toNum(f.countMax)
   const yearsMin = toNum(f.yearsMin), yearsMax = toNum(f.yearsMax)
   const scaleMin = toNum(f.scaleMin), scaleMax = toNum(f.scaleMax)
   const retMin = toNum(f.retMin), retMax = toNum(f.retMax)
 
   return list.filter(m => {
+    // 顶部统一搜索框：经理 / 公司 / 基金 / ID 关键字（包含匹配）
+    if (q) {
+      const hay = [m.name, m.company, m.id, m.bestReturnFund, ...(m.fundNames || []), ...(m.fundCodes || [])].join(' ').toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    // 代表产品类型筛选
+    if (prodType) {
+      const t = (repOf(m)?.type || '').toLowerCase()
+      if (!t.includes(prodType)) return false
+    }
     if (company && !String(m.company).includes(company)) return false
     if (name && !String(m.name).includes(name)) return false
     if (mid && !String(m.id).includes(mid)) return false
     if (fund) {
-      const hit = m.fundCodes.some(c => c.includes(fund)) || m.fundNames.some(n => n.includes(fund))
+      const codes = m.fundCodes || []
+      const names = m.fundNames || []
+      const hit = codes.some(c => String(c).includes(fund)) || names.some(n => String(n).includes(fund))
       if (!hit) return false
     }
     if (bestFund && !String(m.bestReturnFund).includes(bestFund)) return false
