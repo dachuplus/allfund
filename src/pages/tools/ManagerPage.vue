@@ -15,38 +15,38 @@
     <div class="filter-card">
       <div class="filter-head">
         <span class="filter-title">筛选维度（10 项）</span>
-        <span class="filter-hint">首次加载已拉取全量（东方财富单页上限 2000，已自动翻页合并）；点「确认筛选」会向服务端重新拉取全量并叠加 10 维度筛选（结果基于服务端最新全量，而非仅筛内存）。</span>
+        <span class="filter-hint">数据来自东方财富基金经理在线接口，实时拉取、不落库。调整条件后点「确认筛选」会重新向服务端拉取全量并叠加筛选。</span>
       </div>
 
       <div class="filter-grid">
         <!-- 1. 类型（只读，由上方 tab 决定） -->
         <div class="field">
-          <label>① 类型</label>
+          <label>类型</label>
           <div class="readonly-val">{{ currentTypeLabel }}</div>
         </div>
         <!-- 2. 公司 -->
         <div class="field">
-          <label>② 公司</label>
+          <label>公司</label>
           <input v-model.trim="f.company" type="text" placeholder="如 易方达 / 华夏" />
         </div>
         <!-- 3. 姓名 -->
         <div class="field">
-          <label>③ 姓名</label>
+          <label>姓名</label>
           <input v-model.trim="f.name" type="text" placeholder="经理姓名 / 拼音" />
         </div>
         <!-- 4. 经理ID -->
         <div class="field">
-          <label>④ 经理ID</label>
+          <label>经理ID</label>
           <input v-model.trim="f.managerId" type="text" placeholder="如 300015" />
         </div>
         <!-- 5. 现任基金 -->
         <div class="field">
-          <label>⑤ 现任基金</label>
+          <label>现任基金</label>
           <input v-model.trim="f.fund" type="text" placeholder="基金代码 / 名称" />
         </div>
         <!-- 6. 产品数量 -->
         <div class="field">
-          <label>⑥ 产品数量（只）</label>
+          <label>产品数量（只）</label>
           <div class="range">
             <input v-model.trim="f.countMin" type="number" min="0" placeholder="最小" />
             <span>~</span>
@@ -55,7 +55,7 @@
         </div>
         <!-- 7. 管理时间 -->
         <div class="field">
-          <label>⑦ 管理时间（年）</label>
+          <label>管理时间（年）</label>
           <div class="range">
             <input v-model.trim="f.yearsMin" type="number" min="0" placeholder="最小" />
             <span>~</span>
@@ -64,7 +64,7 @@
         </div>
         <!-- 8. 管理总规模 -->
         <div class="field">
-          <label>⑧ 管理总规模（亿元）</label>
+          <label>管理总规模（亿元）</label>
           <div class="range">
             <input v-model.trim="f.scaleMin" type="number" min="0" placeholder="最小" />
             <span>~</span>
@@ -73,7 +73,7 @@
         </div>
         <!-- 9. 最佳回报 -->
         <div class="field">
-          <label>⑨ 最佳回报（%）</label>
+          <label>最佳回报（%）</label>
           <div class="range">
             <input v-model.trim="f.retMin" type="number" placeholder="最小" />
             <span>~</span>
@@ -82,7 +82,7 @@
         </div>
         <!-- 10. 最佳回报基金 -->
         <div class="field">
-          <label>⑩ 最佳回报基金</label>
+          <label>最佳回报基金</label>
           <input v-model.trim="f.bestFund" type="text" placeholder="基金名称关键词" />
         </div>
       </div>
@@ -108,7 +108,7 @@
       <template v-else-if="error"><span class="error">加载失败：{{ error }}</span></template>
       <template v-else>
         <span>共 <b>{{ filtered.length }}</b> 位经理（已加载 {{ rawAll.length }} 条）</span>
-        <span class="muted">数据来源：东方财富基金经理接口（在线，不落库）</span>
+        <span class="muted">数据来源：东方财富（在线实时）</span>
       </template>
     </div>
 
@@ -375,15 +375,15 @@ onMounted(loadAll)
 .filter-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 12px; }
 .filter-title { font-weight: 700; font-size: 16px; color: var(--brand, #1d70b8); }
 .filter-hint { font-size: 13px; color: var(--text-secondary, #505a5a); }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field label { font-size: 13px; font-weight: 700; color: #0b0c0c; }
-.field input, .field select { padding: 8px 10px; border: 1px solid #b1b4b6; font-size: 14px; }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 18px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-secondary, #505a5a); }
+.field input, .field select { padding: 8px 10px; border: 1px solid #b1b4b6; font-size: 14px; border-radius: 0; background: #fff; }
 .field input:focus { outline: 3px solid #ffdd00; outline-offset: 0; border-color: var(--brand, #1d70b8); }
 .readonly-val { padding: 8px 10px; background: #f3f2f1; border: 1px solid var(--border, #ccc); font-weight: 700; }
-.range { display: flex; align-items: center; gap: 6px; }
-.range input { width: 100%; }
-.range span { color: var(--text-secondary, #505a5a); }
+.range { display: flex; align-items: center; gap: 8px; }
+.range input { width: 100%; min-width: 0; }
+.range span { color: var(--text-secondary, #505a5a); white-space: nowrap; }
 
 .filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
 .btn-primary {
