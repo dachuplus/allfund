@@ -47,6 +47,15 @@ FT_MAP = {
 }
 FT_LIST = list(FT_MAP.keys())
 
+# 基金代码归一化为主键（与 sync_etfs_to_fund_scores.py / reconcile_fund_universe.py 的 canonical_key 一致）：
+# 场内产品（沪市 5xxxxx ETF、深市 15xxxxx/16xxxxx LOF 及场内份额）用裸 6 位码；场外产品加 .OF 后缀。
+# 旧逻辑无脑 f[0] + '.OF' 会把场内 ETF/LOF/定开也错误地加成 .OF，导致它们长期不在评分表内。
+def canonical_fund_code(raw):
+    code = (raw or '').strip()
+    if code.startswith('5') or code.startswith('15') or code.startswith('16'):
+        return code
+    return code + '.OF'
+
 # 整类抓取重试（根治上游瞬时空响应：某大类首页返回空 datas 致 staging 该大类=0、
 # promote 校验 80% 阈值整批拒绝、流水线直接挂掉。历史已发生多次：8/19 股票型、10/17 混合型）。
 # 首页即空或中页空且未达声明总数 → 判为上游瞬时抽风，整类指数退避重试最多 FT_MAX_RETRY 次；
@@ -225,7 +234,7 @@ def fetch_funds(ft, attempt=1):
                 f = item.split(',')
                 if len(f) < 13:
                     continue
-                code = f[0].strip() + '.OF'
+                code = canonical_fund_code(f[0])
                 name = (f[1] or '').strip()
                 # 分类完全由天天基金 FundGuideapi 的 f[3]（「一级-二级」结构，如 指数型-股票）派生；
                 # 旧「聚源分类」已废弃删除。f[3] 为空时回落到 FT_MAP[ft] 初值（与 import_via_rest step 2g 兜底一致）。
@@ -583,7 +592,7 @@ def _parse_pingzhong_qdii(code, t1_tt, raw):
         except Exception:
             pass
     return {
-        'c': code + '.OF',
+        'c': canonical_fund_code(code),
         'n': _qdii_fund_name(raw),
         't0': 'QDII',
         't1': t1_tt,
