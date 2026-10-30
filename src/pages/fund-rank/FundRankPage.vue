@@ -8,7 +8,9 @@
         <span class="frk-summary-sep">·</span>
         <span v-if="summaryDate">截止时间：{{ summaryDate }}</span>
         <span v-if="meta.total_count" class="frk-summary-sep">·</span>
-        <span v-if="meta.total_count">覆盖 {{ meta.total_count }} 只开放式基金（含 QDII）</span>
+        <span v-if="meta.total_count">覆盖 {{ meta.total_count }} 只开放式基金（含 ETF/LOF/QDII）</span>
+        <span v-if="meta.interface_total" class="frk-summary-sep">·</span>
+        <span v-if="meta.interface_total">接口包含基金总量 {{ meta.interface_total }} 只</span>
       </div>
     </div>
 

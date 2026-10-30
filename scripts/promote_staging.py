@@ -312,6 +312,20 @@ def main():
         else:
             print(f'  ✅ [L1] 分类[{cat}] 充足 ({ratio*100:.1f}%)，与主列表一致', flush=True)
 
+    # 场内覆盖（非阻塞）：staging 内场内 ETF/LOF 数 vs 主列表场内数
+    # 场内基金现已并入主拉取（fetch_etf_full），staging 应覆盖主列表场内全集；
+    # 仅作监测展示，偏低仅警告不阻断切换。
+    try:
+        oe_staging = pg("SELECT count(*) AS cnt FROM fund_scores_staging WHERE c NOT LIKE '%.OF'")[0]['cnt']
+        if oe > 0:
+            oer = oe_staging / oe if oe else 0
+            if oer < 0.80:
+                warn(f'场内 ETF/LOF 覆盖偏低 ({oer*100:.1f}%): staging 场内 {oe_staging} / 主列表场内 {oe}（已并入主拉取，请检查拉取）', 'L1')
+            else:
+                info(f'场内 ETF/LOF 已并入主拉取: staging 场内 {oe_staging} / 主列表场内 {oe} ({oer*100:.1f}%)')
+    except Exception as e:
+        info(f'场内覆盖统计跳过: {e}')
+
     # ── Layer 2：中间表(staging)数据量与评分质量校验 ────────────────────────
     print('\n[Layer 2] 中间表(staging)数据量与评分质量校验', flush=True)
     ok &= check(staging_total >= 19000, f'staging 数据量充足 (>=19000): {staging_total}', 'L2')
@@ -472,13 +486,16 @@ def main():
     else:
         print('\n[3] 跳过 fund_combined 重建（--skip-combined）', flush=True)
 
-    # ── 3.5 更新 fund_scores_meta 时间戳 ───────────────────────────────
-    print('\n[3.5] 更新 fund_scores_meta 时间戳（页面"更新时间"来源）', flush=True)
+    # ── 3.5 更新 fund_scores_meta 时间戳 + 接口全量 ──────────────────────
+    # interface_total = 东方财富全量主列表总量（数据源包含的全部基金），供基金评分页
+    # 说明行展示「接口包含的基金总量」；total_count = 本平台实际覆盖数（覆盖数量）。
+    print('\n[3.5] 更新 fund_scores_meta 时间戳 + 接口全量（页面"更新时间/接口总量"来源）', flush=True)
     try:
-        pg("""INSERT INTO fund_scores_meta (tsq, update_time, total_count, scored_count)
-              SELECT now(), now()::text, count(*), count(k_all) FROM fund_scores""")
-        mm = pg("SELECT tsq, total_count, scored_count FROM fund_scores_meta ORDER BY tsq DESC LIMIT 1")[0]
-        print(f"  ✓ fund_scores_meta 已更新: tsq={mm['tsq']}, 总数={mm['total_count']}, 已评分={mm['scored_count']}", flush=True)
+        pg("ALTER TABLE fund_scores_meta ADD COLUMN IF NOT EXISTS interface_total integer;")
+        pg(f"""INSERT INTO fund_scores_meta (tsq, update_time, total_count, scored_count, interface_total)
+              SELECT now(), now()::text, count(*), count(k_all), {int(U)} FROM fund_scores""")
+        mm = pg("SELECT tsq, total_count, scored_count, interface_total FROM fund_scores_meta ORDER BY tsq DESC LIMIT 1")[0]
+        print(f"  ✓ fund_scores_meta 已更新: tsq={mm['tsq']}, 总数={mm['total_count']}, 已评分={mm['scored_count']}, 接口全量={mm['interface_total']}", flush=True)
     except Exception as e:
         print(f'  [WARN] fund_scores_meta 时间戳更新失败（不影响评分切换）: {e}', flush=True)
 

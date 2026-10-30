@@ -56,6 +56,49 @@ def canonical_fund_code(raw):
         return code
     return code + '.OF'
 
+
+def is_on_exchange(code):
+    """场内基金（ETF/LOF/封闭）：沪市 5xxxxx、深市 15xxxx/16xxxx。其余为场外。"""
+    if not code or len(code) != 6 or not code.isdigit():
+        return False
+    return code.startswith('5') or code.startswith('15') or code.startswith('16')
+
+
+def map_type(mt):
+    """主列表 type 字段（如 "混合型基金"/"ETF-场内"/"QDII-股票"）→ (t0一级, t1二级, t1_tt展示)。
+    t1_tt 保留完整主列表类型（经理图鉴展示用）；t0 归一到 fund_scores 大类词汇。
+    与 sync_etfs_to_fund_scores.py / reconcile_fund_universe.py 的口径一致。"""
+    if not mt:
+        return ('', '', '')
+    t = mt.strip()
+    if 'ETF' in t:
+        base = 'ETF'
+    elif 'LOF' in t:
+        base = 'LOF'
+    elif t.startswith('QDII') or '海外' in t or '全球' in t:
+        base = 'QDII'
+    elif '货币' in t:
+        base = '货币型'
+    elif '债券' in t:
+        base = '债券型'
+    elif '股票' in t:
+        base = '股票型'
+    elif '混合' in t:
+        base = '混合型'
+    elif '指数' in t:
+        base = '指数型'
+    elif 'FOF' in t.upper():
+        base = 'FOF'
+    elif '保本' in t:
+        base = '保本型'
+    elif '理财' in t:
+        base = '理财型'
+    elif '封闭' in t:
+        base = '封闭式'
+    else:
+        base = t
+    return (base, t, t)
+
 # 整类抓取重试（根治上游瞬时空响应：某大类首页返回空 datas 致 staging 该大类=0、
 # promote 校验 80% 阈值整批拒绝、流水线直接挂掉。历史已发生多次：8/19 股票型、10/17 混合型）。
 # 首页即空或中页空且未达声明总数 → 判为上游瞬时抽风，整类指数退避重试最多 FT_MAX_RETRY 次；
@@ -534,7 +577,10 @@ def _qdii_syl(raw, name):
     return m.group(1) if m else ''
 
 def _parse_pingzhong_qdii(code, t1_tt, raw):
-    """解析单只 pingzhongdata，返回与 fetch_funds 同结构的 fund dict。"""
+    """解析单只 pingzhongdata，返回与 fetch_funds 同结构的 fund dict。
+    t0/t1 由主列表类型 map_type 推导（QDII→QDII、ETF-场内→ETF 等），使同一解析器
+    既服务 QDII 也服务场内 ETF/LOF/封闭，分类口径与 sync_etfs/reconcile 完全一致。"""
+    t0, t1, _ = map_type(t1_tt)
     r1m = _return_float(_qdii_syl(raw, 'syl_1y'))   # 近1月
     r3m = _return_float(_qdii_syl(raw, 'syl_3y'))   # 近3月
     r6m = _return_float(_qdii_syl(raw, 'syl_6y'))   # 近6月
@@ -594,8 +640,8 @@ def _parse_pingzhong_qdii(code, t1_tt, raw):
     return {
         'c': canonical_fund_code(code),
         'n': _qdii_fund_name(raw),
-        't0': 'QDII',
-        't1': t1_tt,
+        't0': t0 or '其他',
+        't1': t1 or t1_tt,
         't1_tt': t1_tt,
         't2': t1_tt,
         't6': '',
@@ -655,6 +701,79 @@ def fetch_qdii_full():
     return results
 
 
+# ── 场内 ETF/LOF/封闭 全量并入主拉取 ───────────────────────────────────────
+# 背景：此前场内 ETF/LOF 只由 sync_etfs_to_fund_scores（仅标签关联）和 reconcile
+# （仅骨架补录）在 promote 之后补进生产，不进 staging、不被评分、也不随主流程更新。
+# 用户要求：ETF 和这些以前没拉的产品，要并进每天夜里一起拉、一起评分、一起 promote。
+# 实现：从主列表取全部场内代码（沪市5xxxxx/深市15xxxxx/16xxxxx），逐只 pingzhongdata
+# 取净值/阶段收益，复用 _parse_pingzhong_qdii（t0 由 map_type 推导，口径统一），
+# 直接汇入 all_funds → funds_output.ndjson → staging → promote，与场外基金同等待遇。
+def fetch_etf_master_codes():
+    """从东方财富全量主列表取所有场内基金代码+类型（沪市5xxxxx、深市15xxxxx/16xxxxx）。"""
+    try:
+        r = subprocess.run(
+            ['curl', '-s', '--max-time', '40', '-H',
+             'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', MASTER_QDII_URL],
+            capture_output=True, text=True, timeout=50)
+        txt = r.stdout
+        m = re.search(r'var r\s*=\s*(\[.*\]);', txt, re.S)
+        if not m:
+            print('  ⚠ 主列表解析失败，场内 ETF/LOF 跳过', flush=True)
+            return []
+        rows = re.findall(r'\["([0-9]{6})","([^"]*)","([^"]*)","([^"]*)","([^"]*)"\]', m.group(1))
+        out = []
+        for code, _py, name, t, _py3 in rows:
+            if is_on_exchange(code):
+                out.append((code, t))
+        print(f'  [ok] 主列表场内基金 {len(out)} 只', flush=True)
+        return out
+    except Exception as e:
+        print(f'  ⚠ 主列表拉取异常: {e}', flush=True)
+        return []
+
+
+def parse_pingzhong(code, t1_tt):
+    """通用逐只 pingzhongdata 解析（场内 ETF/LOF/封闭用）；t0 由 map_type 推导。"""
+    url = PINGZHONG_URL.format(code=code)
+    for _ in range(2):
+        try:
+            r = subprocess.run(['curl', '-s', '--max-time', '25',
+                '-H', 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+                '-H', 'Referer: https://fund.eastmoney.com/', url],
+                capture_output=True, text=True, timeout=30)
+            if r.stdout and 'fS_name' in r.stdout:
+                return _parse_pingzhong_qdii(code, t1_tt, r.stdout)
+        except Exception:
+            pass
+        time.sleep(1)
+    return None
+
+
+def fetch_etf_full():
+    """场内 ETF/LOF/封闭 全量：主列表取名单 + pingzhongdata 逐只取指标（统一口径）。"""
+    codes = fetch_etf_master_codes()
+    if not codes:
+        print('  ⚠ 场内主列表为空，跳过场内拉取', flush=True)
+        FETCH_COMPLETENESS['etf'] = {'got': 0, 'declared': 0}
+        return []
+    print(f'  主列表场内名单: {len(codes)} 只，逐只 pingzhongdata 取指标...', flush=True)
+    results = []
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futs = {ex.submit(parse_pingzhong, code, t): code for code, t in codes}
+        done = 0
+        for f in as_completed(futs):
+            res = f.result()
+            if res:
+                results.append(res)
+            done += 1
+            if done % 200 == 0:
+                print(f'    已处理 {done}/{len(codes)}', flush=True)
+    print(f'  pingzhongdata 成功解析: {len(results)} 只')
+    # 完整性登记（非阻塞：场内解析失败多为个别基金无 pingzhongdata，不终止整条流水线）
+    FETCH_COMPLETENESS['etf'] = {'got': len(results), 'declared': len(codes)}
+    return results
+
+
 def main():
     print('=' * 60)
     print('fund_scores 全量抓取 + Supabase 导入')
@@ -678,6 +797,17 @@ def main():
             print(f'  → 已落盘 {FT_MAP[ft]}({ft}) {len(funds)} 条（累计 {raw_written} 条）', flush=True)
             all_funds.extend(funds)
             time.sleep(0.5)
+
+    # 1.4 场内 ETF/LOF/封闭 全量并入主拉取（用户要求：每天夜里一起拉、一起评分、一起 promote）
+    print('\n[1.4] 拉取场内 ETF/LOF/封闭全量（主列表筛选 + pingzhongdata 逐只取指标）...', flush=True)
+    etf_funds = fetch_etf_full()
+    for fund in etf_funds:
+        fo.write(json.dumps(fund, ensure_ascii=False) + '\n')
+    fo.flush()          # 拉多少存多少，立即落盘
+    raw_written += len(etf_funds)
+    all_funds.extend(etf_funds)
+    print(f'  → 已落盘 场内 {len(etf_funds)} 只（累计 {raw_written} 条）', flush=True)
+
     print(f'  中间文件 {raw_file}: {raw_written} 条（未去重）')
 
     # 去重（必须在完整性校验之前：同一只基金可能同时在多个大类里被上游返回，
@@ -749,6 +879,20 @@ def main():
                 print(f'  ✓ [{t0}] 与生产基线一致 ({ratio*100:.1f}%): {gn}/{bn}')
     except Exception as e:
         print(f'  [WARN] 生产基线比对跳过（查询失败，不影响 declared 校验）: {e}')
+
+    # 1.5b 场内 ETF/LOF 覆盖（非阻塞）：仅告警，不终止流水线
+    #     场内基金解析失败多为个别基金无 pingzhongdata（新上市/特殊品种），属常态；
+    #     仅当整体拉取严重不足（<50%）才提示，避免误杀其他基金的夜间更新。
+    etf_info = FETCH_COMPLETENESS.get('etf')
+    if etf_info and etf_info.get('declared'):
+        er = etf_info['got'] / etf_info['declared']
+        if er < 0.50:
+            print(f'  ⚠ 场内 ETF/LOF 拉取严重不足: 实际 {etf_info["got"]} / 声明 {etf_info["declared"]} '
+                  f'({er*100:.1f}%)，请检查 pingzhongdata 可用性（不阻断其他基金更新）', flush=True)
+        else:
+            print(f'  ✓ 场内 ETF/LOF: 实际 {etf_info["got"]} / 声明 {etf_info["declared"]} ({er*100:.1f}%)', flush=True)
+    else:
+        print('  · 场内 ETF/LOF: 未拉取（主列表为空或跳过）', flush=True)
 
     if incomplete or baseline_fail:
         print('\n' + '=' * 60)

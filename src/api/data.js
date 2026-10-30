@@ -493,7 +493,7 @@ async function fetchFundMetaImpl() {
     // pgrst 在 object 模式下返回 406 导致整体查询失败、截止时间显示「暂无/—」）
     const { data, error } = await supabase
       .from('fund_scores_meta')
-      .select('nav_date,total_count,scored_count,tsq,update_time')
+      .select('nav_date,total_count,scored_count,tsq,update_time,interface_total')
       .order('tsq', { ascending: false })
       .limit(1)
     if (error) {
