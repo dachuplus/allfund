@@ -344,6 +344,23 @@ def main():
     print('\n[6] 复核覆盖率...', flush=True)
     existing_exact, existing_norm = get_existing()
     report_coverage(master, existing_exact, existing_norm, args.threshold)
+
+    # [7] 回填基金评分页"覆盖数量"指标：promote 在 finalize 阶段（步骤3）快照 total_count，
+    # 早于本脚本（步骤5i）+ sync_etfs（步骤5h）补录的场内/Reits/商品骨架，导致页面展示的
+    # 覆盖数偏低。本步骤是夜跑最后一个写库环节，用最终生产表计数回填 meta.total_count，
+    # 使 FundRankPage 展示真实覆盖数（≈接口总量）。
+    try:
+        cnt_rows = run_sql("SELECT count(*) AS cnt FROM fund_scores")
+        final_cnt = int(cnt_rows[0]['cnt']) if cnt_rows else 0
+        run_sql(
+            "UPDATE fund_scores_meta SET total_count = %s "
+            "WHERE tsq = (SELECT max(tsq) FROM fund_scores_meta)",
+            [final_cnt],
+        )
+        print(f'    [7] 已回填 meta.total_count = {final_cnt}（最终生产表计数）', flush=True)
+    except Exception as e:
+        print(f'    [7] 回填 meta.total_count 失败（非致命）：{e}', flush=True)
+
     print('\n完成。', flush=True)
 
 
