@@ -491,11 +491,30 @@ async function fetchFundMetaImpl() {
   if (supabase) {
     // 取 fund_scores_meta 最新一行（用 limit(1) 而非 .single()，避免多行时
     // pgrst 在 object 模式下返回 406 导致整体查询失败、截止时间显示「暂无/—」）
-    const { data, error } = await supabase
+    // 注：interface_total 列由夜跑 promote_staging 步骤3.5 经 ALTER 创建并写入，
+    // 新列上线前若直接 SELECT 会触发「列不存在」错误 → 整体 meta 查询失败、说明行不显示。
+    // 故先带该列查询，失败则降级为不含该列的查询，保证页面在列就绪前后都可用。
+    const BASE = 'nav_date,total_count,scored_count,tsq,update_time'
+    let data = null
+    let error = null
+    const r1 = await supabase
       .from('fund_scores_meta')
-      .select('nav_date,total_count,scored_count,tsq,update_time,interface_total')
+      .select(BASE + ',interface_total')
       .order('tsq', { ascending: false })
       .limit(1)
+    if (r1.error) {
+      console.warn('[fetchFundMeta] 含 interface_total 查询失败，降级重试:', r1.error?.message || r1.error)
+      const r2 = await supabase
+        .from('fund_scores_meta')
+        .select(BASE)
+        .order('tsq', { ascending: false })
+        .limit(1)
+      data = r2.data
+      error = r2.error
+    } else {
+      data = r1.data
+      error = null
+    }
     if (error) {
       console.error('[fetchFundMeta] query error:', error)
       throw error
