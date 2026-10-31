@@ -798,15 +798,17 @@ def main():
             all_funds.extend(funds)
             time.sleep(0.5)
 
-    # 1.4 场内 ETF/LOF/封闭 全量并入主拉取（用户要求：每天夜里一起拉、一起评分、一起 promote）
-    print('\n[1.4] 拉取场内 ETF/LOF/封闭全量（主列表筛选 + pingzhongdata 逐只取指标）...', flush=True)
-    etf_funds = fetch_etf_full()
-    for fund in etf_funds:
-        fo.write(json.dumps(fund, ensure_ascii=False) + '\n')
-    fo.flush()          # 拉多少存多少，立即落盘
-    raw_written += len(etf_funds)
-    all_funds.extend(etf_funds)
-    print(f'  → 已落盘 场内 {len(etf_funds)} 只（累计 {raw_written} 条）', flush=True)
+        # 1.4 场内 ETF/LOF/封闭 全量并入主拉取（用户要求：每天夜里一起拉、一起评分、一起 promote）
+        #     ⚠️ 必须写在 with 块内：fo 在 with 退出时会被 Python 自动关闭，
+        #        写在块外会因「I/O operation on closed file」崩溃（原 2877 场内拉取事故）。
+        print('\n[1.4] 拉取场内 ETF/LOF/封闭全量（主列表筛选 + pingzhongdata 逐只取指标）...', flush=True)
+        etf_funds = fetch_etf_full()
+        for fund in etf_funds:
+            fo.write(json.dumps(fund, ensure_ascii=False) + '\n')
+        fo.flush()          # 拉多少存多少，立即落盘
+        raw_written += len(etf_funds)
+        all_funds.extend(etf_funds)
+        print(f'  → 已落盘 场内 {len(etf_funds)} 只（累计 {raw_written} 条）', flush=True)
 
     print(f'  中间文件 {raw_file}: {raw_written} 条（未去重）')
 
