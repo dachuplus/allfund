@@ -200,6 +200,7 @@ const WEEKS = [
   { key: 'w3', label: 'Week 3' },
   { key: 'w4', label: 'Week 4' },
   { key: 'w5', label: 'Week 5' },
+  { key: 'w6', label: 'Week 6' },
 ]
 const LOADERS = {
   w1: () => import('../../data/toeflJuniorW1.js'),
@@ -207,6 +208,7 @@ const LOADERS = {
   w3: () => import('../../data/toeflJuniorW3.js'),
   w4: () => import('../../data/toeflJuniorW4.js'),
   w5: () => import('../../data/toeflJuniorW5.js'),
+  w6: () => import('../../data/toeflJuniorW6.js'),
 }
 
 const weeks = WEEKS
