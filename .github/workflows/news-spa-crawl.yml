@@ -1,0 +1,41 @@
+name: 资讯SPA聚合爬虫
+
+on:
+  schedule:
+    # 每日北京时间 03:30（海外 runner 时区，约 UTC 19:30）渲染一次 SPA 资讯源
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: '只爬指定 source_key（默认全部）'
+        required: false
+        default: ''
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright + deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright requests
+          playwright install --with-deps chromium
+
+      - name: Run news SPA crawler
+        env:
+          SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+          SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.source }}" ]; then
+            ARGS="--source ${{ github.event.inputs.source }}"
+          fi
+          python3 scripts/news_spa_crawler.py $ARGS

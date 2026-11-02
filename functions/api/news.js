@@ -19,12 +19,146 @@
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 
+// Supabase（只读 publishable anon key）——用于读取 SPA 站点经定时爬虫渲染后写入的缓存表。
+const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
+const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
+
+/**
+ * 新浪娱乐「娱乐看点排行榜」由 top.ent.sina.com.cn 的 GetTopDataList 接口以 JSON-P 形式提供
+ *（页面本身为 JS 渲染，静态 HTML 无文章列表）。该接口返回 JSON-P： var <js_var> = {"data":[{title,url,...}]};
+ */
+async function parseSinaTop(s) {
+  const d = new Date()
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  const api =
+    `https://top.ent.sina.com.cn/ws/GetTopDataList.php?top_type=day&top_cat=ent_suda` +
+    `&top_time=${ymd}&top_show_num=20&top_order=DESC&js_var=all_1_data`
+  const txt = await fetchHtml(api, 9000)
+  const m = txt.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/)
+  if (!m) return []
+  let obj
+  try {
+    obj = JSON.parse(m[1])
+  } catch (e) {
+    return []
+  }
+  const arr = (obj && obj.data) || []
+  return arr
+    .slice(0, 20)
+    .map((it) => ({
+      title: htmlUnescape(it.title || ''),
+      link: it.url || '',
+      publishedAt: it.create_date
+        ? Date.parse(it.create_date + (it.create_time ? ' ' + it.create_time : ''))
+        : Date.now(),
+    }))
+    .filter((x) => x.title && x.link && /[\u4e00-\u9fff]/.test(x.title))
+}
+
+/**
+ * 新浪股票研报列表：页面为 GBK 编码，文章链接形如
+ *   <a target="_blank" title="标题" href="//stock.finance.sina.com.cn/stock/go.php/vReport_Show/kind/lastest/rptid/xxxx/index.phtml">
+ * 标题在 title 属性而非 <a> 文本，通用解析器会漏掉，故单独处理。
+ */
+function parseSinaReport(html) {
+  const out = []
+  const seen = new Set()
+  const re = /<a\b[^>]*>/gi
+  let m
+  while ((m = re.exec(html)) !== null) {
+    const tag = m[0]
+    if (!/vReport_Show/i.test(tag)) continue
+    const hrefM = tag.match(/href="([^"]+)"/i)
+    const titleM = tag.match(/title="([^"]+)"/i)
+    if (!hrefM || !titleM) continue
+    let href = hrefM[1].trim()
+    const title = htmlUnescape(titleM[1].trim())
+    if (href.startsWith('//')) href = 'https:' + href
+    else if (href.startsWith('/')) href = 'https://stock.finance.sina.com.cn' + href
+    else if (!/^https?:\/\//i.test(href)) continue
+    if (!/[\u4e00-\u9fff]/.test(title) || title.length < 4) continue
+    if (seen.has(href)) continue
+    seen.add(href)
+    out.push({ title, link: href, publishedAt: Date.now() })
+    if (out.length >= 30) break
+  }
+  return out
+}
+
+/** 读取 SPA 站点经定时爬虫渲染后写入的缓存（news_spa_cache） */
+async function readNewsSpaCache(sourceKey) {
+  const url =
+    `${SUPABASE_URL}/rest/v1/news_spa_cache?source_key=eq.${encodeURIComponent(sourceKey)}` +
+    `&select=title,url,published_at&order=fetched_at.desc`
+  const res = await fetch(url, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+  })
+  if (!res.ok) throw new Error('sb ' + res.status)
+  const rows = await res.json()
+  return (rows || []).map((r) => ({
+    title: r.title,
+    url: r.url,
+    published_at: r.published_at || '',
+  }))
+}
+
+/**
+ * 搜狐 xtopic 为 Vue 单页应用(SPA)：文章列表由前端 JS 渲染，静态 HTML 无内容、无 SSR、无公开数据接口。
+ * 数据由定时 Playwright 爬虫（scripts/news_spa_crawler.py，与基金公司投教聚合同方案）渲染写入 news_spa_cache。
+ * 缓存命中 → 直接返回；未命中（爬虫尚未运行/不可达）→ 返回 spa:true 由调用方降级为「暂不可接入」。
+ */
+async function parseSohuTopic(s) {
+  try {
+    const rows = await readNewsSpaCache('sohu')
+    if (rows.length) {
+      return {
+        spa: false,
+        items: rows.map((r) => ({
+          title: r.title,
+          link: r.url,
+          publishedAt: r.published_at ? Date.parse(r.published_at) : Date.now(),
+        })),
+      }
+    }
+  } catch (e) {
+    // 缓存读取失败不致命，降级为 pending
+  }
+  return {
+    spa: true,
+    reason:
+      '搜狐 xtopic 为 Vue 单页应用(SPA)，文章列表由前端 JS 渲染、无服务端渲染内容、无公开数据接口，边缘节点无法解析。' +
+      '已由定时 Playwright 爬虫（与基金公司投教聚合同方案）渲染写入缓存，首次运行后自动可用；当前缓存为空，请稍后刷新。',
+  }
+}
+
+/** 占位源 / SPA 未就绪：返回「暂不可接入」说明（不发起抓取、不报错重试） */
+function unavailableResponse(cat, s, reason) {
+  const body = {
+    updatedAt: new Date().toISOString(),
+    cat,
+    src: s.key,
+    source: { name: s.name, url: s.url },
+    count: 0,
+    items: [],
+    unavailable: true,
+    error: reason || '该数据源暂不可接入。',
+  }
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, s-maxage=86400',
+      'Access-Control-Allow-Origin': '*',
+    },
+  })
+}
+
 /* ============ 源注册表（分类 → 站点） ============ */
 const REGISTRY = {
   yingshi: [
-    { key: 'sina', name: '新浪娱乐', url: 'https://ent.sina.com.cn/', enc: 'auto' },
-    { key: 'sohu', name: '搜狐娱乐', url: 'https://yule.sohu.com/', enc: 'auto' },
-    { key: 'mtime', name: '时光网', url: 'https://www.mtime.com/', enc: 'auto' },
+    { key: 'sina', name: '新浪娱乐', url: 'https://ent.sina.com.cn/hotnews/ent/Daily/', parser: 'sinaTop' },
+    { key: 'sohu', name: '搜狐娱乐', url: 'https://www.sohu.com/xtopic/TURBd05EYzNORGd5', parser: 'sohuTopic' },
+    { key: 'mtime', name: '时光网', url: 'https://news.mtime.com/hot/', enc: 'auto' },
   ],
   meishi: [
     { key: 'douguo', name: '豆果美食', url: 'https://www.douguo.com/', enc: 'auto' },
@@ -46,7 +180,7 @@ const REGISTRY = {
     { key: 'morningstar', name: '晨星观点', url: 'https://www.morningstar.cn/page/insights.html', unavailable: true, reason: '晨星观点为动态渲染（SPA）且数据接口有反爬保护，边缘节点暂无法抓取。' },
   ],
   stock: [
-    { key: 'sina', name: '新浪财经·股票', url: 'https://finance.sina.com.cn/stock/', enc: 'auto' },
+    { key: 'sina', name: '新浪研报', url: 'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/lastest/index.phtml', parser: 'sinaReport' },
     { key: 'jqka', name: '同花顺', url: 'https://www.10jqka.com.cn/', enc: 'auto' },
     { key: 'cls', name: '财联社电报', url: 'https://www.cls.cn/api/v1/telegraph?page=1', enc: 'json' },
   ],
@@ -260,30 +394,24 @@ export async function onRequest(context) {
 
   // 占位源：源站为 SPA/反爬，边缘节点无法抓取，直接返回「暂不可接入」说明（不发起抓取、不报错重试）。
   if (s.unavailable) {
-    const body = {
-      updatedAt: new Date().toISOString(),
-      cat,
-      src: s.key,
-      source: { name: s.name, url: s.url },
-      count: 0,
-      items: [],
-      unavailable: true,
-      error: s.reason || '该数据源暂不可接入。',
-    }
-    return new Response(JSON.stringify(body), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=86400',
-        'Access-Control-Allow-Origin': '*',
-      },
-    })
+    return unavailableResponse(cat, s, s.reason || '该数据源暂不可接入。')
   }
 
   let items = []
   let err = null
   try {
-    if (s.enc === 'json') {
+    if (s.parser === 'sinaTop') {
+      items = await parseSinaTop(s)
+    } else if (s.parser === 'sinaReport') {
+      const html = await fetchHtml(s.url, 9000)
+      items = parseSinaReport(html)
+    } else if (s.parser === 'sohuTopic') {
+      const r = await parseSohuTopic(s)
+      if (r.spa) {
+        return unavailableResponse(cat, s, r.reason)
+      }
+      items = r.items
+    } else if (s.enc === 'json') {
       items = await fetchClsTelegraph(s.url)
     } else {
       const html = await fetchHtml(s.url, 9000)
