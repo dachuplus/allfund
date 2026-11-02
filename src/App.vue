@@ -413,12 +413,14 @@ const currentFeatureLabel = computed(() => {
 
 /* Logo */
 .govuk-header__logo {
-  margin-right: 30px;
+  margin-right: 16px;
+  flex-shrink: 0;
 }
 .govuk-header__logotype-text {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
 /* 导航区 */
@@ -439,6 +441,7 @@ const currentFeatureLabel = computed(() => {
   font-weight: 400;
   text-decoration: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 .auth-btn {
   background: transparent;
@@ -489,16 +492,19 @@ const currentFeatureLabel = computed(() => {
   display: flex;
   align-items: center;
   gap: 0;
+  flex-shrink: 0;
 }
 .govuk-header__nav-item {
   display: block;
-  padding: 12px 24px;
+  padding: 12px 12px;
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
   text-decoration: none;
   border-bottom: 4px solid transparent;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .govuk-header__nav-item:hover {
   color: #ffffff;
@@ -517,6 +523,13 @@ const currentFeatureLabel = computed(() => {
 .govuk-header__nav-item--download:hover {
   color: #ffffff;
   border-bottom-color: #ffffff;
+}
+
+/* 中等屏（769–900px）：进一步压缩，确保导航一行放得下 */
+@media (min-width: 769px) and (max-width: 900px) {
+  .govuk-header__container { padding: 0 16px; }
+  .govuk-header__logotype-text { font-size: 18px; }
+  .govuk-header__nav-item { padding: 12px 8px; font-size: 15px; }
 }
 
 /* ========== 移动端：顶部导航换行布局 ========== */
