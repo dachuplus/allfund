@@ -334,6 +334,7 @@ const quickLinks = [
   { path: '/content',          label: '娱乐', feature: 'content' },
   { path: '/blog',             label: '博客', feature: 'content-blog' },
   { path: '/signal',           label: '策略', feature: 'signal' },
+  { path: '/news',             label: '资讯', feature: null },
   { path: '/tools',  label: '选品', feature: 'fund-rank' },
   { path: '/portfolio',        label: '组合', feature: 'portfolio' },
 ]

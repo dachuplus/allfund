@@ -25,6 +25,16 @@ const routes = [
     }
   },
   {
+    path: '/news',
+    component: () => import('../pages/news/NewsAggregatorPage.vue'),
+    meta: {
+      tab: 'news',
+      title: '资讯',
+      description: '资讯聚合：在线拉取各大财经与基金资讯站点的公开内容，实时聚合、不落地存储，仅作便捷阅读入口，不构成投资建议。',
+      keywords: '资讯聚合,财经资讯,基金资讯,新闻聚合,实时资讯'
+    }
+  },
+  {
     path: '/tools',
     component: () => import('../pages/tools/SelectionPage.vue'),
     meta: {
