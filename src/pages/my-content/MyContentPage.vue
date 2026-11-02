@@ -563,7 +563,7 @@ watch(() => route.fullPath, () => {
 
 <style scoped>
 .content-page {
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   padding: var(--space-md);
 }

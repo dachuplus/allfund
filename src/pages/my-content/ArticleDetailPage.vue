@@ -142,7 +142,7 @@ watch(() => route.params.id, (newId) => {
 <style scoped>
 /* 三列 Grid：左空间 | 文章主体(680px居中) | 右空间 */
 .dp-layout {
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   padding: var(--space-md);
   display: grid;

@@ -517,7 +517,7 @@ watch(pageSize, () => { currentPage.value = 1 })
 <style scoped>
 .stock-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 4px 0 24px;
 }

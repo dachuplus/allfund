@@ -155,7 +155,7 @@
         个人观点，仅供参考，不构成任何投资建议或金融产品营销。市场有风险，投资需谨慎。
       </footer>
 
-      <!-- 底部访客计数条（对齐 1400px 内容列，gov.uk 风格） -->
+      <!-- 底部访客计数条（对齐 960px 内容列，gov.uk 风格） -->
       <footer v-if="visitorCount !== null" class="site-visitor-bar">
         <span class="site-visitor-bar__text">你是第 <strong>{{ visitorCount }}</strong> 位访客</span>
         <router-link to="/guestbook" class="site-visitor-bar__link">留言板</router-link>
@@ -400,7 +400,7 @@ const currentFeatureLabel = computed(() => {
   width: 100%;
 }
 .govuk-header__container {
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 0 15px;
   display: flex;
@@ -456,7 +456,7 @@ const currentFeatureLabel = computed(() => {
 }
 /* ========== Phase banner ========== */
 .govuk-phase-banner {
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   padding: var(--space-sm) 15px;
   border-bottom: 1px solid var(--border);
@@ -590,7 +590,7 @@ const currentFeatureLabel = computed(() => {
 .pc-main {
   padding: var(--space-xl) 30px;
   padding-bottom: var(--space-2xl);
-  max-width: 1400px;
+  max-width: 960px;
   margin: 0 auto;
   width: 100%;
 }
