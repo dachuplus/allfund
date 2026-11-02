@@ -17,18 +17,18 @@ const UA =
 
 const NAV_NOISE = /(登录|注册|首页|关于我们|关于|联系我们|隐私|版权|友情链接|设为首页|收藏|下载APP|手机|客服|免责|备案|招贤|招聘|加入我们|微博|微信|English|EN$|地图|反馈|投诉|RSS|订阅)/
 
-function detectEnc(buf, ct) {
-  if (ct && /charset=([\w-]+)/i.test(ct)) {
-    const c = ct.match(/charset=([\w-]+)/i)[1].toLowerCase()
-    if (c === 'gbk' || c === 'gb2312' || c === 'gb18030') return 'gbk'
+// 页面常误标 charset（如声明 UTF-8 实为 GBK），故不盲信 meta/header，
+// 改用「严格 UTF-8 校验」判据：GBK 字节流几乎必然含非法 UTF-8 序列 → 解码抛错 → 回退 GBK。
+function smartDecode(buf) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
+  } catch (e) {
+    try {
+      return new TextDecoder('gbk').decode(buf)
+    } catch (e2) {
+      return new TextDecoder('utf-8').decode(buf)
+    }
   }
-  // GB18030 范围内高频字节探测（简体中文站常见）
-  let gb = 0
-  for (let i = 0; i < buf.length; i++) {
-    if (buf[i] > 0x80) gb++
-    if (gb > 30 && gb > buf.length * 0.05) return 'gbk'
-  }
-  return 'utf-8'
 }
 
 function parseAnchors(html, base) {
@@ -70,10 +70,7 @@ async function fetchHtml(url) {
     })
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const buf = new Uint8Array(await res.arrayBuffer())
-    const ct = res.headers.get('content-type') || ''
-    const enc = detectEnc(buf, ct)
-    const dec = new TextDecoder(enc === 'gbk' ? 'gbk' : 'utf-8')
-    return dec.decode(buf)
+    return smartDecode(buf)
   } finally {
     clearTimeout(t)
   }
