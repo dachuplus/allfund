@@ -29,12 +29,12 @@
         v-for="s in currentSources"
         :key="s.key"
         class="news-sub"
-        :class="{ 'news-sub--active': activeSrc === s.key }"
+        :class="{ 'news-sub--active': activeSrc === s.key, 'news-sub--unavailable': s.unavailable }"
         role="tab"
         :aria-selected="activeSrc === s.key"
         @click="switchSrc(s.key)"
       >
-        {{ s.name }}
+        {{ s.name }}<span v-if="s.unavailable" class="news-sub__flag">暂不可用</span>
       </button>
     </nav>
 
@@ -42,7 +42,8 @@
     <div class="news-toolbar">
       <span class="news-cur">当前：{{ activeCatLabel }} · {{ activeSrcName }}</span>
       <span class="news-count" v-if="!loading">
-        {{ items.length > 0 ? `共 ${items.length} 条` : '暂无数据' }}
+        <template v-if="unavailableReason">暂不可接入</template>
+        <template v-else>{{ items.length > 0 ? `共 ${items.length} 条` : '暂无数据' }}</template>
         <span class="news-updated" v-if="updatedAt"> · 更新于 {{ formatTime(updatedAt) }}</span>
       </span>
       <span v-else class="news-count">加载中…</span>
@@ -65,6 +66,12 @@
       <p class="news-error__title">资讯加载失败</p>
       <p class="news-error__desc">{{ error }}</p>
       <button class="news-refresh" @click="load(true)">重试</button>
+    </div>
+
+    <!-- 占位源：源站为动态渲染/反爬，暂不可接入 -->
+    <div v-else-if="unavailableReason" class="news-unavailable" role="status">
+      <p class="news-unavailable__title">该数据源暂不可接入</p>
+      <p class="news-unavailable__desc">{{ unavailableReason }}</p>
     </div>
 
     <!-- 空态 -->
@@ -120,6 +127,9 @@ const sources = {
     { key: 'hexun', name: '和讯' },
     { key: 'chnfund', name: '中国基金报' },
     { key: 'sina', name: '新浪基金' },
+    { key: 'cls', name: '财联社基金', unavailable: true },
+    { key: 'ttjj', name: '天天基金', unavailable: true },
+    { key: 'morningstar', name: '晨星观点', unavailable: true },
   ],
   stock: [
     { key: 'sina', name: '新浪财经·股票' },
@@ -143,6 +153,7 @@ const items = ref([])
 const loading = ref(false)
 const error = ref('')
 const updatedAt = ref('')
+const unavailableReason = ref('')
 
 const currentSources = computed(() => sources[activeCat.value] || [])
 const activeCatLabel = computed(() => (cats.find((c) => c.key === activeCat.value) || {}).label || '')
@@ -162,6 +173,7 @@ async function load(force) {
   abortCtrl = new AbortController()
   loading.value = true
   error.value = ''
+  unavailableReason.value = ''
   const url = buildUrl() + (force ? '&refresh=1' : '')
   try {
     const res = await Promise.race([
@@ -172,7 +184,9 @@ async function load(force) {
     const data = await res.json()
     items.value = Array.isArray(data.items) ? data.items : []
     updatedAt.value = data.updatedAt || ''
-    if (data.error) error.value = '上游站点抓取失败：' + data.error
+    // 占位源：源站 SPA/反爬，返回 unavailable=true，展示「暂不可接入」说明（非错误、不重试）
+    unavailableReason.value = data.unavailable ? (data.error || '该数据源暂不可接入。') : ''
+    if (!data.unavailable && data.error) error.value = '上游站点抓取失败：' + data.error
   } catch (e) {
     if (e && e.name === 'AbortError') return
     error.value = (e && e.message) || '未知错误'
@@ -287,6 +301,16 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .news-sub:hover { background: #e8e7e6; }
+.news-sub--unavailable { opacity: 0.62; font-style: italic; }
+.news-sub__flag {
+  font-size: 11px;
+  font-style: normal;
+  margin-left: 6px;
+  color: #b1b4b6;
+  font-weight: 400;
+}
+.news-sub--active.news-sub--unavailable { opacity: 1; }
+.news-sub--active .news-sub__flag { color: #ffffff; }
 .news-sub--active {
   color: #ffffff;
   background: #1d70b8;
@@ -356,6 +380,16 @@ onUnmounted(() => {
 }
 .news-error__title { font-size: 20px; font-weight: 700; color: #d4351c; margin: 0 0 8px; }
 .news-error__desc { font-size: 15px; color: #505a5f; margin: 0 0 16px; }
+
+/* 占位源：暂不可接入 */
+.news-unavailable {
+  text-align: center;
+  padding: 40px 20px;
+  background: #f3f2f1;
+  border: 1px solid #b1b4b6;
+}
+.news-unavailable__title { font-size: 20px; font-weight: 700; color: #0b0c0c; margin: 0 0 8px; }
+.news-unavailable__desc { font-size: 15px; color: #505a5f; margin: 0; max-width: 640px; margin-left: auto; margin-right: auto; line-height: 1.6; }
 
 /* 骨架屏 */
 .news-loading { padding-top: 8px; }

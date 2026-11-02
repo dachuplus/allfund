@@ -39,6 +39,11 @@ const REGISTRY = {
     { key: 'hexun', name: '和讯', url: 'https://funds.hexun.com/hotnews/', enc: 'auto', linkPattern: /funds\.hexun\.com\/\d{4}-\d{2}-\d{2}\// },
     { key: 'chnfund', name: '中国基金报', url: 'https://www.chnfund.com/fund', enc: 'auto' },
     { key: 'sina', name: '新浪基金', url: 'https://finance.sina.com.cn/fund/', enc: 'auto', linkPattern: /finance\.sina\.com\.cn\/(jjxw|money\/fund)\// },
+    // —— 以下 3 个为「暂不可用」占位：源站为 JS 动态渲染(SPA) 或 数据接口有反爬保护，
+    //    边缘节点（海外出口）无法解析其文章列表。前端进入后展示「暂不可接入」说明，不报错重试。
+    { key: 'cls', name: '财联社基金', url: 'https://www.cls.cn/depth?id=1110', unavailable: true, reason: '财联社「深度」为动态渲染（SPA）且数据接口有反爬保护，边缘节点暂无法抓取。' },
+    { key: 'ttjj', name: '天天基金', url: 'https://fund.eastmoney.com/a/cjjyw.html', unavailable: true, reason: '天天基金资讯页为 JavaScript 渲染（GBK），静态 HTML 无文章列表，边缘节点无法解析。' },
+    { key: 'morningstar', name: '晨星观点', url: 'https://www.morningstar.cn/page/insights.html', unavailable: true, reason: '晨星观点为动态渲染（SPA）且数据接口有反爬保护，边缘节点暂无法抓取。' },
   ],
   stock: [
     { key: 'sina', name: '新浪财经·股票', url: 'https://finance.sina.com.cn/stock/', enc: 'auto' },
@@ -252,6 +257,28 @@ export async function onRequest(context) {
     })
   }
   const s = list.find((x) => x.key === src) || list[0]
+
+  // 占位源：源站为 SPA/反爬，边缘节点无法抓取，直接返回「暂不可接入」说明（不发起抓取、不报错重试）。
+  if (s.unavailable) {
+    const body = {
+      updatedAt: new Date().toISOString(),
+      cat,
+      src: s.key,
+      source: { name: s.name, url: s.url },
+      count: 0,
+      items: [],
+      unavailable: true,
+      error: s.reason || '该数据源暂不可接入。',
+    }
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=86400',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  }
 
   let items = []
   let err = null
