@@ -82,6 +82,18 @@
           </router-link>
         </nav>
         <div class="govuk-header__content">
+          <div class="govuk-header__width">
+            <label class="sr-only" for="hdrWidthSelect">页面宽度</label>
+            <select
+              id="hdrWidthSelect"
+              class="hdr-width-select"
+              :value="pageWidth"
+              @change="onPageWidthChange"
+              title="选择页面宽度（全站生效，记忆在本机）"
+            >
+              <option v-for="o in pageWidthOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </div>
           <div class="govuk-header__auth">
             <!-- 已登录 -->
             <template v-if="isLoggedIn">
@@ -186,10 +198,17 @@ import PermissionRequestDialog from './components/PermissionRequestDialog.vue'
 import { useAuth, FEATURES } from './composables/useAuth'
 import { useFeatureFlags, TOGGLEABLE_FEATURES } from './composables/useFeatureFlags'
 import { supabase } from './api/supabase'
-import { initPageWidth } from './composables/usePageWidth'
+import { initPageWidth, PAGE_WIDTH_OPTIONS, usePageWidth } from './composables/usePageWidth'
 
 // 启动即恢复用户上次选择的页面宽度（避免先按默认 960 渲染再跳变）
 initPageWidth()
+
+/* 页面宽度选择（顶部导航右侧，全站联动） */
+const pageWidthOptions = PAGE_WIDTH_OPTIONS
+const { current: pageWidth, applyPageWidth } = usePageWidth()
+function onPageWidthChange(e) {
+  applyPageWidth(e.target.value)
+}
 
 const route   = useRoute()
 const router  = useRouter()
@@ -434,6 +453,32 @@ const currentFeatureLabel = computed(() => {
   justify-content: flex-end;
   align-items: center;
 }
+.govuk-header__width {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.hdr-width-select {
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 0;
+  background: #ffffff;
+  color: #0b0c0c;
+  cursor: pointer;
+  max-width: 150px;
+}
 .govuk-header__auth {
   display: flex;
   align-items: center;
@@ -529,11 +574,13 @@ const currentFeatureLabel = computed(() => {
   border-bottom-color: #ffffff;
 }
 
-/* 中等屏（769–900px）：进一步压缩，确保导航一行放得下 */
-@media (min-width: 769px) and (max-width: 900px) {
+/* 中等屏（769–1000px）：进一步压缩，确保导航+宽度选择一行放得下 */
+@media (min-width: 769px) and (max-width: 1000px) {
   .govuk-header__container { padding: 0 16px; }
   .govuk-header__logotype-text { font-size: 18px; }
   .govuk-header__nav-item { padding: 12px 8px; font-size: 15px; }
+  .govuk-header__width { margin-right: 8px; }
+  .hdr-width-select { font-size: 11px; max-width: 110px; }
 }
 
 /* ========== 移动端：顶部导航换行布局 ========== */
@@ -544,6 +591,7 @@ const currentFeatureLabel = computed(() => {
     height: auto;
     padding: 10px 14px 0;
   }
+  .govuk-header__width { display: none; }
   .govuk-header__logo {
     order: 1;
     margin-right: 0;
