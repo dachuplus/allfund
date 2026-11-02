@@ -130,6 +130,13 @@ def crawl_one(browser, c):
         except Exception:
             pass
         page.wait_for_timeout(1500)
+        # 触发懒加载：多次滚动到底部，等待文章列表片段渲染（搜狐 xtopic 为无限滚动）
+        for _ in range(6):
+            try:
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            except Exception:
+                pass
+            page.wait_for_timeout(1200)
         links = extract_links(page, host, c.get("linkPattern"))
         ctx.close()
         return key, c["name"], links
