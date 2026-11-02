@@ -35,6 +35,16 @@ const routes = [
     }
   },
   {
+    path: '/toujiao',
+    component: () => import('../pages/news/ToujiaoPage.vue'),
+    meta: {
+      tab: 'toujiao',
+      title: '投教基地',
+      description: '投教基地：聚合 100 家公募基金公司投资者教育基地公开内容，按公募管理规模排序，标题即跳转链接，一键直达各公司投教原文。',
+      keywords: '投教基地,投资者教育,基金公司投教,公募投教,基金投教内容'
+    }
+  },
+  {
     path: '/tools',
     component: () => import('../pages/tools/SelectionPage.vue'),
     meta: {

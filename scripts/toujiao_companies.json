@@ -1,0 +1,730 @@
+[
+  {
+    "rank": 1,
+    "name": "易方达基金",
+    "domain": "efunds.com.cn",
+    "edu": "https://edu.efunds.com.cn/",
+    "verified": true
+  },
+  {
+    "rank": 2,
+    "name": "华夏基金",
+    "domain": "chinaamc.com",
+    "edu": "https://edu.chinaamc.com/",
+    "verified": false
+  },
+  {
+    "rank": 3,
+    "name": "广发基金",
+    "domain": "gffunds.com.cn",
+    "edu": "https://edu.gffunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 4,
+    "name": "富国基金",
+    "domain": "fullgoal.com.cn",
+    "edu": "https://edu.fullgoal.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 5,
+    "name": "南方基金",
+    "domain": "southernfund.com",
+    "edu": "https://edu.southernfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 6,
+    "name": "嘉实基金",
+    "domain": "harvestfund.com.cn",
+    "edu": "https://edu.harvestfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 7,
+    "name": "汇添富基金",
+    "domain": "99fund.com",
+    "edu": "https://edu.99fund.com/",
+    "verified": false
+  },
+  {
+    "rank": 8,
+    "name": "华泰柏瑞基金",
+    "domain": "huaaipb.com",
+    "edu": "https://edu.huaaipb.com/",
+    "verified": false
+  },
+  {
+    "rank": 9,
+    "name": "博时基金",
+    "domain": "bosera.com",
+    "edu": "https://edu.bosera.com/",
+    "verified": false
+  },
+  {
+    "rank": 10,
+    "name": "景顺长城基金",
+    "domain": "igwfmc.com",
+    "edu": "https://edu.igwfmc.com/",
+    "verified": false
+  },
+  {
+    "rank": 11,
+    "name": "招商基金",
+    "domain": "cmfchina.com",
+    "edu": "https://edu.cmfchina.com/",
+    "verified": false
+  },
+  {
+    "rank": 12,
+    "name": "鹏华基金",
+    "domain": "phfund.com.cn",
+    "edu": "https://edu.phfund.com.cn/",
+    "verified": true
+  },
+  {
+    "rank": 13,
+    "name": "国泰基金",
+    "domain": "jxfund.com.cn",
+    "edu": "https://edu.jxfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 14,
+    "name": "华安基金",
+    "domain": "huaan.com.cn",
+    "edu": "https://edu.huaan.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 15,
+    "name": "工银瑞信基金",
+    "domain": "icbccs.com.cn",
+    "edu": "https://edu.icbccs.com.cn/",
+    "verified": true
+  },
+  {
+    "rank": 16,
+    "name": "永赢基金",
+    "domain": "maxwealthfund.com",
+    "edu": "https://edu.maxwealthfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 17,
+    "name": "中欧基金",
+    "domain": "zofund.com",
+    "edu": "https://edu.zofund.com/",
+    "verified": false
+  },
+  {
+    "rank": 18,
+    "name": "天弘基金",
+    "domain": "thfund.com.cn",
+    "edu": "https://edu.thfund.com.cn/",
+    "verified": true
+  },
+  {
+    "rank": 19,
+    "name": "中银基金",
+    "domain": "bocim.com",
+    "edu": "https://edu.bocim.com/",
+    "verified": false
+  },
+  {
+    "rank": 20,
+    "name": "兴证全球基金",
+    "domain": "xqfunds.com",
+    "edu": "https://edu.xqfunds.com/",
+    "verified": true
+  },
+  {
+    "rank": 21,
+    "name": "银华基金",
+    "domain": "yhfund.com.cn",
+    "edu": "https://edu.yhfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 22,
+    "name": "平安基金",
+    "domain": "pinganfund.com",
+    "edu": "https://edu.pinganfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 23,
+    "name": "大成基金",
+    "domain": "dcfund.com.cn",
+    "edu": "https://edu.dcfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 24,
+    "name": "兴业基金",
+    "domain": "cib-fund.com.cn",
+    "edu": "https://edu.cib-fund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 25,
+    "name": "交银施罗德基金",
+    "domain": "jysld.com",
+    "edu": "https://edu.jysld.com/",
+    "verified": false
+  },
+  {
+    "rank": 26,
+    "name": "华宝基金",
+    "domain": "fund001.com",
+    "edu": "https://edu.fund001.com/",
+    "verified": false
+  },
+  {
+    "rank": 27,
+    "name": "建信基金",
+    "domain": "ccbfund.cn",
+    "edu": "https://edu.ccbfund.cn/",
+    "verified": false
+  },
+  {
+    "rank": 28,
+    "name": "海富通基金",
+    "domain": "hftfund.com",
+    "edu": "https://edu.hftfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 29,
+    "name": "国寿安保基金",
+    "domain": "guoshengan.com",
+    "edu": "https://edu.guoshengan.com/",
+    "verified": false
+  },
+  {
+    "rank": 30,
+    "name": "上海东方证券资产",
+    "domain": "dfham.com",
+    "edu": "https://edu.dfham.com/",
+    "verified": false
+  },
+  {
+    "rank": 31,
+    "name": "上银基金",
+    "domain": "boscam.com.cn",
+    "edu": "https://edu.boscam.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 32,
+    "name": "浦银安盛基金",
+    "domain": "pyaxa.com",
+    "edu": "https://edu.pyaxa.com/",
+    "verified": false
+  },
+  {
+    "rank": 33,
+    "name": "万家基金",
+    "domain": "wjasset.com",
+    "edu": "https://edu.wjasset.com/",
+    "verified": false
+  },
+  {
+    "rank": 34,
+    "name": "国投瑞银基金",
+    "domain": "ubssdic.com",
+    "edu": "https://edu.ubssdic.com/",
+    "verified": false
+  },
+  {
+    "rank": 35,
+    "name": "长城基金",
+    "domain": "ccdfund.com.cn",
+    "edu": "https://edu.ccdfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 36,
+    "name": "华商基金",
+    "domain": "hsfund.com",
+    "edu": "https://edu.hsfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 37,
+    "name": "鑫元基金",
+    "domain": "xyfunds.com.cn",
+    "edu": "https://edu.xyfunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 38,
+    "name": "农银汇理基金",
+    "domain": "abc-ca.com",
+    "edu": "https://edu.abc-ca.com/",
+    "verified": false
+  },
+  {
+    "rank": 39,
+    "name": "中加基金",
+    "domain": "fundca.com",
+    "edu": "https://edu.fundca.com/",
+    "verified": false
+  },
+  {
+    "rank": 40,
+    "name": "摩根基金",
+    "domain": "jpmorgan.com.cn",
+    "edu": "https://edu.jpmorgan.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 41,
+    "name": "民生加银基金",
+    "domain": "msjud.com",
+    "edu": "https://edu.msjud.com/",
+    "verified": false
+  },
+  {
+    "rank": 42,
+    "name": "国联基金",
+    "domain": "guolian.com.cn",
+    "edu": "https://edu.guolian.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 43,
+    "name": "中银国际证券",
+    "domain": "bocifund.com",
+    "edu": "https://edu.bocifund.com/",
+    "verified": false
+  },
+  {
+    "rank": 44,
+    "name": "创金合信基金",
+    "domain": "cjhxfund.com",
+    "edu": "https://edu.cjhxfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 45,
+    "name": "鹏扬基金",
+    "domain": "pyfund.com.cn",
+    "edu": "https://edu.pyfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 46,
+    "name": "东方基金",
+    "domain": "orient-fund.com",
+    "edu": "https://edu.orient-fund.com/",
+    "verified": false
+  },
+  {
+    "rank": 47,
+    "name": "财通证券资管",
+    "domain": "cnta-zg.com",
+    "edu": "https://edu.cnta-zg.com/",
+    "verified": false
+  },
+  {
+    "rank": 48,
+    "name": "国联安基金",
+    "domain": "guolian-an.com",
+    "edu": "https://edu.guolian-an.com/",
+    "verified": false
+  },
+  {
+    "rank": 49,
+    "name": "泰康基金",
+    "domain": "tkfunds.com",
+    "edu": "https://edu.tkfunds.com/",
+    "verified": false
+  },
+  {
+    "rank": 50,
+    "name": "中信保诚基金",
+    "domain": "citic-pru.com",
+    "edu": "https://edu.citic-pru.com/",
+    "verified": false
+  },
+  {
+    "rank": 51,
+    "name": "中信证券资管",
+    "domain": "citicfund.com",
+    "edu": "https://edu.citicfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 52,
+    "name": "中金基金",
+    "domain": "ciccfund.com",
+    "edu": "https://edu.ciccfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 53,
+    "name": "诺安基金",
+    "domain": "noan.com.cn",
+    "edu": "https://edu.noan.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 54,
+    "name": "长信基金",
+    "domain": "cxfund.com.cn",
+    "edu": "https://edu.cxfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 55,
+    "name": "中庚基金",
+    "domain": "zgfunds.com.cn",
+    "edu": "https://edu.zgfunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 56,
+    "name": "安信基金",
+    "domain": "essenceasset.com",
+    "edu": "https://edu.essenceasset.com/",
+    "verified": false
+  },
+  {
+    "rank": 57,
+    "name": "财通基金",
+    "domain": "cnta.com.cn",
+    "edu": "https://edu.cnta.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 58,
+    "name": "睿远基金",
+    "domain": "reyuanfund.com",
+    "edu": "https://edu.reyuanfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 59,
+    "name": "前海开源基金",
+    "domain": "qhkyfund.com.cn",
+    "edu": "https://edu.qhkyfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 60,
+    "name": "西部利得基金",
+    "domain": "wlfunds.com.cn",
+    "edu": "https://edu.wlfunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 61,
+    "name": "诺德基金",
+    "domain": "nuode.com",
+    "edu": "https://edu.nuode.com/",
+    "verified": false
+  },
+  {
+    "rank": 62,
+    "name": "德邦基金",
+    "domain": "dbfund.com.cn",
+    "edu": "https://edu.dbfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 63,
+    "name": "红土创新基金",
+    "domain": "htcxmc.com",
+    "edu": "https://edu.htcxmc.com/",
+    "verified": false
+  },
+  {
+    "rank": 64,
+    "name": "中邮基金",
+    "domain": "cmsfunds.com.cn",
+    "edu": "https://edu.cmsfunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 65,
+    "name": "宏利基金",
+    "domain": "manulife.com.cn",
+    "edu": "https://edu.manulife.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 66,
+    "name": "光大保德信基金",
+    "domain": "ebscn.com",
+    "edu": "https://edu.ebscn.com/",
+    "verified": false
+  },
+  {
+    "rank": 67,
+    "name": "宝盈基金",
+    "domain": "baoying.com.cn",
+    "edu": "https://edu.baoying.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 68,
+    "name": "银河基金",
+    "domain": "galaxyasset.com",
+    "edu": "https://edu.galaxyasset.com/",
+    "verified": false
+  },
+  {
+    "rank": 69,
+    "name": "申万菱信基金",
+    "domain": "swsmu.com",
+    "edu": "https://edu.swsmu.com/",
+    "verified": false
+  },
+  {
+    "rank": 70,
+    "name": "融通基金",
+    "domain": "rufund.com.cn",
+    "edu": "https://edu.rufund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 71,
+    "name": "国海富兰克林基金",
+    "domain": "ftfund.com",
+    "edu": "https://edu.ftfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 72,
+    "name": "中海基金",
+    "domain": "zhfunds.com",
+    "edu": "https://edu.zhfunds.com/",
+    "verified": false
+  },
+  {
+    "rank": 73,
+    "name": "金鹰基金",
+    "domain": "gefund.com.cn",
+    "edu": "https://edu.gefund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 74,
+    "name": "招商证券资管",
+    "domain": "cmsamt.com",
+    "edu": "https://edu.cmsamt.com/",
+    "verified": false
+  },
+  {
+    "rank": 75,
+    "name": "兴证证券资管",
+    "domain": "xzaz.com",
+    "edu": "https://edu.xzaz.com/",
+    "verified": false
+  },
+  {
+    "rank": 76,
+    "name": "东证资管",
+    "domain": "dfham.com",
+    "edu": "https://edu.dfham.com/",
+    "verified": false
+  },
+  {
+    "rank": 77,
+    "name": "汇丰晋信基金",
+    "domain": "hsbcjt.com",
+    "edu": "https://edu.hsbcjt.com/",
+    "verified": false
+  },
+  {
+    "rank": 78,
+    "name": "信达澳亚基金",
+    "domain": "cinda.com.cn",
+    "edu": "https://edu.cinda.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 79,
+    "name": "华富基金",
+    "domain": "hffund.com",
+    "edu": "https://edu.hffund.com/",
+    "verified": false
+  },
+  {
+    "rank": 80,
+    "name": "泰信基金",
+    "domain": "taixin.com",
+    "edu": "https://edu.taixin.com/",
+    "verified": false
+  },
+  {
+    "rank": 81,
+    "name": "天治基金",
+    "domain": "tzfund.com",
+    "edu": "https://edu.tzfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 82,
+    "name": "益民基金",
+    "domain": "ymfund.com",
+    "edu": "https://edu.ymfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 83,
+    "name": "新华基金",
+    "domain": "ncfund.com.cn",
+    "edu": "https://edu.ncfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 84,
+    "name": "长盛基金",
+    "domain": "csfund.com.cn",
+    "edu": "https://edu.csfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 85,
+    "name": "国金基金",
+    "domain": "gjfund.com",
+    "edu": "https://edu.gjfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 86,
+    "name": "英大基金",
+    "domain": "ydfund.com",
+    "edu": "https://edu.ydfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 87,
+    "name": "中融基金",
+    "domain": "zrfunds.com.cn",
+    "edu": "https://edu.zrfunds.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 88,
+    "name": "九泰基金",
+    "domain": "jiutaifunds.com",
+    "edu": "https://edu.jiutaifunds.com/",
+    "verified": false
+  },
+  {
+    "rank": 89,
+    "name": "弘毅远方基金",
+    "domain": "hongyi.com",
+    "edu": "https://edu.hongyi.com/",
+    "verified": false
+  },
+  {
+    "rank": 90,
+    "name": "凯石基金",
+    "domain": "ksfund.com",
+    "edu": "https://edu.ksfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 91,
+    "name": "博道基金",
+    "domain": "bdfund.com",
+    "edu": "https://edu.bdfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 92,
+    "name": "朱雀基金",
+    "domain": "zque.com",
+    "edu": "https://edu.zque.com/",
+    "verified": false
+  },
+  {
+    "rank": 93,
+    "name": "惠升基金",
+    "domain": "hsfund.com.cn",
+    "edu": "https://edu.hsfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 94,
+    "name": "同泰基金",
+    "domain": "ttfund.com",
+    "edu": "https://edu.ttfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 95,
+    "name": "西藏东财基金",
+    "domain": "dfcffund.com",
+    "edu": "https://edu.dfcffund.com/",
+    "verified": false
+  },
+  {
+    "rank": 96,
+    "name": "蜂巢基金",
+    "domain": "fcfrom.com",
+    "edu": "https://edu.fcfrom.com/",
+    "verified": false
+  },
+  {
+    "rank": 97,
+    "name": "淳厚基金",
+    "domain": "chfund.com",
+    "edu": "https://edu.chfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 98,
+    "name": "达诚基金",
+    "domain": "dcfund.com.cn",
+    "edu": "https://edu.dcfund.com.cn/",
+    "verified": false
+  },
+  {
+    "rank": 99,
+    "name": "瑞达基金",
+    "domain": "ruida.com",
+    "edu": "https://edu.ruida.com/",
+    "verified": false
+  },
+  {
+    "rank": 100,
+    "name": "尚正基金",
+    "domain": "szfund.com",
+    "edu": "https://edu.szfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 101,
+    "name": "兴华基金",
+    "domain": "xinghua.com",
+    "edu": "https://edu.xinghua.com/",
+    "verified": false
+  },
+  {
+    "rank": 102,
+    "name": "恒越基金",
+    "domain": "hyfund.com",
+    "edu": "https://edu.hyfund.com/",
+    "verified": false
+  },
+  {
+    "rank": 103,
+    "name": "湘财基金",
+    "domain": "xc-fund.com",
+    "edu": "https://edu.xc-fund.com/",
+    "verified": false
+  },
+  {
+    "rank": 104,
+    "name": "华融基金",
+    "domain": "hrfund.com",
+    "edu": "https://edu.hrfund.com/",
+    "verified": false
+  }
+]

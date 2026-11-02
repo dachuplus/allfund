@@ -332,6 +332,7 @@ function handleRequestAccess() {
 /* ---- 全局金刚区 ---- */
 const quickLinks = [
   { path: '/news',             label: '资讯', feature: null },
+  { path: '/toujiao',          label: '投教', feature: null },
   { path: '/content',          label: '娱乐', feature: 'content' },
   { path: '/blog',             label: '博客', feature: 'content-blog' },
   { path: '/signal',           label: '策略', feature: 'signal' },
