@@ -39,8 +39,7 @@
               title="点击跳转该公司投教基地"
               @click.stop
             >{{ c.name }}</a>
-            <span class="tj-co__scale">规模第{{ c.rank }}</span>
-            <span v-if="c.verified" class="tj-co__ok" title="域名已确认">✓</span>
+            <span v-if="c.scale != null" class="tj-co__scale">{{ c.scale.toFixed(2) }} 亿</span>
           </div>
           <p v-if="filtered.length === 0" class="tj-side__empty">无匹配公司</p>
         </div>
@@ -215,8 +214,9 @@ onUnmounted(() => {
   padding: 8px 12px; font-size: 14px; background: #ffffff; border: none;
   border-bottom: 1px solid #f3f2f1; cursor: pointer; color: #0b0c0c; outline: none;
 }
-.tj-co:hover { background: #f3f2f1; }
+.tj-co:hover:not(.tj-co--active) { background: #f3f2f1; }
 .tj-co--active { background: #1d70b8; color: #ffffff; }
+.tj-co--active:hover { background: #1d70b8; }
 .tj-co__rank { width: 28px; flex: 0 0 28px; color: #505a5f; font-variant-numeric: tabular-nums; }
 .tj-co--active .tj-co__rank { color: #ffffff; }
 .tj-co__name { flex: 1; font-weight: 700; color: inherit; text-decoration: none; }
@@ -228,8 +228,6 @@ onUnmounted(() => {
   background: #f3f2f1; padding: 2px 6px; border-radius: 2px; white-space: nowrap;
 }
 .tj-co--active .tj-co__scale { color: #ffffff; background: rgba(255,255,255,0.2); }
-.tj-co__ok { color: #00703c; font-weight: 700; }
-.tj-co--active .tj-co__ok { color: #ffffff; }
 .tj-side__empty { padding: 16px; color: #505a5f; font-size: 14px; }
 
 .tj-main { flex: 1; min-width: 0; }
