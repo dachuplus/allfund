@@ -119,6 +119,7 @@ const sources = {
     { key: 'jqka', name: '同花顺' },
     { key: 'hexun', name: '和讯' },
     { key: 'chnfund', name: '中国基金报' },
+    { key: 'sina', name: '新浪基金' },
   ],
   stock: [
     { key: 'sina', name: '新浪财经·股票' },

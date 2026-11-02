@@ -38,6 +38,7 @@ const REGISTRY = {
     { key: 'jqka', name: '同花顺', url: 'https://fund.10jqka.com.cn/jjzx_list/', enc: 'auto', excludeDomains: ['trade.5ifund.com'], linkPattern: /fund\.10jqka\.com\.cn\/\d{8}\/c\d+\.shtml/ },
     { key: 'hexun', name: '和讯', url: 'https://funds.hexun.com/hotnews/', enc: 'auto', linkPattern: /funds\.hexun\.com\/\d{4}-\d{2}-\d{2}\// },
     { key: 'chnfund', name: '中国基金报', url: 'https://www.chnfund.com/fund', enc: 'auto' },
+    { key: 'sina', name: '新浪基金', url: 'https://finance.sina.com.cn/fund/', enc: 'auto', linkPattern: /finance\.sina\.com\.cn\/(jjxw|money\/fund)\// },
   ],
   stock: [
     { key: 'sina', name: '新浪财经·股票', url: 'https://finance.sina.com.cn/stock/', enc: 'auto' },
