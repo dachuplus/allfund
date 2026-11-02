@@ -175,10 +175,18 @@
           分享
         </button>
       </div>
-      <div class="aipk-tl-period" v-if="latestPeriod">
-        {{ latestPeriod }} 月度调仓 · 各模型选基逻辑（两层）
+      <div class="aipk-periods aipk-tl-periods" v-if="timelineAllPeriods.length > 1">
+        <button
+          v-for="p in timelineAllPeriods" :key="p"
+          class="aipk-period-btn"
+          :class="{ active: activeTimelinePeriod === p }"
+          @click="timelinePeriod = p"
+        >{{ p }}</button>
+      </div>
+      <div class="aipk-tl-period" v-if="activeTimelinePeriod">
+        {{ activeTimelinePeriod }} 月度调仓 · 各模型选基逻辑（两层）
         <span class="aipk-tl-mode-note" v-if="orderedModels.length">
-          （{{ realModels.length ? realModels.length + ' 个真实模型' : '' }}{{ realModels.length && ruleModels.length ? ' + ' : '' }}{{ ruleModels.length ? ruleModels.length + ' 个规则版' : '' }}）
+          （{{ realModels.length ? realModels.length + ' 个真实模型' : '' }}{{ realModels.length && ruleModels.length ? ' + ' : '' }}{{ ruleModels.length ? ruleModels.length + ' 个规则版' : '' }}{{ activeTimelinePeriod !== latestPeriod ? ' · 历史期次' : '' }}）
         </span>
       </div>
       <div class="aipk-tl-empty" v-if="!orderedModels.length">暂无选基数据</div>
@@ -189,6 +197,7 @@
           <span class="aipk-tl-model-short" :style="{ color: m.color }">{{ m.name_short }}</span>
         </div>
         <div class="aipk-tl-pending" v-if="m.mode === 'pending'">待接入</div>
+        <div class="aipk-tl-pending" v-else-if="!timelineRowFor(m)">该期暂无选基数据</div>
         <template v-else>
           <div class="aipk-tl-layer">
             <span class="aipk-tl-tag">第一层 · 基于 fund_scores 选二级分类(t1)品类（真实收益/回撤/夏普统计）</span>
@@ -197,7 +206,7 @@
           <div class="aipk-tl-layer">
             <span class="aipk-tl-tag">第二层 · 单品逻辑（多维度分析）</span>
             <div class="aipk-tl-funds">
-              <div class="aipk-tl-fund" v-for="(f, i) in (picksMap[m.id]?.picks || [])" :key="f.code">
+              <div class="aipk-tl-fund" v-for="(f, i) in (timelineRowFor(m).picks || [])" :key="f.code">
                 <span class="aipk-tl-fund-idx">{{ i + 1 }}</span>
                 <a class="aipk-fund-link" :href="fundUrl(f.code)" target="_blank" rel="noopener">
                   <span class="aipk-tl-fund-name">{{ f.name }}</span>
@@ -447,7 +456,8 @@ function providerLabel(p) {
 }
 
 const models = ref([])
-const picksMap = ref({})      // { model_id: { period_month, picks:[{code,name,weight}] } }
+const picksMap = ref({})      // { model_id: { period_month, picks:[{code,name,weight}] } }  (仅最新一期，供收益PK/组合使用)
+const picksByPeriod = ref({}) // { model_id: { period_month: row } }  (全周期，供调仓时间线按月份浏览)
 const fundReturns = ref({})    // { code: { ...returns } }
 const monthlyReturns = ref([]) // [{ model_id, period_month, ret }] 月度收益时间线
 const loading = ref(true)
@@ -584,6 +594,20 @@ const timelinePeriods = computed(() => {
 })
 const latestPeriod = computed(() => timelinePeriods.value[0] || null)
 
+// 调仓时间线：可按月份切换浏览（默认显示最新一期），把历史期次也放进时间线供查看
+const timelinePeriod = ref(null)
+const activeTimelinePeriod = computed(() => timelinePeriod.value || latestPeriod.value)
+const timelineAllPeriods = computed(() => {
+  const set = new Set()
+  Object.values(picksByPeriod.value).forEach(byPer => {
+    Object.keys(byPer || {}).forEach(pm => set.add(pm))
+  })
+  return [...set].sort().reverse()
+})
+function timelineRowFor(m) {
+  return picksByPeriod.value[m.id]?.[activeTimelinePeriod.value] || null
+}
+
 function modelName(id) {
   return models.value.find(m => m.id === id)?.name || id
 }
@@ -629,10 +653,14 @@ async function loadAll() {
     await loadUserModels()
     const { data: p } = await supabase.from('ai_pk_picks').select('*').order('period_month', { ascending: false })
     const byModel = {}
+    const byModelAll = {}
     for (const row of (p || [])) {
       if (!byModel[row.model_id]) byModel[row.model_id] = row
+      if (!byModelAll[row.model_id]) byModelAll[row.model_id] = {}
+      byModelAll[row.model_id][row.period_month] = row
     }
     picksMap.value = byModel
+    picksByPeriod.value = byModelAll
 
     const codes = new Set()
     for (const mid in byModel) (byModel[mid].picks || []).forEach(x => codes.add(x.code))
@@ -955,7 +983,7 @@ function drawLineupPoster(ctx, W, pad, headerH) {
 /** 调仓时间线海报：各模型第一层品类选择逻辑 */
 function drawTimelinePoster(ctx, W, pad, headerH) {
   let y = headerH + 24
-  const periodLabel = latestPeriod.value
+  const periodLabel = activeTimelinePeriod.value
     ? `${latestPeriod.value} 月度调仓 · 各模型两层选基逻辑`
     : '各模型两层选基逻辑'
   ctx.fillStyle = '#1a1a1a'
@@ -1288,6 +1316,7 @@ async function toggleModelActive(m) {
 .aipk-period-btn { padding: 4px var(--space-md); border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
 .aipk-period-btn:hover { border-color: #1d70b8; }
 .aipk-period-btn.active { background: #1d70b8; color: #fff; border-color: #1d70b8; }
+.aipk-tl-periods { margin: 0 0 var(--space-md); }
 
 .aipk-rank { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); margin-bottom: var(--space-md); }
 .aipk-rank-item { display: flex; flex-direction: column; align-items: center; padding: var(--space-md); border: 1px solid var(--border); }
