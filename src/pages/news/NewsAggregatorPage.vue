@@ -4,27 +4,43 @@
     <header class="news-header">
       <h1 class="govuk-heading-l">资讯聚合</h1>
       <p class="govuk-body news-intro">
-        在线聚合各大财经与基金资讯站点的公开内容，实时拉取、不落地存储。仅作信息整理与便捷阅读入口，不代表本站立場，不构成任何投资建议。
+        在线聚合各大资讯站点的公开内容，按领域与站点分类实时拉取、不落地存储。仅作信息整理与便捷阅读入口，不代表本站立場，不构成任何投资建议。
       </p>
     </header>
 
     <!-- 分类 tab -->
-    <nav class="news-tabs" role="tablist" aria-label="资讯分类">
+    <nav class="news-cats" role="tablist" aria-label="资讯分类">
       <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="news-tab"
-        :class="{ 'news-tab--active': activeCat === tab.key }"
+        v-for="c in cats"
+        :key="c.key"
+        class="news-cat"
+        :class="{ 'news-cat--active': activeCat === c.key }"
         role="tab"
-        :aria-selected="activeCat === tab.key"
-        @click="switchCat(tab.key)"
+        :aria-selected="activeCat === c.key"
+        @click="switchCat(c.key)"
       >
-        {{ tab.label }}
+        {{ c.label }}
+      </button>
+    </nav>
+
+    <!-- 网站子 tab -->
+    <nav class="news-subs" role="tablist" aria-label="资讯站点">
+      <button
+        v-for="s in currentSources"
+        :key="s.key"
+        class="news-sub"
+        :class="{ 'news-sub--active': activeSrc === s.key }"
+        role="tab"
+        :aria-selected="activeSrc === s.key"
+        @click="switchSrc(s.key)"
+      >
+        {{ s.name }}
       </button>
     </nav>
 
     <!-- 工具条 -->
     <div class="news-toolbar">
+      <span class="news-cur">当前：{{ activeCatLabel }} · {{ activeSrcName }}</span>
       <span class="news-count" v-if="!loading">
         {{ items.length > 0 ? `共 ${items.length} 条` : '暂无数据' }}
         <span class="news-updated" v-if="updatedAt"> · 更新于 {{ formatTime(updatedAt) }}</span>
@@ -53,60 +69,109 @@
 
     <!-- 空态 -->
     <div v-else-if="items.length === 0" class="empty-state">
-      当前分类暂无可用资讯。可能是上游站点临时不可达，请稍后刷新重试。
+      当前站点暂无可用资讯。可能是上游站点临时不可达或页面结构变动，请稍后刷新重试。
     </div>
 
     <!-- 列表 -->
     <ul v-else class="news-list">
       <li v-for="(it, i) in items" :key="it.link + i" class="news-item">
         <div class="news-item__meta">
-          <span class="tag tag-blue">{{ it.source }}</span>
+          <span class="tag tag-blue">{{ activeSrcName }}</span>
           <span class="news-item__time">{{ timeAgo(it.publishedAt) }}</span>
         </div>
         <a class="news-item__title" :href="it.link" target="_blank" rel="noopener noreferrer">{{ it.title }}</a>
-        <p v-if="it.summary" class="news-item__summary">{{ it.summary }}</p>
       </li>
     </ul>
 
     <!-- 数据来源说明 -->
     <footer class="news-foot">
-      数据来源：各资讯站点公开 RSS / 接口，经边缘节点实时聚合，不落地存储。内容著作权归原站点所有，点击标题跳转原文。
+      数据来源：各资讯站点公开列表页，经边缘节点实时聚合，不落地存储。内容著作权归原站点所有，点击标题跳转原文。
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-const tabs = [
-  { key: 'all', label: '综合' },
+const cats = [
+  { key: 'yingshi', label: '影视' },
+  { key: 'meishi', label: '美食' },
   { key: 'fund', label: '基金' },
   { key: 'stock', label: '股票' },
-  { key: 'global', label: '全球' },
+  { key: 'tech', label: '科技' },
+  { key: 'military', label: '军事' },
 ]
-const activeCat = ref('all')
+const sources = {
+  yingshi: [
+    { key: 'sina', name: '新浪娱乐' },
+    { key: 'sohu', name: '搜狐娱乐' },
+    { key: 'mtime', name: '时光网' },
+  ],
+  meishi: [
+    { key: 'douguo', name: '豆果美食' },
+    { key: 'canyin88', name: '红餐网' },
+    { key: 'meishichina', name: '美食杰' },
+  ],
+  fund: [
+    { key: 'cs', name: '中国证券报' },
+    { key: 'cnstock', name: '上海证券报' },
+    { key: 'stcn', name: '证券时报' },
+    { key: 'jqka', name: '同花顺' },
+    { key: 'hexun', name: '和讯' },
+    { key: 'chnfund', name: '中国基金报' },
+  ],
+  stock: [
+    { key: 'sina', name: '新浪财经·股票' },
+    { key: 'jqka', name: '同花顺' },
+    { key: 'cls', name: '财联社电报' },
+  ],
+  tech: [
+    { key: 'leiphone', name: '雷锋网' },
+    { key: 'ifanr', name: '爱范儿' },
+    { key: 'tmtpost', name: '钛媒体' },
+  ],
+  military: [
+    { key: 'guancha', name: '观察者网·军事' },
+    { key: 'china', name: '中华网军事' },
+  ],
+}
+
+const activeCat = ref('yingshi')
+const activeSrc = ref(sources.yingshi[0].key)
 const items = ref([])
 const loading = ref(false)
 const error = ref('')
 const updatedAt = ref('')
 
+const currentSources = computed(() => sources[activeCat.value] || [])
+const activeCatLabel = computed(() => (cats.find((c) => c.key === activeCat.value) || {}).label || '')
+const activeSrcName = computed(() => {
+  const s = (currentSources.value || []).find((x) => x.key === activeSrc.value)
+  return s ? s.name : ''
+})
+
 let abortCtrl = null
+
+function buildUrl() {
+  return '/api/news?cat=' + activeCat.value + '&src=' + activeSrc.value
+}
 
 async function load(force) {
   if (abortCtrl) abortCtrl.abort()
   abortCtrl = new AbortController()
   loading.value = true
   error.value = ''
-  const url = '/api/news?cat=' + activeCat.value + (force ? '&refresh=1' : '')
+  const url = buildUrl() + (force ? '&refresh=1' : '')
   try {
     const res = await Promise.race([
       fetch(url, { signal: abortCtrl.signal, headers: { Accept: 'application/json' } }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('请求超时（>12s），请稍后重试')), 12000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('请求超时（>15s），请稍后重试')), 15000)),
     ])
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const data = await res.json()
     items.value = Array.isArray(data.items) ? data.items : []
     updatedAt.value = data.updatedAt || ''
+    if (data.error) error.value = '上游站点抓取失败：' + data.error
   } catch (e) {
     if (e && e.name === 'AbortError') return
     error.value = (e && e.message) || '未知错误'
@@ -119,6 +184,13 @@ async function load(force) {
 function switchCat(key) {
   if (key === activeCat.value) return
   activeCat.value = key
+  activeSrc.value = (sources[key] && sources[key][0].key) || ''
+  items.value = []
+  load(false)
+}
+function switchSrc(key) {
+  if (key === activeSrc.value) return
+  activeSrc.value = key
   items.value = []
   load(false)
 }
@@ -144,7 +216,9 @@ function timeAgo(ts) {
 }
 
 onMounted(load)
-onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
+onUnmounted(() => {
+  if (abortCtrl) abortCtrl.abort()
+})
 </script>
 
 <style scoped>
@@ -169,16 +243,16 @@ onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
 }
 
 /* 分类 tab */
-.news-tabs {
+.news-cats {
   display: flex;
   flex-wrap: wrap;
   gap: 0;
   border-bottom: 2px solid #b1b4b6;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
-.news-tab {
-  padding: 10px 20px;
-  font-size: 16px;
+.news-cat {
+  padding: 12px 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #1d70b8;
   background: transparent;
@@ -187,10 +261,35 @@ onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
   margin-bottom: -2px;
   cursor: pointer;
 }
-.news-tab:hover { border-bottom-color: #1d70b8; }
-.news-tab--active {
+.news-cat:hover { border-bottom-color: #1d70b8; }
+.news-cat--active {
   color: #0b0c0c;
   border-bottom-color: #1d70b8;
+}
+
+/* 网站子 tab */
+.news-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 0 4px;
+  border-bottom: 1px solid #b1b4b6;
+  margin-bottom: 16px;
+}
+.news-sub {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d70b8;
+  background: #f3f2f1;
+  border: 1px solid #b1b4b6;
+  cursor: pointer;
+}
+.news-sub:hover { background: #e8e7e6; }
+.news-sub--active {
+  color: #ffffff;
+  background: #1d70b8;
+  border-color: #1d70b8;
 }
 
 /* 工具条 */
@@ -198,8 +297,11 @@ onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 16px;
 }
+.news-cur { font-size: 14px; font-weight: 700; color: #0b0c0c; }
 .news-count { font-size: 14px; color: #505a5f; }
 .news-updated { color: #b1b4b6; }
 .news-refresh {
@@ -245,16 +347,6 @@ onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
   word-break: break-word;
 }
 .news-item__title:hover { color: #1d70b8; text-decoration: underline; }
-.news-item__summary {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #505a5f;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
 /* 错误态 */
 .news-error {
@@ -283,7 +375,7 @@ onUnmounted(() => { if (abortCtrl) abortCtrl.abort() })
 
 @media (max-width: 640px) {
   .govuk-heading-l { font-size: 28px; }
+  .news-cat { padding: 10px 16px; font-size: 16px; }
   .news-item__title { font-size: 16px; }
-  .news-tab { padding: 8px 14px; font-size: 15px; }
 }
 </style>

@@ -1,249 +1,281 @@
 /**
  * EdgeOne Pages Function — 资讯聚合（在线拉取，不落地）
- * 路由： GET /api/news?cat=all|finance|fund|stock|global&refresh=1
+ * 路由： GET /api/news?cat=<分类>&src=<站点key>&refresh=1
  *
  * 设计原则：
- *  1. 数据不落地：所有资讯在边缘节点实时抓取、归一化、返回 JSON，不写库、不写盘。
- *  2. 多源容错：每个源独立 fetch + 超时 + 解析；单源失败不影响整体，返回空数组。
- *  3. 同源边缘缓存：Cache-Control s-maxage=300 + stale-while-revalidate，降低上游压力、加速响应。
- *  4. 分类策略：
- *     - 综合(finance)：以新浪财经要闻为可靠主干；
- *     - 基金(fund)/股票(stock)/全球(global)：除各自专属源外，新浪主干中标题命中关键词
- *       （基金/ETF/净值/公募 → fund；A股/港股/美股/个股 → stock；美股/全球/美联储/海外 → global）
- *       的文章会自动归入对应分类，保证每个 tab 都有内容。
+ *  1. 数据不落地：在边缘节点实时抓取各站点公开列表页、归一化返回 JSON，不写库、不写盘。
+ *  2. 分源聚合：每个「分类 tab → 网站子 tab」对应一次独立抓取；单源失败不影响其它。
+ *  3. 同源边缘缓存：s-maxage=180 + stale-while-revalidate，降低上游压力、加速响应。
+ *  4. 编码自适应：自动探测 UTF-8 / GBK(GB2312/GB18030) 并正确解码，避免中文乱码。
+ *  5. 通用解析：以 <a> 标题抽取为主，配合每源可选过滤（排除域/链接模式/关键词）。
  *
- * 注意：本函数运行在 EdgeOne 海外边缘节点，出口 IP 为海外，部分国内站点可能不可达；
- * 不可达的源会在线上实测后从 SOURCES 中剔除（添加/移除源为单点改动）。
+ * 说明：本函数运行在 EdgeOne 海外边缘节点。实测以下站点从此出口可达（带浏览器 UA + 本站 Referer）：
+ *   新浪娱乐/搜狐娱乐/时光网/豆果美食/红餐网/美食杰/中国证券报/上海证券报/证券时报/
+ *   同花顺(基金)/和讯/中国基金报/新浪财经股票/同花顺/财联社电报/雷锋网/爱范儿/钛媒体/
+ *   观察者网军事/中华网军事。
+ *   财联社「深度」(cls depth) 与 东方财富基金页 为 JS 渲染/SPA，无稳定公开接口，暂不接入。
  */
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+
+/* ============ 源注册表（分类 → 站点） ============ */
+const REGISTRY = {
+  yingshi: [
+    { key: 'sina', name: '新浪娱乐', url: 'https://ent.sina.com.cn/', enc: 'auto' },
+    { key: 'sohu', name: '搜狐娱乐', url: 'https://yule.sohu.com/', enc: 'auto' },
+    { key: 'mtime', name: '时光网', url: 'https://www.mtime.com/', enc: 'auto' },
+  ],
+  meishi: [
+    { key: 'douguo', name: '豆果美食', url: 'https://www.douguo.com/', enc: 'auto' },
+    { key: 'canyin88', name: '红餐网', url: 'https://www.canyin88.com/', enc: 'auto' },
+    { key: 'meishichina', name: '美食杰', url: 'https://www.meishichina.com/', enc: 'auto' },
+  ],
+  fund: [
+    { key: 'cs', name: '中国证券报', url: 'https://www.cs.com.cn/tzjj/', enc: 'auto' },
+    { key: 'cnstock', name: '上海证券报', url: 'https://www.cnstock.com/channel/10033', enc: 'auto' },
+    { key: 'stcn', name: '证券时报', url: 'https://www.stcn.com/article/list/fund.html', enc: 'auto', excludeDomains: ['stcn.com/ad/'] },
+    { key: 'jqka', name: '同花顺', url: 'https://fund.10jqka.com.cn/jjzx_list/', enc: 'auto', excludeDomains: ['trade.5ifund.com'], linkPattern: /fund\.10jqka\.com\.cn\/\d{8}\/c\d+\.shtml/ },
+    { key: 'hexun', name: '和讯', url: 'https://funds.hexun.com/hotnews/', enc: 'auto', linkPattern: /funds\.hexun\.com\/\d{4}-\d{2}-\d{2}\// },
+    { key: 'chnfund', name: '中国基金报', url: 'https://www.chnfund.com/fund', enc: 'auto' },
+  ],
+  stock: [
+    { key: 'sina', name: '新浪财经·股票', url: 'https://finance.sina.com.cn/stock/', enc: 'auto' },
+    { key: 'jqka', name: '同花顺', url: 'https://www.10jqka.com.cn/', enc: 'auto' },
+    { key: 'cls', name: '财联社电报', url: 'https://www.cls.cn/api/v1/telegraph?page=1', enc: 'json' },
+  ],
+  tech: [
+    { key: 'leiphone', name: '雷锋网', url: 'https://www.leiphone.com/', enc: 'auto' },
+    { key: 'ifanr', name: '爱范儿', url: 'https://www.ifanr.com/', enc: 'auto' },
+    { key: 'tmtpost', name: '钛媒体', url: 'https://www.tmtpost.com/', enc: 'auto' },
+  ],
+  military: [
+    { key: 'guancha', name: '观察者网·军事', url: 'https://www.guancha.cn/military/', enc: 'auto' },
+    { key: 'china', name: '中华网军事', url: 'https://military.china.com/', enc: 'auto' },
+  ],
+}
+
+/* ============ 工具 ============ */
+
+function baseOf(url) {
+  const m = url.match(/^https?:\/\/[^/]+/i)
+  return m ? m[0] : ''
+}
+
+function htmlUnescape(s) {
+  return (s || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+    .replace(/&[a-z]+;/gi, ' ')
+}
+
+function stripTags(s) {
+  return (s || '').replace(/<[^>]+>/g, '')
+}
+
+function detectEnc(buf, ct) {
+  let cs = ''
+  const cm = (ct || '').match(/charset=["']?([\w-]+)/i)
+  if (cm) cs = cm[1].toLowerCase()
+  if (!cs) {
+    const head = new TextDecoder('utf-8').decode(buf.slice(0, 1024))
+    const hm = head.match(/charset=["']?([\w-]+)/i)
+    if (hm) cs = hm[1].toLowerCase()
+  }
+  if (cs === 'gbk' || cs === 'gb2312' || cs === 'gb18030') return 'gbk'
+  return 'utf-8'
+}
+
+/** 从文本片段中尽力抽取时间（返回时间戳，失败返回 now） */
+function extractDate(s) {
+  if (!s) return Date.now()
+  let m = s.match(/(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})/)
+  if (m) {
+    const y = +m[1]
+    const mo = +m[2]
+    const d = +m[3]
+    if (y > 1970 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      let h = 0
+      let mi = 0
+      const tm = s.match(/(\d{1,2}):(\d{2})/)
+      if (tm) {
+        h = +tm[1]
+        mi = +tm[2]
+      }
+      const dt = new Date(y, mo - 1, d, h, mi)
+      if (!isNaN(dt.getTime())) return dt.getTime()
+    }
+  }
+  return Date.now()
+}
 
 /** fetch 带超时（AbortController） */
-async function fetchText(url, timeout = 8000, headers = {}) {
+async function fetchBytes(url, timeout = 9000, extraHeaders = {}) {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), timeout)
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { 'User-Agent': UA, 'Accept': '*/*', ...headers },
+      headers: {
+        'User-Agent': UA,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        ...extraHeaders,
+      },
     })
     if (!res.ok) throw new Error('HTTP ' + res.status)
-    return await res.text()
+    const buf = new Uint8Array(await res.arrayBuffer())
+    return { buf, ct: res.headers.get('content-type') || '' }
   } finally {
     clearTimeout(t)
   }
 }
 
+/** 抓取并解码 HTML（自动探测编码） */
+async function fetchHtml(url, timeout = 9000) {
+  const base = baseOf(url)
+  const { buf, ct } = await fetchBytes(url, timeout, { Referer: base + '/' })
+  const enc = detectEnc(buf, ct)
+  let text
+  try {
+    text = new TextDecoder(enc).decode(buf)
+  } catch (e) {
+    text = new TextDecoder('utf-8').decode(buf)
+  }
+  return text
+}
+
 /** fetch JSON */
 async function fetchJson(url, timeout = 8000, headers = {}) {
-  const text = await fetchText(url, timeout, { 'Accept': 'application/json', ...headers })
-  return JSON.parse(text)
-}
-
-/* ============ 解析器 ============ */
-
-/** 新浪财经要闻 JSON（feed.mix.sina.com.cn，已验证可达） */
-function parseSinaJson(text, label) {
-  const data = JSON.parse(text)
-  const arr = (data && data.result && data.result.data) || []
-  return arr.map((it) => ({
-    title: (it.title || '').replace(/<\/?[^>]+>/g, ''),
-    link: it.url || it.wapurl || '',
-    summary: (it.intro || it.summary || it.wapsummary || '').replace(/<\/?[^>]+>/g, '').slice(0, 200),
-    publishedAt: it.ctime ? Number(it.ctime) * 1000 : Date.now(),
-    source: it.media_name || label,
-    category: 'finance',
-  })).filter((x) => x.title && x.link)
-}
-
-/** 通用 RSS / Atom 解析（正则容错） */
-function parseRss(xml, source, cat) {
-  if (!xml) return []
-  const blocks = xml.match(/<item[\s\S]*?<\/item>|<entry[\s\S]*?<\/entry>/g) || []
-  const out = []
-  for (const b of blocks) {
-    const title = textOf(b, 'title')
-    if (!title) continue
-    const link = linkOf(b)
-    const desc = textOf(b, 'description') || textOf(b, 'summary') || textOf(b, 'content')
-    const pub = textOf(b, 'pubDate') || textOf(b, 'published') || textOf(b, 'updated') || textOf(b, 'dc:date')
-    out.push({
-      title: stripHtml(title).slice(0, 120),
-      link,
-      summary: stripHtml(desc).replace(/\s+/g, ' ').slice(0, 200),
-      publishedAt: parseDate(pub),
-      source,
-      category: cat,
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), timeout)
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': UA, Accept: 'application/json', ...headers },
     })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    return await res.json()
+  } finally {
+    clearTimeout(t)
   }
-  return out.filter((x) => x.title && x.link)
 }
 
-/** 东方财富基金新闻 HTML（best-effort，海外节点可达性待实测） */
-function parseEastmoneyFundHtml(html) {
-  if (!html) return []
+/* ============ 通用 HTML 解析 ============ */
+
+function parseAnchors(html, base, opts = {}) {
+  const {
+    minLen = 8,
+    maxLen = 60,
+    excludeDomains = [],
+    linkPattern = null,
+    blacklist = ['登录', '注册', '首页', '客户端', '公众号', '更多', '视频', '图片', '专题', '直播', 'APP', '下载', '返回', '导航', '搜索', '关于', '联系', '版权', '备案', '隐私'],
+  } = opts
+
   const out = []
-  const re = /<a[^>]+href="(https?:\/\/[^"]*eastmoney\.com\/[^"]+)"[^>]*>([^<]{6,80})<\/a>/g
+  const seenT = new Set()
+  const seenU = new Set()
+  const re = /<a\b[^>]*?href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
   let m
-  const seen = new Set()
   while ((m = re.exec(html)) !== null) {
-    const link = m[1]
-    const title = m[2].trim()
-    if (seen.has(title)) continue
-    seen.add(title)
-    out.push({
-      title,
-      link,
-      summary: '',
-      publishedAt: Date.now(),
-      source: '东方财富基金',
-      category: 'fund',
-    })
+    let href = m[1].trim()
+    const raw = m[2]
+    let title = htmlUnescape(stripTags(raw)).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+
+    if (!href) continue
+    if (href.startsWith('//')) href = 'https:' + href
+    else if (href.startsWith('/')) href = base + href
+    else if (!/^https?:\/\//i.test(href)) continue
+
+    if (excludeDomains.some((d) => href.includes(d))) continue
+    if (linkPattern && !linkPattern.test(href)) continue
+    if (/\.(js|css|png|jpg|jpeg|gif|ico|pdf|zip)(\?|$)/i.test(href)) continue
+    if (href.startsWith('javascript:') || href.startsWith('mailto:')) continue
+    if (!/[\u4e00-\u9fff]/.test(title)) continue
+    if (title.length < minLen || title.length > maxLen) continue
+    if (blacklist.some((b) => title.includes(b))) continue
+    if (seenT.has(title) || seenU.has(href)) continue
+    seenT.add(title)
+    seenU.add(href)
+
+    const ctx = raw + html.slice(re.lastIndex, re.lastIndex + 200)
+    out.push({ title, link: href, publishedAt: extractDate(ctx) })
     if (out.length >= 30) break
   }
   return out
 }
 
-/* ============ 文本工具 ============ */
+/* ============ 财联社电报（JSON 特例） ============ */
 
-function textOf(block, tag) {
-  const m = block.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i'))
-  return m ? m[1] : ''
+async function fetchClsTelegraph(url) {
+  const data = await fetchJson(url, 8000, {
+    Referer: 'https://www.cls.cn/telegraph',
+    Origin: 'https://www.cls.cn',
+  })
+  if (!data || data.errno === undefined) return []
+  if (data.errno !== 0) return []
+  const arr = (data.data && data.data.data) || data.data || []
+  if (!Array.isArray(arr)) return []
+  return arr
+    .slice(0, 30)
+    .map((it) => ({
+      title: htmlUnescape(stripTags(it.content || it.title || '')).slice(0, 120),
+      link: 'https://www.cls.cn/detail/' + (it.id || ''),
+      publishedAt: it.time
+        ? Number(it.time) * 1000
+        : it.created_at
+        ? Date.parse(it.created_at)
+        : Date.now(),
+    }))
+    .filter((x) => x.title)
 }
-function linkOf(block) {
-  // RSS <link>https://...</link> 或 <link href="..."/>
-  const inline = block.match(/<link[^>]*href="([^"]+)"/i)
-  if (inline) return inline[1]
-  const txt = textOf(block, 'link')
-  return (txt || '').trim()
-}
-function stripHtml(s) {
-  return (s || '').replace(/<\/?[^>]+>/g, '').replace(/&[a-z]+;/gi, ' ').trim()
-}
-function parseDate(s) {
-  if (!s) return Date.now()
-  const t = Date.parse(s)
-  return Number.isFinite(t) ? t : Date.now()
-}
-
-/** 新浪主干文章按标题关键词自动归入 基金/股票/全球 分类（返回分类数组，避免去重时丢失） */
-function autoTagCategories(item) {
-  const cats = new Set([item.category])
-  const t = item.title || ''
-  if (/(基金|ETF|净值|公募|私募|货币|债券|偏股|FOF|投顾|基金经理|份额|申购|赎回|持仓|理财)/.test(t)) cats.add('fund')
-  if (/(A股|港股|美股|个股|大盘|沪深|创业板|科创板|北证|股票|券商|上市公司|涨停|跌停|市值|板块)/.test(t)) cats.add('stock')
-  if (/(美股|全球|美联储|海外|国际|美元|汇率|黄金|原油|欧股|日经|地缘|降息|加息)/.test(t)) cats.add('global')
-  return Array.from(cats)
-}
-
-/* ============ 源注册表 ============ */
-
-const SINA_FINANCE = 'https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&num=80&r=1'
-
-/* 已实测（EdgeOne 海外边缘节点）：
- *   ✅ 新浪财经要闻 feed.mix JSON 接口 —— 稳定可达，作为主干。
- *   ✅ 财联社电报 /api/v1/telegraph       —— 可达（需带 Referer/Origin 头规避反爬）。
- *   ❌ 东方财富 / 中国基金报 / 格隆汇 / 证券时报 —— 海外 IP 被限流或超时（504/404），已剔除。
- *   ❌ 华尔街见闻 /api* 快讯接口           —— 路径返回 71404 Not Found，暂未找到可用端点。
- * 说明：剔除不可达源既保证响应速度，也避免单源超时拖累整体。新增源只需在下方 SOURCES 追加一项。
- */
-const SOURCES = [
-  {
-    id: 'sina-finance',
-    name: '新浪财经要闻',
-    cat: 'finance',
-    async fetch() {
-      const text = await fetchText(SINA_FINANCE, 9000)
-      return parseSinaJson(text, '新浪财经')
-    },
-  },
-  {
-    id: 'cls-telegraph',
-    name: '财联社电报',
-    cat: 'stock',
-    async fetch() {
-      const data = await fetchJson('https://www.cls.cn/api/v1/telegraph?page=1', 8000, {
-        'Accept': 'application/json',
-        'Referer': 'https://www.cls.cn/telegraph',
-        'Origin': 'https://www.cls.cn',
-      })
-      // 反爬 / 加载态（errno 非 0 视为无数据，不报错）
-      if (!data || data.errno === undefined) return []
-      if (data.errno !== 0) return []
-      const arr = (data.data && data.data.data) || data.data || []
-      if (!Array.isArray(arr)) return []
-      return arr.slice(0, 30).map((it) => ({
-        title: stripHtml(it.content || it.title || '').slice(0, 120),
-        link: 'https://www.cls.cn/detail/' + (it.id || ''),
-        summary: '',
-        publishedAt: (it.time ? Number(it.time) * 1000 : (it.created_at ? Date.parse(it.created_at) : Date.now())),
-        source: '财联社',
-        category: 'stock',
-      })).filter((x) => x.title)
-    },
-  },
-]
-
 
 /* ============ 主入口 ============ */
 
 export async function onRequest(context) {
   const url = new URL(context.request.url)
-  const cat = (url.searchParams.get('cat') || 'all').toLowerCase()
-  const forceRefresh = url.searchParams.get('refresh') === '1'
+  const cat = (url.searchParams.get('cat') || '').toLowerCase()
+  const src = (url.searchParams.get('src') || '').toLowerCase()
+  const force = url.searchParams.get('refresh') === '1'
 
-  const settled = await Promise.allSettled(SOURCES.map((s) => s.fetch()))
+  const list = REGISTRY[cat]
+  if (!list) {
+    return new Response(JSON.stringify({ error: 'unknown cat: ' + cat }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+  const s = list.find((x) => x.key === src) || list[0]
+
   let items = []
-  const srcStatus = {}
-  settled.forEach((r, i) => {
-    const src = SOURCES[i]
-    if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-      srcStatus[src.id] = { ok: true, count: r.value.length }
-      items = items.concat(r.value)
+  let err = null
+  try {
+    if (s.enc === 'json') {
+      items = await fetchClsTelegraph(s.url)
     } else {
-      srcStatus[src.id] = { ok: false, error: String(r.reason && r.reason.message || r.reason) }
+      const html = await fetchHtml(s.url, 9000)
+      items = parseAnchors(html, baseOf(s.url), s)
     }
-  })
-
-  // 展开分类（新浪主干按关键词自动归入 基金/股票/全球），每条保留完整分类数组
-  const enriched = items.map((it) => ({
-    ...it,
-    categories: autoTagCategories(it),
-  }))
-
-  // 去重（按标题 + 链接），保留带全部分类的单一记录
-  const seen = new Set()
-  let merged = []
-  for (const it of enriched) {
-    const key = (it.title + '|' + it.link).slice(0, 160)
-    if (seen.has(key)) continue
-    seen.add(key)
-    // category 取主分类（数组首项），供前端展示
-    merged.push({ ...it, category: it.categories[0] })
+  } catch (e) {
+    err = String((e && e.message) || e)
   }
-
-  // 按分类过滤（cat=all 不过滤；否则要求分类数组包含该分类）
-  if (cat !== 'all') {
-    merged = merged.filter((it) => (it.categories || []).includes(cat))
-  }
-
-  // 排序（最新优先）+ 截断
-  merged.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
-  const limit = 80
-  if (merged.length > limit) merged = merged.slice(0, limit)
 
   const body = {
     updatedAt: new Date().toISOString(),
     cat,
-    count: merged.length,
-    items: merged,
-    sources: srcStatus,
+    src: s.key,
+    source: { name: s.name, url: s.url },
+    count: items.length,
+    items,
+    error: err,
   }
 
-  const cacheCtrl = forceRefresh
-    ? 'no-store'
-    : 'public, s-maxage=300, stale-while-revalidate=600'
-
+  const cacheCtrl = force ? 'no-store' : 'public, s-maxage=180, stale-while-revalidate=300'
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
