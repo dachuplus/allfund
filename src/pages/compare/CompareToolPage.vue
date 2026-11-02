@@ -191,7 +191,7 @@ function isBest(key, code) {
 
 <style scoped>
 .compare-page {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: var(--space-lg) var(--space-md);
   color: var(--text-primary);

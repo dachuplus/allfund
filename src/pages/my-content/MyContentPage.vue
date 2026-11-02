@@ -1,5 +1,17 @@
 <template>
   <div class="content-page">
+    <!-- 页面宽度选择（右侧，全站联动，记忆在本地） -->
+    <div class="cp-width-bar">
+      <label class="cp-width-bar__label" for="cpWidthSelect">页面宽度</label>
+      <select
+        id="cpWidthSelect"
+        class="cp-width-bar__select"
+        :value="pageWidth"
+        @change="onPageWidthChange"
+      >
+        <option v-for="o in pageWidthOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+      </select>
+    </div>
     <!-- 二级分类导航：博客（/blog，单分类）/ 娱乐下的影视 · 美食 · 工具 · 游戏 · 奥数 · 语文 · 英文 · 信奥。
          博客模式下仅一个分类，隐藏 tab 栏；娱乐模式下多分类展示。 -->
     <div class="cp-tabs" v-if="visibleCategories.length > 1">
@@ -254,6 +266,14 @@ import { SH_RESTAURANTS_EXTRA } from '../../data/shRestaurantsExtra.js'
 import { MUST_EAT_SHANGHAI, MUST_EAT_SOURCES } from '../../data/mustEatShanghai.js'
 import { listArticles, deleteArticle, setArticlePinned, NETWORK_SLOW_MSG, isNetworkError, toErrorMessage } from '../../api/articles'
 import { confirm, toast } from '../../composables/useToast'
+import { PAGE_WIDTH_OPTIONS, usePageWidth } from '../../composables/usePageWidth'
+
+/* 页面宽度选择（首页右侧下拉框，全站联动） */
+const pageWidthOptions = PAGE_WIDTH_OPTIONS
+const { current: pageWidth, applyPageWidth } = usePageWidth()
+function onPageWidthChange(e) {
+  applyPageWidth(e.target.value)
+}
 import { useFeatureFlags } from '../../composables/useFeatureFlags'
 
 /**
@@ -563,9 +583,27 @@ watch(() => route.fullPath, () => {
 
 <style scoped>
 .content-page {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: var(--space-md);
+}
+/* 页面宽度选择条（右对齐，gov.uk 风格下拉框） */
+.cp-width-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+.cp-width-bar__label { font-size: 13px; color: #505a5f; }
+.cp-width-bar__select {
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 2px solid #0b0c0c;
+  border-radius: 0;
+  background: #ffffff;
+  color: #0b0c0c;
+  cursor: pointer;
 }
 /* Tab 栏：窗口窄时自动折成多行（不横向滑动，避免点不到后面的选项）。
    底线由每个 tab 自带，折行后每行都有一条分隔线。 */

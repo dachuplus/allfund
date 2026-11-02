@@ -465,7 +465,7 @@ onMounted(() => {
 <style scoped>
 .index-page {
   width: 100%;
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: 4px 0 24px;
 }

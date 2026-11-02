@@ -190,7 +190,7 @@ onUnmounted(() => {
 
 <style scoped>
 .tj-page {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: 30px 20px 40px;
 }

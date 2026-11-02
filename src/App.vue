@@ -186,6 +186,10 @@ import PermissionRequestDialog from './components/PermissionRequestDialog.vue'
 import { useAuth, FEATURES } from './composables/useAuth'
 import { useFeatureFlags, TOGGLEABLE_FEATURES } from './composables/useFeatureFlags'
 import { supabase } from './api/supabase'
+import { initPageWidth } from './composables/usePageWidth'
+
+// 启动即恢复用户上次选择的页面宽度（避免先按默认 960 渲染再跳变）
+initPageWidth()
 
 const route   = useRoute()
 const router  = useRouter()
@@ -400,7 +404,7 @@ const currentFeatureLabel = computed(() => {
   width: 100%;
 }
 .govuk-header__container {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: 0 15px;
   display: flex;
@@ -459,7 +463,7 @@ const currentFeatureLabel = computed(() => {
 }
 /* ========== Phase banner ========== */
 .govuk-phase-banner {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: var(--space-sm) 15px;
   border-bottom: 1px solid var(--border);
@@ -603,7 +607,7 @@ const currentFeatureLabel = computed(() => {
 .pc-main {
   padding: var(--space-xl) 30px;
   padding-bottom: var(--space-2xl);
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   width: 100%;
 }

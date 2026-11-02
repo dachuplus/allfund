@@ -238,7 +238,7 @@ onUnmounted(() => {
 
 <style scoped>
 .news-page {
-  max-width: 960px;
+  max-width: var(--pc-max-width);
   margin: 0 auto;
   padding: 30px 20px 40px;
 }
