@@ -19,19 +19,29 @@
           aria-label="搜索基金公司"
         />
         <div class="tj-side__list" role="listbox" aria-label="基金公司">
-          <button
+          <div
             v-for="c in filtered"
             :key="c.domain"
             class="tj-co"
             :class="{ 'tj-co--active': activeDomain === c.domain }"
             role="option"
             :aria-selected="activeDomain === c.domain"
+            tabindex="0"
             @click="selectCompany(c)"
+            @keydown.enter="selectCompany(c)"
           >
             <span class="tj-co__rank">{{ c.rank }}</span>
-            <span class="tj-co__name">{{ c.name }}</span>
+            <a
+              class="tj-co__name tj-co__link"
+              :href="c.edu"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="点击跳转该公司投教基地"
+              @click.stop
+            >{{ c.name }}</a>
+            <span class="tj-co__scale">规模第{{ c.rank }}</span>
             <span v-if="c.verified" class="tj-co__ok" title="域名已确认">✓</span>
-          </button>
+          </div>
           <p v-if="filtered.length === 0" class="tj-side__empty">无匹配公司</p>
         </div>
       </aside>
@@ -203,13 +213,21 @@ onUnmounted(() => {
 .tj-co {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   padding: 8px 12px; font-size: 14px; background: #ffffff; border: none;
-  border-bottom: 1px solid #f3f2f1; cursor: pointer; color: #0b0c0c;
+  border-bottom: 1px solid #f3f2f1; cursor: pointer; color: #0b0c0c; outline: none;
 }
 .tj-co:hover { background: #f3f2f1; }
 .tj-co--active { background: #1d70b8; color: #ffffff; }
 .tj-co__rank { width: 28px; flex: 0 0 28px; color: #505a5f; font-variant-numeric: tabular-nums; }
 .tj-co--active .tj-co__rank { color: #ffffff; }
-.tj-co__name { flex: 1; font-weight: 700; }
+.tj-co__name { flex: 1; font-weight: 700; color: inherit; text-decoration: none; }
+.tj-co__link { cursor: pointer; }
+.tj-co__link:hover { text-decoration: underline; }
+.tj-co--active .tj-co__name { color: #ffffff; }
+.tj-co__scale {
+  flex: 0 0 auto; font-size: 11px; line-height: 1; color: #505a5f;
+  background: #f3f2f1; padding: 2px 6px; border-radius: 2px; white-space: nowrap;
+}
+.tj-co--active .tj-co__scale { color: #ffffff; background: rgba(255,255,255,0.2); }
 .tj-co__ok { color: #00703c; font-weight: 700; }
 .tj-co--active .tj-co__ok { color: #ffffff; }
 .tj-side__empty { padding: 16px; color: #505a5f; font-size: 14px; }
