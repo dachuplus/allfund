@@ -202,14 +202,13 @@ onUnmounted(() => {
 
 .tj-layout { display: flex; gap: 24px; align-items: flex-start; }
 .tj-side {
-  width: 280px; flex: 0 0 280px; position: sticky; top: 16px;
-  max-height: calc(100vh - 40px); display: flex; flex-direction: column;
+  width: 280px; flex: 0 0 280px;
 }
 .tj-search {
   width: 100%; padding: 10px 12px; font-size: 14px; border: 2px solid #0b0c0c; margin-bottom: 10px;
   box-sizing: border-box;
 }
-.tj-side__list { overflow-y: auto; border: 1px solid #b1b4b6; flex: 1; }
+.tj-side__list { border: 1px solid #b1b4b6; }
 .tj-co {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   padding: 8px 12px; font-size: 14px; background: #ffffff; border: none;
@@ -280,7 +279,7 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .tj-layout { flex-direction: column; }
-  .tj-side { width: 100%; flex: none; position: static; max-height: 280px; }
+  .tj-side { width: 100%; flex: none; }
   .govuk-heading-l { font-size: 28px; }
   .tj-item__title { font-size: 16px; }
 }
