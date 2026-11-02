@@ -34,6 +34,8 @@ SOURCES = [
         "key": "sohu",
         "name": "搜狐娱乐",
         "url": "https://www.sohu.com/xtopic/TURBd05EYzNORGd5",
+        # 仅保留真实文章链接（sohu.com/a/<数字>_<数字>），过滤作者主页/其它话题导航等噪音
+        "linkPattern": r"sohu\.com/a/\d+_\d+",
     },
 ]
 
@@ -78,7 +80,7 @@ def ensure_table():
             log("  schema stmt ->", r.status_code, r.text[:160])
 
 
-def extract_links(page, base_host):
+def extract_links(page, base_host, pattern=None):
     try:
         anchors = page.eval_on_selector_all(
             "a",
@@ -99,6 +101,8 @@ def extract_links(page, base_host):
         from urllib.parse import urlparse
         uh = urlparse(h)
         if uh.netloc != base_host and base_host.split(".")[-2] not in uh.netloc:
+            continue
+        if pattern and not re.search(pattern, h):
             continue
         if h in seen:
             continue
@@ -126,7 +130,7 @@ def crawl_one(browser, c):
         except Exception:
             pass
         page.wait_for_timeout(1500)
-        links = extract_links(page, host)
+        links = extract_links(page, host, c.get("linkPattern"))
         ctx.close()
         return key, c["name"], links
     except Exception as e:
