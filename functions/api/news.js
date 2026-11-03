@@ -26,13 +26,15 @@ const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
 /**
  * 新浪娱乐「娱乐看点排行榜」由 top.ent.sina.com.cn 的 GetTopDataList 接口以 JSON-P 形式提供
  *（页面本身为 JS 渲染，静态 HTML 无文章列表）。该接口返回 JSON-P： var <js_var> = {"data":[{title,url,...}]};
+ * top_cat=ent_kandian_pc_24h 对应「娱乐看点排行榜」24 小时榜单（ent.sina.com.cn/hotnews/ent/Daily/ 页面所引用的接口）；
+ * 注：ent_suda 为「速达」影视榜（新蝙蝠侠/真探等电影电视剧），不是用户要的看点榜，故不用。
  */
 async function parseSinaTop(s) {
   const d = new Date()
   const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
   const api =
-    `https://top.ent.sina.com.cn/ws/GetTopDataList.php?top_type=day&top_cat=ent_suda` +
-    `&top_time=${ymd}&top_show_num=20&top_order=DESC&js_var=all_1_data`
+    `https://top.ent.sina.com.cn/ws/GetTopDataList.php?top_type=day&top_cat=ent_kandian_pc_24h` +
+    `&top_time=${ymd}&top_show_num=20&top_order=DESC&get_new=1&js_var=all_1_data`
   const txt = await fetchHtml(api, 9000)
   const m = txt.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/)
   if (!m) return []
