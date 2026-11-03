@@ -90,6 +90,76 @@ async function parseTophubDays(s) {
 }
 
 /**
+ * 中国证券报·基金动态（www.cs.com.cn/tzjj/01/list.html）：MI4 CMS，静态 HTML 无文章列表，
+ * 列表由 js/25/mi4_page_articles_guide.js 维护的 PAGE_INDEX_MAP（按日期分片
+ * mi4_sub_articles_YYYYMMDD.js）提供；每个分片为
+ *   var MI4_PAGE_ARTICLE = [{title,pub_date,url,external_link,subNm,miOrigin,...}]
+ * 取最新若干日期分片合并、按发布时间倒序，返回最新 30 条（链接优先 external_link）。
+ * 说明：原直接抓 tzjj/ 首页静态 HTML 只拿到过时的推荐位（2026-03 及更早），故改用此数据分片。
+ */
+async function parseCsFund() {
+  const guideUrl = 'https://www.cs.com.cn/js/25/mi4_page_articles_guide.js'
+  let guide = ''
+  try {
+    guide = await fetchHtml(guideUrl, 9000)
+  } catch (e) {
+    return []
+  }
+  const names = []
+  const seenNm = new Set()
+  const fre = /mi4_sub_articles_(\d{8})\.js/g
+  let fm
+  while ((fm = fre.exec(guide)) !== null) {
+    const nm = fm[0]
+    if (!seenNm.has(nm)) {
+      seenNm.add(nm)
+      names.push(nm)
+    }
+    if (names.length >= 6) break
+  }
+  if (!names.length) return []
+  const shards = await Promise.all(
+    names.map(async (nm) => {
+      try {
+        return await fetchHtml('https://www.cs.com.cn/js/25/' + nm, 9000)
+      } catch (e) {
+        return ''
+      }
+    })
+  )
+  const out = []
+  const seenLink = new Set()
+  for (const txt of shards) {
+    if (!txt) continue
+    const mm = txt.match(/MI4_PAGE_ARTICLE\s*=\s*(\[[\s\S]*\])/)
+    if (!mm) continue
+    let arr
+    try {
+      arr = JSON.parse(mm[1])
+    } catch (e) {
+      continue
+    }
+    if (!Array.isArray(arr)) continue
+    for (const a of arr) {
+      const title = htmlUnescape(a.title || '').trim()
+      let link = (a.external_link || a.url || '').trim()
+      if (!title || !link || !/[\u4e00-\u9fff]/.test(title)) continue
+      if (link.startsWith('//')) link = 'https:' + link
+      else if (!/^https?:\/\//i.test(link)) continue
+      if (seenLink.has(link)) continue
+      seenLink.add(link)
+      out.push({
+        title,
+        link,
+        publishedAt: a.pub_date ? extractDate(a.pub_date) : Date.now(),
+      })
+    }
+  }
+  out.sort((a, b) => b.publishedAt - a.publishedAt)
+  return out.slice(0, 30)
+}
+
+/**
  * 新浪股票研报列表：页面为 GBK 编码，文章链接形如
  *   <a target="_blank" title="标题" href="//stock.finance.sina.com.cn/stock/go.php/vReport_Show/kind/lastest/rptid/xxxx/index.phtml">
  * 标题在 title 属性而非 <a> 文本，通用解析器会漏掉，故单独处理。
@@ -206,7 +276,7 @@ const REGISTRY = {
     { key: 'meishichina', name: '美食杰', url: 'https://www.meishichina.com/', enc: 'auto' },
   ],
   fund: [
-    { key: 'cs', name: '中国证券报', url: 'https://www.cs.com.cn/tzjj/', enc: 'auto' },
+    { key: 'cs', name: '中国证券报', url: 'https://www.cs.com.cn/tzjj/01/list.html', parser: 'csFund' },
     { key: 'cnstock', name: '上海证券报', url: 'https://www.cnstock.com/channel/10033', enc: 'auto' },
     { key: 'stcn', name: '证券时报', url: 'https://www.stcn.com/article/list/fund.html', enc: 'auto', excludeDomains: ['stcn.com/ad/'] },
     { key: 'jqka', name: '同花顺', url: 'https://fund.10jqka.com.cn/jjzx_list/', enc: 'auto', excludeDomains: ['trade.5ifund.com'], linkPattern: /fund\.10jqka\.com\.cn\/\d{8}\/c\d+\.shtml/ },
@@ -444,6 +514,8 @@ export async function onRequest(context) {
       items = await parseSinaTop(s)
     } else if (s.parser === 'tophubDays') {
       items = await parseTophubDays(s)
+    } else if (s.parser === 'csFund') {
+      items = await parseCsFund()
     } else if (s.parser === 'sinaReport') {
       const html = await fetchHtml(s.url, 9000)
       items = parseSinaReport(html)
