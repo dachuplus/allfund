@@ -81,12 +81,31 @@
 
     <!-- 列表 -->
     <ul v-else class="news-list">
-      <li v-for="(it, i) in items" :key="it.link + i" class="news-item">
-        <div class="news-item__meta">
-          <span class="tag tag-blue">{{ activeSrcName }}</span>
-          <span class="news-item__time">{{ timeAgo(it.publishedAt) }}</span>
-        </div>
-        <a class="news-item__title" :href="it.link" target="_blank" rel="noopener noreferrer">{{ it.title }}</a>
+      <li
+        v-for="(it, i) in items"
+        :key="it.link + i"
+        class="news-item"
+        :class="{ 'news-item--bzb': isBzb }"
+      >
+        <template v-if="isBzb">
+          <div class="bzb-row">
+            <span class="bzb-rank">{{ it.rank }}</span>
+            <div class="bzb-main">
+              <a class="news-item__title" :href="it.link" target="_blank" rel="noopener noreferrer">{{ it.title }}</a>
+              <div class="bzb-meta">
+                <span class="bzb-source">{{ it.source }}</span>
+                <span class="bzb-heat">{{ it.heat }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="news-item__meta">
+            <span class="tag tag-blue">{{ activeSrcName }}</span>
+            <span class="news-item__time">{{ timeAgo(it.publishedAt) }}</span>
+          </div>
+          <a class="news-item__title" :href="it.link" target="_blank" rel="noopener noreferrer">{{ it.title }}</a>
+        </template>
       </li>
     </ul>
 
@@ -101,6 +120,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const cats = [
+  { key: 'bangzhongbang', label: '榜中榜' },
   { key: 'yingshi', label: '影视' },
   { key: 'meishi', label: '美食' },
   { key: 'fund', label: '基金' },
@@ -109,6 +129,11 @@ const cats = [
   { key: 'military', label: '军事' },
 ]
 const sources = {
+  bangzhongbang: [
+    { key: 'day', name: '日榜' },
+    { key: 'week', name: '周榜' },
+    { key: 'month', name: '月榜' },
+  ],
   yingshi: [
     { key: 'sina', name: '新浪娱乐' },
     { key: 'sohu', name: '搜狐娱乐' },
@@ -147,8 +172,8 @@ const sources = {
   ],
 }
 
-const activeCat = ref('yingshi')
-const activeSrc = ref(sources.yingshi[0].key)
+const activeCat = ref('bangzhongbang')
+const activeSrc = ref(sources.bangzhongbang[0].key)
 const items = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -161,6 +186,7 @@ const activeSrcName = computed(() => {
   const s = (currentSources.value || []).find((x) => x.key === activeSrc.value)
   return s ? s.name : ''
 })
+const isBzb = computed(() => activeCat.value === 'bangzhongbang')
 
 let abortCtrl = null
 
@@ -372,6 +398,22 @@ onUnmounted(() => {
   word-break: break-word;
 }
 .news-item__title:hover { color: #1d70b8; text-decoration: underline; }
+
+/* 榜中榜：排名序号（纯数字，无徽标）+ 来源·热度 */
+.news-item--bzb { padding: 14px 0; }
+.bzb-row { display: flex; align-items: flex-start; gap: 14px; }
+.bzb-rank {
+  flex: 0 0 30px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0b0c0c;
+  text-align: right;
+  line-height: 1.4;
+}
+.bzb-main { flex: 1 1 auto; min-width: 0; }
+.bzb-meta { margin-top: 4px; font-size: 13px; color: #505a5f; }
+.bzb-source { font-weight: 700; color: #1d70b8; }
+.bzb-heat { margin-left: 8px; }
 
 /* 错误态 */
 .news-error {

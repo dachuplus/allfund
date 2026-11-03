@@ -58,6 +58,38 @@ async function parseSinaTop(s) {
 }
 
 /**
+ * 榜中榜（tophub.today/hot）：页面静态 HTML 仅含「日榜」100 条；「周榜/月榜」由点击 tab 触发
+ * POST https://tophub.today/hot/days（表单 days=1/7/30）返回 JSON。返回字段：
+ *   title(标题) / url(原文链接) / sitename(来源平台) / views(热度，如「1614万热度」) / logo / ID。
+ * 边缘函数实时拉取、不落地、不入库，仅走 EdgeOne 边缘缓存，与现有其他源一致。
+ */
+async function parseTophubDays(s) {
+  const days = s.days || 1
+  const res = await fetch('https://tophub.today/hot/days', {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA,
+      Referer: 'https://tophub.today/hot',
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    },
+    body: 'days=' + encodeURIComponent(days),
+  })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  const data = await res.json()
+  if (!data || data.error || !Array.isArray(data.data)) return []
+  return data.data.slice(0, 100).map((x, i) => ({
+    title: htmlUnescape(x.title || ''),
+    link: x.url || '',
+    source: x.sitename || '',
+    heat: x.views || '',
+    rank: i + 1,
+    publishedAt: Date.now(),
+  }))
+}
+
+/**
  * 新浪股票研报列表：页面为 GBK 编码，文章链接形如
  *   <a target="_blank" title="标题" href="//stock.finance.sina.com.cn/stock/go.php/vReport_Show/kind/lastest/rptid/xxxx/index.phtml">
  * 标题在 title 属性而非 <a> 文本，通用解析器会漏掉，故单独处理。
@@ -157,6 +189,12 @@ function unavailableResponse(cat, s, reason) {
 
 /* ============ 源注册表（分类 → 站点） ============ */
 const REGISTRY = {
+  // 榜中榜（tophub.today/hot）：日/周/月三榜通过 POST /hot/days 取 JSON，静态 HTML 仅含日榜。
+  bangzhongbang: [
+    { key: 'day', name: '日榜', parser: 'tophubDays', days: 1 },
+    { key: 'week', name: '周榜', parser: 'tophubDays', days: 7 },
+    { key: 'month', name: '月榜', parser: 'tophubDays', days: 30 },
+  ],
   yingshi: [
     { key: 'sina', name: '新浪娱乐', url: 'https://ent.sina.com.cn/hotnews/ent/Daily/', parser: 'sinaTop' },
     { key: 'sohu', name: '搜狐娱乐', url: 'https://www.sohu.com/xtopic/TURBd05EYzNORGd5', parser: 'sohuTopic' },
@@ -404,6 +442,8 @@ export async function onRequest(context) {
   try {
     if (s.parser === 'sinaTop') {
       items = await parseSinaTop(s)
+    } else if (s.parser === 'tophubDays') {
+      items = await parseTophubDays(s)
     } else if (s.parser === 'sinaReport') {
       const html = await fetchHtml(s.url, 9000)
       items = parseSinaReport(html)
