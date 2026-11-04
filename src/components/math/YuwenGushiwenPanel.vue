@@ -18,7 +18,7 @@
     </div>
 
     <p class="gsw-sub">
-      {{ title }}　{{ isDoc ? '复习文档（可搜索）' : '共 ' + list.length + ' 题（含答案与解析）' }}{{ loading ? '　加载中…' : '' }}
+      {{ title }}　{{ isDoc ? '复习文档（可搜索）' : '共 ' + questions.length + ' 题（含答案与解析）' }}{{ loading ? '　加载中…' : '' }}
     </p>
 
     <!-- 知识点文档视图 -->
@@ -86,53 +86,60 @@
       </button>
     </div>
 
-    <!-- 题目列表 -->
+    <!-- 题目列表（题目与「专题讲义」块按原文顺序混排：讲义块单独成卡，不串入题目） -->
     <div v-if="!pageItems.length" class="gsw-empty">
-      {{ onlyWrong ? '答错的题目会在这里～先做几道题吧' : '没有匹配的题目' }}
+      {{ onlyWrong ? '答错的题目会在这里～先做几道题吧' : '没有匹配的内容' }}
     </div>
     <div v-else class="gsw-list">
-      <div
-        v-for="item in pageItems"
-        :key="item.id"
-        class="gsw-card"
-        :class="{ open: revealed[item.id] || revealAll }"
-      >
-        <div class="gsw-q">
-          <span class="gsw-n">第 {{ item.id }} 题</span>
-          <span class="gsw-qtext">{{ item.q }}</span>
+      <template v-for="item in pageItems" :key="item.kind === 'doc' ? 'doc-' + (item.title || 'x') : item.id">
+        <!-- 专题讲义块：单独展示 -->
+        <div v-if="item.kind === 'doc'" class="gsw-docblock">
+          <div class="gsw-docblock-bar">{{ item.title || '专题讲义' }}</div>
+          <p v-for="(para, pi) in docParas(item.body)" :key="pi" class="gsw-docblock-p">{{ para }}</p>
         </div>
-
-        <div class="gsw-opts">
-          <button
-            v-for="(opt, i) in item.options"
-            :key="i"
-            type="button"
-            class="gsw-opt"
-            :class="optClass(item, i)"
-            @click="select(item, i)"
-          >
-            <span class="gsw-opt-key">{{ String.fromCharCode(65 + i) }}</span>
-            <span class="gsw-opt-text">{{ opt }}</span>
-          </button>
-        </div>
-
-        <!-- 展开：答案 + 解析 -->
-        <div v-if="revealed[item.id] || revealAll" class="gsw-ans">
-          <div class="gsw-ans-line">
-            <span class="gsw-ans-label">答案</span>
-            <span class="gsw-ans-key">{{ item.answer }}</span>
-            <span v-if="selected[item.id]" class="gsw-verdict" :class="isCorrect(item) ? 'ok' : 'no'">
-              {{ isCorrect(item) ? '答对了' : '答错了' }}
-            </span>
+        <!-- 题目卡片 -->
+        <div
+          v-else
+          class="gsw-card"
+          :class="{ open: revealed[item.id] || revealAll }"
+        >
+          <div class="gsw-q">
+            <span class="gsw-n">第 {{ item.id }} 题</span>
+            <span class="gsw-qtext">{{ item.q }}</span>
           </div>
-          <p class="gsw-analysis">
-            <span class="gsw-ans-label">解析</span>{{ item.analysis }}
-          </p>
+
+          <div class="gsw-opts">
+            <button
+              v-for="(opt, i) in item.options"
+              :key="i"
+              type="button"
+              class="gsw-opt"
+              :class="optClass(item, i)"
+              @click="select(item, i)"
+            >
+              <span class="gsw-opt-key">{{ String.fromCharCode(65 + i) }}</span>
+              <span class="gsw-opt-text">{{ opt }}</span>
+            </button>
+          </div>
+
+          <!-- 展开：答案 + 解析 -->
+          <div v-if="revealed[item.id] || revealAll" class="gsw-ans">
+            <div class="gsw-ans-line">
+              <span class="gsw-ans-label">答案</span>
+              <span class="gsw-ans-key">{{ item.answer }}</span>
+              <span v-if="selected[item.id]" class="gsw-verdict" :class="isCorrect(item) ? 'ok' : 'no'">
+                {{ isCorrect(item) ? '答对了' : '答错了' }}
+              </span>
+            </div>
+            <p class="gsw-analysis">
+              <span class="gsw-ans-label">解析</span>{{ item.analysis }}
+            </p>
+          </div>
+          <div v-else class="gsw-foot">
+            <button class="gsw-link" type="button" @click="toggleReveal(item)">显示答案 / 解析</button>
+          </div>
         </div>
-        <div v-else class="gsw-foot">
-          <button class="gsw-link" type="button" @click="toggleReveal(item)">显示答案 / 解析</button>
-        </div>
-      </div>
+      </template>
     </div>
 
     <!-- 分页 -->
@@ -351,12 +358,15 @@ async function switchPaper(key) {
 // 搜索 / 切换错题本时回到第一页
 watch([search, onlyWrong], () => { page.value = 1 })
 
+// 题目（剔除「专题讲义」块）；其余试卷无 type 字段，全部视作题目，向后兼容
+const questions = computed(() => list.value.filter((it) => it.type !== 'doc'))
+
 const filtered = computed(() => {
   const kw = search.value.trim().toLowerCase()
-  let arr = list.value
+  let arr = questions.value
   if (kw) {
     arr = arr.filter(
-      (it) => it.q.toLowerCase().includes(kw) || it.analysis.toLowerCase().includes(kw),
+      (it) => it.q.toLowerCase().includes(kw) || (it.analysis || '').toLowerCase().includes(kw),
     )
   }
   if (onlyWrong.value) {
@@ -365,13 +375,30 @@ const filtered = computed(() => {
   return arr
 })
 
+// 正文视图：保留「专题讲义」块在原文中的穿插位置；搜索时讲义块按标题/正文命中过滤
+const rendered = computed(() => {
+  const kw = search.value.trim().toLowerCase()
+  const fset = new Set(filtered.value.map((it) => it.id))
+  const out = []
+  for (const it of list.value) {
+    if (it.type === 'doc') {
+      if (kw && !((it.title || '') + ' ' + (it.body || '')).toLowerCase().includes(kw)) continue
+      out.push({ kind: 'doc', title: it.title, body: it.body })
+    } else {
+      if (!fset.has(it.id)) continue
+      out.push({ kind: 'q', ...it })
+    }
+  }
+  return out
+})
+
 // 实时统计：已作答 / 答对 / 答错 / 正确率
 const stats = computed(() => {
   const sel = selected.value
   let answered = 0
   let correct = 0
   let wrong = 0
-  for (const it of list.value) {
+  for (const it of questions.value) {
     const s = sel[it.id]
     if (!s) continue
     answered++
@@ -382,10 +409,10 @@ const stats = computed(() => {
   return { answered, correct, wrong, rate }
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
+const totalPages = computed(() => Math.max(1, Math.ceil(rendered.value.length / pageSize.value)))
 const pageItems = computed(() => {
   const from = (page.value - 1) * pageSize.value
-  return filtered.value.slice(from, from + pageSize.value)
+  return rendered.value.slice(from, from + pageSize.value)
 })
 
 function select(item, i) {
@@ -407,6 +434,11 @@ function optClass(item, i) {
     return ''
   }
   return selected.value[item.id] === letter ? 'picked' : ''
+}
+
+// 讲义正文：按换行拆成段落并去空行
+function docParas(body) {
+  return (body || '').split('\n').map((s) => s.trim()).filter(Boolean)
 }
 </script>
 
@@ -570,6 +602,27 @@ function optClass(item, i) {
 .gsw-btn:hover { background: #f3f2f1; }
 
 .gsw-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* 专题讲义块：与题目卡片明显区分，单独展示 */
+.gsw-docblock {
+  border: 2px solid #1d70b8;
+  border-left-width: 6px;
+  background: #f3f7fb;
+}
+.gsw-docblock-bar {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: #1d70b8;
+  padding: 8px 14px;
+}
+.gsw-docblock-p {
+  margin: 8px 14px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary, #505a5f);
+  white-space: pre-wrap;
+}
 .gsw-card { border: 1px solid var(--border, #d6d6d6); background: #fff; }
 .gsw-card.open { border-color: #1d70b8; }
 .gsw-q {
