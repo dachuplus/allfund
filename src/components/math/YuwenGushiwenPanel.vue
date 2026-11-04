@@ -257,6 +257,11 @@ const papers = [
     load: () => import('../../data/gushiwenDasaiFsZhentiSi.js').then((m) => ({ title: m.GUSHIWEN_FS_ZHENTI_SI_TITLE, list: m.GUSHIWEN_FS_ZHENTI_SI })),
   },
   {
+    key: 'fzjiangyi2',
+    label: '复赛讲义2',
+    load: () => import('../../data/gushiwenDasaiFzJiangyi2.js').then((m) => ({ title: m.GUSHIWEN_FZ_JIANGYI2_TITLE, list: m.GUSHIWEN_FZ_JIANGYI2 })),
+  },
+  {
     key: 'zd',
     label: '知识点',
     doc: true,
