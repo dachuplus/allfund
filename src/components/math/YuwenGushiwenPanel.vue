@@ -237,6 +237,26 @@ const papers = [
     load: () => import('../../data/gushiwenDasaiFs15.js').then((m) => ({ title: m.GUSHIWEN_FS15_TITLE, list: m.GUSHIWEN_FS15 })),
   },
   {
+    key: 'kenei4',
+    label: '课内四',
+    load: () => import('../../data/gushiwenDasaiKeNeiSi.js').then((m) => ({ title: m.GUSHIWEN_KE_NEI_SI_TITLE, list: m.GUSHIWEN_KE_NEI_SI })),
+  },
+  {
+    key: 'kenei3',
+    label: '课内三',
+    load: () => import('../../data/gushiwenDasaiKeNeiSan.js').then((m) => ({ title: m.GUSHIWEN_KE_NEI_SAN_TITLE, list: m.GUSHIWEN_KE_NEI_SAN })),
+  },
+  {
+    key: 'buchong100',
+    label: '补充100',
+    load: () => import('../../data/gushiwenDasaiBuChong100.js').then((m) => ({ title: m.GUSHIWEN_BU_CHONG_100_TITLE, list: m.GUSHIWEN_BU_CHONG_100 })),
+  },
+  {
+    key: 'fzhenti4',
+    label: '复赛真题四',
+    load: () => import('../../data/gushiwenDasaiFsZhentiSi.js').then((m) => ({ title: m.GUSHIWEN_FS_ZHENTI_SI_TITLE, list: m.GUSHIWEN_FS_ZHENTI_SI })),
+  },
+  {
     key: 'zd',
     label: '知识点',
     doc: true,
