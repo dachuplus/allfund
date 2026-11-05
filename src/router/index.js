@@ -29,7 +29,7 @@ const routes = [
     component: () => import('../pages/news/NewsAggregatorPage.vue'),
     meta: {
       tab: 'news',
-      title: '资讯',
+      title: '选题',
       description: '资讯聚合：按影视、美食、基金、股票、科技、军事分类，在线拉取各站点公开内容，实时聚合、不落地存储，仅作便捷阅读入口，不构成投资建议。',
       keywords: '资讯聚合,影视资讯,美食资讯,基金资讯,股票资讯,科技资讯,军事资讯,新闻聚合'
     }
