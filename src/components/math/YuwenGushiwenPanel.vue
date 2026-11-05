@@ -269,6 +269,18 @@ const papers = [
     load: () => import('../../data/gushiwenDasaiFzJiangyi2.js').then((m) => ({ title: m.GUSHIWEN_FZ_JIANGYI2_TITLE, list: m.GUSHIWEN_FZ_JIANGYI2 })),
   },
   {
+    key: 'buchongshang',
+    label: '补充上',
+    doc: true,
+    load: () => import('../../data/gushiwenDasaiBuChongShang.js').then((m) => ({ title: m.GUSHIWEN_BU_CHONG_SHANG_TITLE, blocks: m.GUSHIWEN_BU_CHONG_SHANG_BLOCKS })),
+  },
+  {
+    key: 'buchongxia',
+    label: '补充下',
+    doc: true,
+    load: () => import('../../data/gushiwenDasaiBuChongXia.js').then((m) => ({ title: m.GUSHIWEN_BU_CHONG_XIA_TITLE, blocks: m.GUSHIWEN_BU_CHONG_XIA_BLOCKS })),
+  },
+  {
     key: 'zd',
     label: '知识点',
     doc: true,
