@@ -44,7 +44,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getArticle, getAuthor, incrementViews, listArticles, NETWORK_SLOW_MSG, isNetworkError } from '../../api/articles'
+import { getArticle, incrementViews, listArticles, NETWORK_SLOW_MSG, isNetworkError } from '../../api/articles'
 import { renderMarkdown } from '../../utils/markdown'
 import { toast } from '../../composables/useToast.js'
 import { useAuth } from '../../composables/useAuth'
@@ -54,7 +54,6 @@ const route = useRoute()
 const router = useRouter()
 const { isOwner } = useAuth()
 const article = ref(null)
-const author = ref(null)
 const loading = ref(false)
 const articleList = ref([])
 const { featureEnabled } = useFeatureFlags()
@@ -71,29 +70,36 @@ function catLabel(c) {
   return map[c] || '博客'
 }
 
-/** 加载单篇文章（含作者 + 阅读量） */
+/** 加载单篇文章（正文与附属请求解耦，附属失败绝不清空已渲染正文） */
 async function loadArticle(id) {
   loading.value = true
+  // 1. 正文主体：只负责取文章，失败时不影响「页面上已经显示着的」正文
+  let a
   try {
-    const a = await getArticle(id)
-    // 博客分类：功能关闭时禁止访问（与路由 / 列表层一致）
-    if (a && a.category === 'blog' && !featureEnabled('content-blog')) {
-      article.value = null
-      blocked.value = true
-      return
-    }
-    article.value = a || null
-    if (a) {
-      author.value = await getAuthor(a.author_email)
-      if (a.status === 'published') incrementViews(id).catch(() => {})
-    }
+    a = await getArticle(id)
   } catch (e) {
-    article.value = null
-    // 瞬时网络故障（504/超时/断网）→ 统一友好提示
+    // 关键：仅当当前没有任何正文可显示时才置空。
+    // 此前这里无条件 article.value = null —— 后台重取/切卷时任一网络抖动
+    // 都会把已经正常显示的文章抹掉，并误报「文章不存在或尚未发布」。
+    if (!article.value) article.value = null
+    // 瞬时网络故障（504/超时/断网）→ 统一友好提示，正文保留
     if (isNetworkError(e)) toast(NETWORK_SLOW_MSG, 'error')
-  } finally {
     loading.value = false
+    return
   }
+  // 博客分类：功能关闭时禁止访问（与路由 / 列表层一致）
+  if (a && a.category === 'blog' && !featureEnabled('content-blog')) {
+    article.value = null
+    blocked.value = true
+    loading.value = false
+    return
+  }
+  article.value = a || null
+  // 2. 附属请求与正文解耦：阅读量自增完全非阻塞，失败不影响渲染。
+  // 作者信息此前在此 await，但模板从未使用 author，且该请求走跨境代理链路，
+  // 一旦超时会走上面的 catch 清空正文 → 表现为「看一分钟文章自动消失」，故移除。
+  if (a && a.status === 'published') incrementViews(id).catch(() => {})
+  loading.value = false
 }
 
 /** 切换文章（右侧就地切换 + 更新 URL） */

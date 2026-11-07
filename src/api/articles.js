@@ -289,17 +289,18 @@ async function refreshListInBackground(opts, ck) {
 /**
  * 取单篇文章。
  * 提速优化：已发布文章优先走同域边缘缓存接口 /api/article/:id（EdgeOne 境外节点就近返回，免跨境直连新加坡）。
- * 兜底：边缘 2.5s 内未响应/返 404（未发布/草稿）→ 回退直连 Supabase，保证作者可读自己草稿。
+ * 兜底：边缘 8s 内未响应/返 404（未发布/草稿）→ 回退直连 Supabase，保证作者可读自己草稿。
+ * 超时由 5s 放宽到 8s：边缘冷缓存实测曾达 4.84s，5s 余量过薄，误触发兜底（跨境链路更易失败）。
  */
 export async function getArticle(id) {
   const numId = Number(id)
   if (!Number.isFinite(numId)) throw new Error('文章 ID 无效')
 
-  // 1. 优先走边缘缓存接口（5s 超时，避免偶发慢回源拖白屏）
+  // 1. 优先走边缘缓存接口（8s 超时，避免偶发慢回源拖白屏）
   try {
     const res = await Promise.race([
       fetch(`/api/article/${numId}`, { headers: { Accept: 'application/json' } }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('edge-timeout')), 5000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('edge-timeout')), 8000)),
     ])
     if (res.ok) {
       const data = await res.json()
