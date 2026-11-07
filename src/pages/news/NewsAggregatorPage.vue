@@ -168,7 +168,7 @@ const sources = {
   ],
   military: [
     { key: 'guancha', name: '观察者网·军事' },
-    { key: 'china', name: '中华网军事' },
+    { key: 'defensenews', name: 'Defense News' },
   ],
 }
 

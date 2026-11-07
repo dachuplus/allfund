@@ -12,7 +12,7 @@
  * 说明：本函数运行在 EdgeOne 海外边缘节点。实测以下站点从此出口可达（带浏览器 UA + 本站 Referer）：
  *   新浪娱乐/搜狐娱乐/时光网/豆果美食/红餐网/美食杰/中国证券报/上海证券报/证券时报/
  *   同花顺(基金)/和讯/中国基金报/新浪财经股票/同花顺/财联社电报/雷锋网/爱范儿/钛媒体/
- *   观察者网军事/中华网军事。
+ *   观察者网军事/Defense News（英文源，标题按原文直出，不翻译）。
  *   财联社「深度」(cls depth) 与 东方财富基金页 为 JS 渲染/SPA，无稳定公开接口，暂不接入。
  */
 
@@ -301,7 +301,14 @@ const REGISTRY = {
   ],
   military: [
     { key: 'guancha', name: '观察者网·军事', url: 'https://www.guancha.cn/military/', enc: 'auto' },
-    { key: 'china', name: '中华网军事', url: 'https://military.china.com/', enc: 'auto' },
+    // Defense News（英文源）：通用解析器默认只收中文标题，故开启 latin 并放宽长度；
+    // linkPattern 只放行带 /YYYY/MM/DD/ 的文章页，排除 /meta/ 专题页与 /video/ 广告位。
+    {
+      key: 'defensenews', name: 'Defense News', url: 'https://www.defensenews.com/', enc: 'auto',
+      latin: true, minLen: 20, maxLen: 160,
+      linkPattern: /defensenews\.com\/(?!meta\/|video\/)[a-z0-9\-/]+\/20\d{2}\/\d{2}\/\d{2}\/[a-z0-9-]+/i,
+      blacklist: ['Subscribe', 'Sign in', 'Newsletter', 'Advertise', 'Privacy Policy', 'Terms of Use', 'Careers', 'Sitemap', 'Login', 'Register', 'Sponsored', 'Money Minute'],
+    },
   ],
 }
 
@@ -424,6 +431,7 @@ function parseAnchors(html, base, opts = {}) {
     maxLen = 60,
     excludeDomains = [],
     linkPattern = null,
+    latin = false, // 英文站点：跳过「标题必须含中文」检查（仅显式开启的源受影响）
     blacklist = ['登录', '注册', '首页', '客户端', '公众号', '更多', '视频', '图片', '专题', '直播', 'APP', '下载', '返回', '导航', '搜索', '关于', '联系', '版权', '备案', '隐私'],
   } = opts
 
@@ -446,7 +454,8 @@ function parseAnchors(html, base, opts = {}) {
     if (linkPattern && !linkPattern.test(href)) continue
     if (/\.(js|css|png|jpg|jpeg|gif|ico|pdf|zip)(\?|$)/i.test(href)) continue
     if (href.startsWith('javascript:') || href.startsWith('mailto:')) continue
-    if (!/[\u4e00-\u9fff]/.test(title)) continue
+    if (!latin && !/[\u4e00-\u9fff]/.test(title)) continue
+    if (latin && !/[a-z]/i.test(title)) continue
     if (title.length < minLen || title.length > maxLen) continue
     if (blacklist.some((b) => title.includes(b))) continue
     if (seenT.has(title) || seenU.has(href)) continue
@@ -454,7 +463,13 @@ function parseAnchors(html, base, opts = {}) {
     seenU.add(href)
 
     const ctx = raw + html.slice(re.lastIndex, re.lastIndex + 200)
-    out.push({ title, link: href, publishedAt: extractDate(ctx) })
+    let publishedAt = extractDate(ctx)
+    // 英文源的文章 URL 自带 /YYYY/MM/DD/，比页面片段里的时间更可靠
+    if (latin) {
+      const dm = href.match(/\/(20\d{2})\/(\d{2})\/(\d{2})\//)
+      if (dm) publishedAt = Date.UTC(+dm[1], +dm[2] - 1, +dm[3])
+    }
+    out.push({ title, link: href, publishedAt })
     if (out.length >= 30) break
   }
   return out
