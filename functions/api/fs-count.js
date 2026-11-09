@@ -49,10 +49,7 @@ export async function onRequest(context) {
     usp.set('select', 'c')
     usp.delete('order')
     usp.delete('offset')
-    // 保留极小的 limit：PostgREST 的 count=exact 返回的是筛选后总行数，与 limit 无关
-    // （实测 0-0/15481）；但不带 limit 时上游会准备 1000 行数据，经 EdgeOne 出站链路
-    // 容易被网关判超时返回 502。带 limit=1 时全量计数 0.5s 左右即可返回。
-    usp.set('limit', '1')
+    usp.delete('limit')
     inner = p + (usp.toString() ? '?' + usp.toString() : '')
   } catch (_) { /* 无 query 时忽略 */ }
 
@@ -61,28 +58,39 @@ export async function onRequest(context) {
     const v = req.headers.get(k)
     if (v) headers.set(k, v)
   }
-  headers.set('Prefer', 'count=exact')
+  // ⚠️ 绝不能带 `Prefer: count=exact`：EdgeOne 边缘层对入站和函数出站携带该头的
+  //    请求都会返回自家 502 HTML（实测诊断回显），上游的 206 响应同样被吞。
+  //    改为普通 GET 分页取回代码列再累加 —— 不产生 206，不受该限制影响。
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
+  const PAGE = 1000      // Supabase 单次返回上限
+  const BATCH = 8        // 每轮并发页数，控制耗时
   try {
-    const upstream = await fetch(SUPABASE_BASE + inner, {
-      method: 'GET',
-      headers,
-      signal: controller.signal,
-      redirect: 'follow',
-    })
-    const cr = upstream.headers.get('content-range')
-    const m = cr && /\/(\d+)$/.exec(cr)
-    if (m) return json({ count: Number(m[1]) })
-    // 诊断信息：定位上游究竟返回了什么（状态码 / content-range / 响应片段）
-    const detail = await upstream.text().catch(() => '')
-    return json({
-      count: null,
-      error: 'upstream ' + upstream.status,
-      contentRange: cr,
-      detail: detail.slice(0, 220),
-    }, 502)
+    let total = 0
+    let offset = 0
+    let done = false
+    for (let round = 0; round < 8 && !done; round++) {
+      const offsets = Array.from({ length: BATCH }, (_, i) => offset + i * PAGE)
+      const pages = await Promise.all(offsets.map(async (o) => {
+        const u = new URL(SUPABASE_BASE + inner)
+        u.searchParams.set('limit', String(PAGE))
+        u.searchParams.set('offset', String(o))
+        const r = await fetch(u.toString(), {
+          method: 'GET', headers, signal: controller.signal, redirect: 'follow',
+        })
+        if (!r.ok) return { n: -1, status: r.status }
+        const arr = await r.json().catch(() => [])
+        return { n: Array.isArray(arr) ? arr.length : 0, status: r.status }
+      }))
+      for (const pg of pages) {
+        if (pg.n < 0) return json({ count: null, error: 'upstream ' + pg.status }, 502)
+        total += pg.n
+        if (pg.n < PAGE) { done = true; break }
+      }
+      offset += BATCH * PAGE
+    }
+    return json({ count: total })
   } catch (e) {
     return json({ count: null, error: String((e && e.message) || e) }, 502)
   } finally {
