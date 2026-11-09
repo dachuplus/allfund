@@ -35,7 +35,7 @@ export async function onRequest(context) {
   if (!targetPath) return json({ count: null, error: 'missing path' }, 400)
   if (
     targetPath.startsWith('http://') || targetPath.startsWith('https://') ||
-    targetPath.startsWith('//') || targetPath.startsWith('../') ||
+    targetPath.startsWith('//') || targetPath.includes('..') ||
     !targetPath.startsWith('/rest/v1/')
   ) {
     return json({ count: null, error: 'invalid path' }, 400)
@@ -49,7 +49,10 @@ export async function onRequest(context) {
     usp.set('select', 'c')
     usp.delete('order')
     usp.delete('offset')
-    usp.delete('limit')
+    // 保留极小的 limit：PostgREST 的 count=exact 返回的是筛选后总行数，与 limit 无关
+    // （实测 0-0/15481）；但不带 limit 时上游会准备 1000 行数据，经 EdgeOne 出站链路
+    // 容易被网关判超时返回 502。带 limit=1 时全量计数 0.5s 左右即可返回。
+    usp.set('limit', '1')
     inner = p + (usp.toString() ? '?' + usp.toString() : '')
   } catch (_) { /* 无 query 时忽略 */ }
 
