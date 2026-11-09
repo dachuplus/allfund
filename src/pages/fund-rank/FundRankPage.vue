@@ -755,8 +755,9 @@ const t1Map = ref({})    // { [normalizedT0]: [{ value, label, cnt }] }
 const t0RawMap = ref({}) // { [normalizedT0]: [rawT0Values] }，用于归一化后按多个原始 t0 过滤
 
 // 一级分类归一化：数据库里同时存在「混合型」和「混合型基金」，应合并展示为「混合型」
+// 空 t0（新发基金分类尚未回填）归一化为「未分类」，否则筛选项只剩一个孤零零的数字计数
 function normT0(t0) {
-  return (t0 || '').replace(/基金$/, '')
+  return (t0 || '').replace(/基金$/, '') || '未分类'
 }
 
 async function fetchCategories() {
