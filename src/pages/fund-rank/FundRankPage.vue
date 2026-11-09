@@ -755,9 +755,9 @@ const t1Map = ref({})    // { [normalizedT0]: [{ value, label, cnt }] }
 const t0RawMap = ref({}) // { [normalizedT0]: [rawT0Values] }，用于归一化后按多个原始 t0 过滤
 
 // 一级分类归一化：数据库里同时存在「混合型」和「混合型基金」，应合并展示为「混合型」
-// 空 t0（新发基金分类尚未回填）归一化为「未分类」，否则筛选项只剩一个孤零零的数字计数
+// 空 t0（新发基金分类尚未回填）归一化为「新发基金」，否则筛选项只剩一个孤零零的数字计数
 function normT0(t0) {
-  return (t0 || '').replace(/基金$/, '') || '未分类'
+  return (t0 || '').replace(/基金$/, '') || '新发基金'
 }
 
 async function fetchCategories() {
@@ -1174,19 +1174,13 @@ async function loadData(reset = true, _retryCount = 0) {
       sortDir: sortDir.value || undefined,
     }
 
-    // 并行拉取「真实总数」：走 fund-scores-count Edge Function（service-role + count=exact），
-    // 完整复刻上述过滤链 + 前端场内(filterCN)过滤，返回不受 pageSize(2000) 限制的真实总数。
+    // 并行拉取「真实总数」：复用与列表完全相同的过滤链做服务端 count=exact，
+    // 不受 pageSize 限制。默认「主代码」查 fund_scores_main 视图时口径同样一致，
+    // 因此不再跳过（2026-11-09 修复「筛选结果只显示已加载 1000 只」）。
     // 不阻塞列表加载；结果回来后响应式更新 totalCount（失败则保持 null，回退 funds.length）。
-    // 例外：默认「主代码」走 fund_scores_main 去重视图，而线上 count 函数仍按原表计数会偏大，
-    // 故此时跳过精确计数并清空残留值，回退「已加载条数」；切到「全部」/字母档时口径恢复一致。
-    const mainOnly = filterSC.value.length === 1 && filterSC.value[0] === 'MAIN'
-    if (mainOnly) {
-      totalCount.value = null
-    } else {
-      fetchFundScoresCount({ ...queryParams, filterCN: filterCN.value || undefined })
-        .then(cnt => { if (cnt != null) totalCount.value = cnt })
-        .catch(() => {})
-    }
+    fetchFundScoresCount(queryParams)
+      .then(cnt => { if (cnt != null) totalCount.value = cnt })
+      .catch(() => {})
 
     // t0（一级分类）/ t1（二级分类 t1_tt）直接来自 fund_scores，服务端按总表过滤
     const result = await withTimeout(fetchFundScores(queryParams), LOAD_TIMEOUT_MS)

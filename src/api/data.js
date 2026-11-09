@@ -328,21 +328,24 @@ export function scaleFilterExpr(ranges) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, countOnly = false } = params
   if (supabase) {
-    // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
-    //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
-    //       如需精确总数，可后续用 count=planned（pg_class.reltuples 估计，较快）。
+    // 列表请求不带 count（22000+ 行 × 30 列曾触发 57014）。精确总数改由
+    // countOnly 模式复用同一条过滤链，只 select c + head + count=exact（见下方），
+    // 保证「筛选结果」与列表口径完全一致，且每页仍可只加载 pageSize 条。
     // 「主代码」单选：改查服务端去重视图 fund_scores_main。
-    // 该视图按「基金主体名（剥掉份额字母/前后端括号后缀）+ 基金经理」分组，组内优先级
-    //   A 类(非后端) > 无份额后缀 > 其它字母份额 > 前后端变体 > 代码最小兜底，
+    // 该视图按「基金主体名（剥掉份额字母/前后端括号后缀）」分组，组内按
+    //   最早成立日 → 并列时 A 份额 → 无份额后缀 → 其它字母 → 前后端变体 → 代码最小，
     // 每只基金恰好保留一行。旧 MAIN_CODE_REGEX（仅「名称末位不是份额字母」）在 28315 行里
     // 只能命中 4955 行，会漏掉绝大多数以 A/C 结尾的基金、且无法排除 A(后端) 等变体，
     // regex 也无法表达「组内选一个」，故用视图。
     // 选中其它份额档或「全部」时回到原表，保留既有份额多选语义。
     const mainOnly = Array.isArray(shareClasses) && shareClasses.length === 1
       && shareClasses[0] === SHARE_CLASS_MAIN && !mainCode
-    let query = supabase.from(mainOnly ? 'fund_scores_main' : 'fund_scores').select(FUND_SCORES_COLS)
+    const table = mainOnly ? 'fund_scores_main' : 'fund_scores'
+    let query = countOnly
+      ? supabase.from(table).select('c', { count: 'exact', head: true })
+      : supabase.from(table).select(FUND_SCORES_COLS)
     // 分类筛选：直接采用 fund_scores 的「一级分类 t0」与「二级分类 t1_tt」
     // （从总表服务端过滤，而非客户端对前 100 条再筛）
     if (t1) {
@@ -352,7 +355,9 @@ async function fetchFundScoresImpl(params = {}) {
       // 一级分类：按聚源 t0 过滤（货币型 t1_tt 为 NULL，也走此分支）
       // 支持数组（如归一化后同时匹配 "混合型" 和 "混合型基金"）
       if (Array.isArray(t0) && t0.length > 0) {
-        query = query.in('t0', t0)
+        // PostgREST 的 in.("") 匹配不到空字符串（实测返回 []），
+        // 「新发基金」这类 t0='' 的分类必须用 eq. 精确匹配。
+        query = (t0.length === 1 && t0[0] === '') ? query.eq('t0', '') : query.in('t0', t0)
       } else {
         query = query.eq('t0', t0)
       }
@@ -428,6 +433,14 @@ async function fetchFundScoresImpl(params = {}) {
     // 改用 nullsFirst: false 让 null 排到最后
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；
     //       否则按靠谱分周期 kKey 排序。两种排序均在服务端完成，覆盖全表而非仅已加载的 100 条。
+    // 精确总数：与列表共用上面完整的过滤链，仅取 count（head 请求不返回行，也不带 Range）。
+    // ⚠️ 绝不能叠加 .range()：实测带 Range 时 PostgREST count=exact 会触发 57014；
+    //    不带 Range 时视图全量计数 1.0~1.4s 正常返回。
+    if (countOnly) {
+      const { count, error } = await query
+      if (error) throw error
+      return { data: [], count: count ?? null }
+    }
     const orderField = sortField || kKey
     const orderAsc = sortField ? (sortDir === 'asc') : !!sortAsc
     const from = (page - 1) * pageSize
@@ -435,7 +448,6 @@ async function fetchFundScoresImpl(params = {}) {
       .order(orderField, { ascending: orderAsc, nullsFirst: false })
       .range(from, from + pageSize - 1)
     if (error) throw error
-    // 不带 count（见上方说明），前端会用 funds.length 作为总数 fallback
     return { data: data || [], count: null }
   }
   // 未配置 Supabase：按最高风控规则返回空，绝不展示伪造的示例数据
@@ -444,32 +456,26 @@ async function fetchFundScoresImpl(params = {}) {
 
 /**
  * 取当前筛选条件下的真实总数（服务端精确计数）。
- * 走 fund-scores-count Edge Function（service-role 直连，count='exact'，绕过代理 502 与 57014），
- * 完整复刻 fetchFundScoresImpl 的过滤链 + 前端「场内」(filterCN) 客户端过滤。
- * 失败返回 null（前端回退 funds.length 作为总数 fallback）。
+ *
+ * 2026-11-09 重写：原先走 fund-scores-count Edge Function，但该线上函数仍是旧版
+ * （按原表计数、默认主代码态口径偏大），且要求登录 session —— 站点已全面开放，
+ * 未登录时恒返回 null，页面只能拿「已加载条数」顶替，于是显示「筛选结果 1000 只」。
+ * 现在直接复用 fetchFundScoresImpl 的过滤链（countOnly 模式），同一张表 + 同一组条件下
+ * head + count=exact，口径与列表 100% 一致，也不需要登录。
+ *
+ * CDN 会在边缘层拦截入站的 `Prefer: count=exact` 头（一律 502），因此
+ * src/api/supabase.js 会把该头改写成 query 参数 __count=exact，
+ * 由 functions/api/sb-proxy.js 在服务端转发时加回该头。
+ *
+ * 失败返回 null（页面回退显示「已加载条数」）。
  */
 export async function fetchFundScoresCount(params = {}) {
   if (!supabase) return null
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) return null
-    const url = rewriteSupabaseUrl(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-scores-count`)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify(params),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      console.warn('[fetchFundScoresCount] 计数失败：', data.error || res.status)
-      return null
-    }
-    return typeof data.count === 'number' ? data.count : null
+    const r = await fetchFundScoresImpl({ ...params, countOnly: true })
+    return typeof r.count === 'number' ? r.count : null
   } catch (e) {
-    console.warn('[fetchFundScoresCount] 计数异常，降级为不显示总数：', e)
+    console.warn('[fetchFundScoresCount] 计数失败：', e)
     return null
   }
 }

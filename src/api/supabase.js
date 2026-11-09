@@ -93,6 +93,52 @@ function convertRangeToOffsetLimit(targetPath, headers) {
   return { targetPath: p + '?' + usp.toString(), headers }
 }
 
+/**
+ * ⚠️ EdgeOne CDN 会在边缘层对携带 `Prefer: count=exact` 的入站请求直接返回 502
+ * （请求根本到不了 sb-proxy 函数），PostgREST 精确计数因此不可用。
+ * 这里把该头改写成自定义 query 参数 __count=exact，由 functions/api/sb-proxy.js
+ * 在服务端转发时再加回 Prefer 头，从而绕开 CDN 拦截。
+ */
+function convertCountExactToParam(targetPath, headers) {
+  let preferVal = null
+  try {
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+      preferVal = headers.get('prefer')
+    } else if (Array.isArray(headers)) {
+      const p = headers.find(([k]) => String(k).toLowerCase() === 'prefer')
+      preferVal = p ? p[1] : null
+    } else if (headers && typeof headers === 'object') {
+      preferVal = headers.prefer || headers.Prefer || null
+    }
+  } catch (_) { /* 只读 headers 时忽略 */ }
+  if (!preferVal || !String(preferVal).includes('count=exact')) return targetPath
+
+  // 去掉 Prefer 头中的 count=exact（保留其它 prefer 值），避免 CDN 502
+  try {
+    const rest = String(preferVal).split(',').map(s => s.trim())
+      .filter(s => s && s !== 'count=exact').join(', ')
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+      if (rest) headers.set('prefer', rest)
+      else headers.delete('prefer')
+    } else if (Array.isArray(headers)) {
+      for (let i = headers.length - 1; i >= 0; i--) {
+        if (String(headers[i][0] || '').toLowerCase() === 'prefer') {
+          if (rest) headers[i][1] = rest
+          else headers.splice(i, 1)
+        }
+      }
+    } else if (headers && typeof headers === 'object') {
+      if (rest) { headers.prefer = rest; headers.Prefer = rest }
+      else { delete headers.prefer; delete headers.Prefer }
+    }
+  } catch (_) { /* 只读 headers 时忽略 */ }
+
+  const [p, qs] = targetPath.split('?')
+  const usp = new URLSearchParams(qs || '')
+  usp.set('__count', 'exact')
+  return p + '?' + usp.toString()
+}
+
 function rewriteToProxy(input, init) {
   let str
   if (typeof input === 'string') str = input
@@ -108,6 +154,7 @@ function rewriteToProxy(input, init) {
   let targetPath = u.pathname + u.search
   if (init && init.headers) {
     targetPath = convertRangeToOffsetLimit(targetPath, init.headers).targetPath
+    targetPath = convertCountExactToParam(targetPath, init.headers)
   }
   return `${PROXY_BASE}?path=${encodeURIComponent(targetPath)}`
 }

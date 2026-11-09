@@ -145,9 +145,25 @@ export async function onRequest(context) {
     return jsonError('absolute or relative traversal url not allowed', 400)
   }
 
-  const targetUrl = SUPABASE_BASE + (targetPath.startsWith('/') ? targetPath : '/' + targetPath)
   const method = req.method.toUpperCase()
   const headers = buildUpstreamHeaders(req.headers)
+
+  // 精确计数（2026-11-09）：EdgeOne CDN 会拦截携带 `Prefer: count=exact` 的入站请求
+  // 并直接返回 502（请求到不了本函数）。前端因此把该头改写为 query 参数 __count=exact，
+  // 这里在服务端转发时加回 Prefer 头，并从上游路径里移除这个自定义参数。
+  // 注意：绝对不要同时带 Range 头 —— 实测会让 PostgREST count=exact 触发 57014。
+  let upstreamPath = targetPath
+  try {
+    const [p, qs] = upstreamPath.split('?')
+    const usp = new URLSearchParams(qs || '')
+    if (usp.get('__count') === 'exact') {
+      usp.delete('__count')
+      headers.set('Prefer', 'count=exact')
+      upstreamPath = p + (usp.toString() ? '?' + usp.toString() : '')
+    }
+  } catch (_) { /* path 无 query 时忽略 */ }
+
+  const targetUrl = SUPABASE_BASE + (upstreamPath.startsWith('/') ? upstreamPath : '/' + upstreamPath)
 
   // 读取 body（仅一次），重试时复用同一份 ArrayBuffer
   let body = undefined
