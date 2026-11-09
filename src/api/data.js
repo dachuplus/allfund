@@ -343,8 +343,10 @@ async function fetchFundScoresImpl(params = {}) {
     const mainOnly = Array.isArray(shareClasses) && shareClasses.length === 1
       && shareClasses[0] === SHARE_CLASS_MAIN && !mainCode
     const table = mainOnly ? 'fund_scores_main' : 'fund_scores'
+    // countOnly 只构造查询串（交给 /api/fs-count 在服务端计数），不在这里发请求：
+    // 直接发 PostgREST count=exact 会被 CDN 拦（入站 Prefer 头 502 / 206 响应 502）。
     let query = countOnly
-      ? supabase.from(table).select('c', { count: 'exact', head: true })
+      ? supabase.from(table).select('c')
       : supabase.from(table).select(FUND_SCORES_COLS)
     // 分类筛选：直接采用 fund_scores 的「一级分类 t0」与「二级分类 t1_tt」
     // （从总表服务端过滤，而非客户端对前 100 条再筛）
@@ -433,13 +435,22 @@ async function fetchFundScoresImpl(params = {}) {
     // 改用 nullsFirst: false 让 null 排到最后
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；
     //       否则按靠谱分周期 kKey 排序。两种排序均在服务端完成，覆盖全表而非仅已加载的 100 条。
-    // 精确总数：与列表共用上面完整的过滤链，仅取 count（head 请求不返回行，也不带 Range）。
-    // ⚠️ 绝不能叠加 .range()：实测带 Range 时 PostgREST count=exact 会触发 57014；
-    //    不带 Range 时视图全量计数 1.0~1.4s 正常返回。
+    // 精确总数：把「与列表完全相同的过滤链」序列化后交给服务端函数计数。
+    // 既不发 Prefer 头、也不经过 206 响应，绕开 EdgeOne CDN 的两处限制。
     if (countOnly) {
-      const { count, error } = await query
-      if (error) throw error
-      return { data: [], count: count ?? null }
+      const u = query.url
+      const qs = new URLSearchParams(u.search)
+      qs.delete('order'); qs.delete('offset'); qs.delete('limit')
+      const inner = u.pathname + (qs.toString() ? '?' + qs.toString() : '')
+      const base = (typeof location !== 'undefined' &&
+        /^(www\.dachu\.me|localhost|127\.0\.0\.1)$/.test(location.hostname))
+        ? '/api/fs-count' : 'https://www.dachu.me/api/fs-count'
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+      const res = await fetch(`${base}?path=${encodeURIComponent(inner)}`, {
+        headers: key ? { apikey: key, Authorization: `Bearer ${key}` } : {},
+      })
+      const j = await res.json().catch(() => ({}))
+      return { data: [], count: typeof j.count === 'number' ? j.count : null }
     }
     const orderField = sortField || kKey
     const orderAsc = sortField ? (sortDir === 'asc') : !!sortAsc
@@ -463,9 +474,9 @@ async function fetchFundScoresImpl(params = {}) {
  * 现在直接复用 fetchFundScoresImpl 的过滤链（countOnly 模式），同一张表 + 同一组条件下
  * head + count=exact，口径与列表 100% 一致，也不需要登录。
  *
- * CDN 会在边缘层拦截入站的 `Prefer: count=exact` 头（一律 502），因此
- * src/api/supabase.js 会把该头改写成 query 参数 __count=exact，
- * 由 functions/api/sb-proxy.js 在服务端转发时加回该头。
+ * CDN 会在边缘层拦截入站 `Prefer: count=exact`（502），且会吞掉上游
+ * 206 Partial Content 响应。因此改由 functions/api/fs-count.js 在服务端
+ * 发出站计数请求，只把总数以普通 200 JSON 返回。
  *
  * 失败返回 null（页面回退显示「已加载条数」）。
  */
