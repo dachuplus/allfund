@@ -333,7 +333,16 @@ async function fetchFundScoresImpl(params = {}) {
     // 注意：不带 count='exact'（之前会因为 22000+ 行 × 30 列触发数据库 statement_timeout 57014，
     //       表现为页面「基金数据加载失败」）。改用 funds.length 作为显示总数（见 FundRankPage.vue）。
     //       如需精确总数，可后续用 count=planned（pg_class.reltuples 估计，较快）。
-    let query = supabase.from('fund_scores').select(FUND_SCORES_COLS)
+    // 「主代码」单选：改查服务端去重视图 fund_scores_main。
+    // 该视图按「基金主体名（剥掉份额字母/前后端括号后缀）+ 基金经理」分组，组内优先级
+    //   A 类(非后端) > 无份额后缀 > 其它字母份额 > 前后端变体 > 代码最小兜底，
+    // 每只基金恰好保留一行。旧 MAIN_CODE_REGEX（仅「名称末位不是份额字母」）在 28315 行里
+    // 只能命中 4955 行，会漏掉绝大多数以 A/C 结尾的基金、且无法排除 A(后端) 等变体，
+    // regex 也无法表达「组内选一个」，故用视图。
+    // 选中其它份额档或「全部」时回到原表，保留既有份额多选语义。
+    const mainOnly = Array.isArray(shareClasses) && shareClasses.length === 1
+      && shareClasses[0] === SHARE_CLASS_MAIN && !mainCode
+    let query = supabase.from(mainOnly ? 'fund_scores_main' : 'fund_scores').select(FUND_SCORES_COLS)
     // 分类筛选：直接采用 fund_scores 的「一级分类 t0」与「二级分类 t1_tt」
     // （从总表服务端过滤，而非客户端对前 100 条再筛）
     if (t1) {
@@ -402,10 +411,10 @@ async function fetchFundScoresImpl(params = {}) {
     if (bondMax != null) query = query.lte('bond_pct', bondMax)
     if (cashMin != null) query = query.gte('cash_pct', cashMin)
     if (cashMax != null) query = query.lte('cash_pct', cashMax)
-    // 份额（多选，含「主代码」）：名称 regex 服务端下推
-    const shareFilter = (shareClasses && shareClasses.length)
+    // 份额（多选，含「主代码」）：名称 regex 服务端下推；mainOnly 已由视图完成去重，无需再筛
+    const shareFilter = mainOnly ? null : ((shareClasses && shareClasses.length)
       ? shareClassFilter(shareClasses)
-      : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null)
+      : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null))
     if (shareFilter) {
       query = query.filter('n', 'match', shareFilter.match)
       if (shareFilter.notMatch) query = query.not('n', 'match', shareFilter.notMatch)

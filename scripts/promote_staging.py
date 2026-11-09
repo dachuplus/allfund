@@ -376,9 +376,14 @@ def main():
     # ── 2. 原子切换：仅替换 staging 管理的代码，保留生产表其他代码 ──────────
     # 2026-10-30 修正：由「TRUNCATE + 全量 INSERT」改为「DELETE 仅 staging 覆盖代码 + INSERT」，
     # 保留场内 ETF/LOF（sync_etfs 直写）、reconcile 回填桩等不进 staging 的代码，天然防误删。
+    # 2026-11-09 追加修正：DELETE 改按「基础代码」（剥掉 .OF 后缀）匹配。
+    # 起因：canonical_fund_code() 改版后场内基金（5/15/16 开头）以裸 6 位码写入 staging，
+    # 而历史生产表还留着同基金的 .OF 旧行；精确 c 匹配删不掉，导致同名两行、评分不同，
+    # 前端出现「重复基金」。按基础码删除可同时清掉旧格式残留，且不会误伤不进 staging 的代码。
     print('\n[2] 原子切换 fund_scores ← fund_scores_staging（UPSERT 式：仅替换 staging 管理的代码）', flush=True)
     switch_sql = (
-        f'DELETE FROM fund_scores WHERE c IN (SELECT c FROM fund_scores_staging); '
+        f"DELETE FROM fund_scores WHERE split_part(c,'.',1) IN "
+        f"(SELECT split_part(c,'.',1) FROM fund_scores_staging); "
         f'INSERT INTO fund_scores ({PROMOTE_COLS}) SELECT {PROMOTE_COLS} FROM fund_scores_staging;'
     )
     try:
@@ -397,6 +402,24 @@ def main():
         pg('TRUNCATE TABLE fund_scores; INSERT INTO fund_scores SELECT * FROM _fs_backup;')
         sys.exit(1)
     print(f'  ✓ 切换成功，fund_scores 现有 {new_total} 条', flush=True)
+
+    # ── 2.1 代码格式护栏（2026-11-09）──────────────────────────────────────
+    # 同一基础代码不允许同时存在「裸 6 位码」与「.OF 后缀」两种格式。上面 DELETE 已按基础码
+    # 清理；这里做切换后统计，若仍有历史残留则自动删除旧格式行（不阻断流水线）。
+    try:
+        dup_fmt = pg("""SELECT count(*) AS cnt FROM (
+            SELECT split_part(c,'.',1) code FROM fund_scores GROUP BY 1
+            HAVING count(*) FILTER (WHERE c LIKE '%.%') > 0
+               AND count(*) FILTER (WHERE c NOT LIKE '%.%') > 0) x""")[0]['cnt']
+        if dup_fmt:
+            print(f'  [WARN] 仍有 {dup_fmt} 个基础代码并存新旧双格式，清理遗留后缀行', flush=True)
+            pg("""DELETE FROM fund_scores s WHERE s.c LIKE '%.%'
+                  AND EXISTS (SELECT 1 FROM fund_scores p
+                    WHERE p.c = split_part(s.c,'.',1) AND p.n = s.n)""", timeout=300)
+        else:
+            print('  ✓ 代码格式护栏：无新旧双格式重复', flush=True)
+    except Exception as e:
+        print(f'  [WARN] 代码格式护栏执行失败（不阻断切换）: {e}', flush=True)
 
     # ── Layer 3：生产表数量校验（基准=数据源全量 U）────────────────────────
     # 允许新发基金使生产超过 U；只卡"显著少于 U"（真实丢失）。

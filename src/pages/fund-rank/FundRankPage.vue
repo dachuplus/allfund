@@ -829,7 +829,9 @@ const filterT1 = ref('')
 
 // 更多筛选
 const showMoreFilter = ref(false)
-const filterSC = ref([])       // 份额（多选）：可含 'MAIN' 主代码 与 份额字母 A/B/C/...（空数组=全部）
+// 默认「主代码」：只显示每只基金的主份额（服务端去重视图 fund_scores_main），
+// 避免 A/C/Y/后端份额并列造成「重复基金」观感。点「全部」或任一字母档即可查看其它份额。
+const filterSC = ref(['MAIN'])  // 份额（多选）：可含 'MAIN' 主代码 与 份额字母 A/B/C/...（空数组=全部）
 const filterHolding = ref([])  // 持有期（多选）：可含 '无限制' 与 7天/30天/…/5年（空数组=全部）
 const filterETF = ref('')
 const filterLOF = ref('')
@@ -1174,9 +1176,16 @@ async function loadData(reset = true, _retryCount = 0) {
     // 并行拉取「真实总数」：走 fund-scores-count Edge Function（service-role + count=exact），
     // 完整复刻上述过滤链 + 前端场内(filterCN)过滤，返回不受 pageSize(2000) 限制的真实总数。
     // 不阻塞列表加载；结果回来后响应式更新 totalCount（失败则保持 null，回退 funds.length）。
-    fetchFundScoresCount({ ...queryParams, filterCN: filterCN.value || undefined })
-      .then(cnt => { if (cnt != null) totalCount.value = cnt })
-      .catch(() => {})
+    // 例外：默认「主代码」走 fund_scores_main 去重视图，而线上 count 函数仍按原表计数会偏大，
+    // 故此时跳过精确计数并清空残留值，回退「已加载条数」；切到「全部」/字母档时口径恢复一致。
+    const mainOnly = filterSC.value.length === 1 && filterSC.value[0] === 'MAIN'
+    if (mainOnly) {
+      totalCount.value = null
+    } else {
+      fetchFundScoresCount({ ...queryParams, filterCN: filterCN.value || undefined })
+        .then(cnt => { if (cnt != null) totalCount.value = cnt })
+        .catch(() => {})
+    }
 
     // t0（一级分类）/ t1（二级分类 t1_tt）直接来自 fund_scores，服务端按总表过滤
     const result = await withTimeout(fetchFundScores(queryParams), LOAD_TIMEOUT_MS)
@@ -1247,9 +1256,9 @@ function setT1(val) {
   loadData(true)
 }
 
-/** 清除所有更多筛选条件 */
+/** 清除所有更多筛选条件（份额回到默认「主代码」） */
 function clearMoreFilters() {
-  filterSC.value = []
+  filterSC.value = ['MAIN']
   filterHolding.value = []
   filterCN.value = ''
   filterETF.value = ''
@@ -1375,7 +1384,8 @@ function onScaleInput() {
 
 const activeMoreFilterCount = computed(() => {
   let n = 0
-  if (filterSC.value.length) n++
+  // 默认「主代码」不算用户主动筛选，避免「更多筛选」按钮默认就显示 1
+  if (filterSC.value.length && !(filterSC.value.length === 1 && filterSC.value[0] === 'MAIN')) n++
   if (filterHolding.value.length) n++
   if (filterETF.value) n++
   if (filterLOF.value) n++

@@ -124,8 +124,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // 与 data.js fetchFundScoresImpl 同步：「主代码」单选改查去重视图，
+    // 否则计数仍按原表 28315 行、列表按视图 15481 行，总数会偏大。
+    const mainOnly = Array.isArray(shareClasses) && shareClasses.length === 1
+      && shareClasses[0] === SHARE_CLASS_MAIN && !mainCode
     // head + count='exact'：只取总数，不返回行（极轻量，不触发 57014）
-    let query = admin.from('fund_scores').select('c', { count: 'exact', head: true })
+    let query = admin.from(mainOnly ? 'fund_scores_main' : 'fund_scores').select('c', { count: 'exact', head: true })
 
     if (t1) {
       query = query.eq('t1_tt', t1)
@@ -181,9 +185,9 @@ Deno.serve(async (req: Request) => {
     if (bondMax != null) query = query.lte('bond_pct', bondMax)
     if (cashMin != null) query = query.gte('cash_pct', cashMin)
     if (cashMax != null) query = query.lte('cash_pct', cashMax)
-    const shareFilter = (shareClasses && shareClasses.length)
+    const shareFilter = mainOnly ? null : ((shareClasses && shareClasses.length)
       ? shareClassFilter(shareClasses)
-      : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null)
+      : (mainCode ? shareClassFilter([SHARE_CLASS_MAIN]) : null))
     if (shareFilter) {
       query = query.filter('n', 'match', shareFilter.match)
       if (shareFilter.notMatch) query = query.not('n', 'match', shareFilter.notMatch)
