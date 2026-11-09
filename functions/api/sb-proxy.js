@@ -78,7 +78,7 @@ async function proxyOnce(targetUrl, method, headers, body) {
   return winner
 }
 
-function buildResponse(upstream, req) {
+function buildResponse(upstream, req, countMode = false) {
   // 过滤响应中的 hop-by-hop 头，避免下游浏览器误用
   const respHeaders = new Headers()
   for (const [key, value] of upstream.headers.entries()) {
@@ -89,9 +89,14 @@ function buildResponse(upstream, req) {
   }
   // 补齐 CORS 头（覆盖式 set：上游若已带 ACAO:* 也只是覆盖同值，不会重复）
   for (const [k, v] of Object.entries(corsHeaders(req))) respHeaders.set(k, v)
+  // 精确计数：PostgREST 对 count=exact 返回 206 Partial Content，而 EdgeOne CDN
+  // 无法处理 206 响应（实测边缘层直接 502 HTML）。对 __count 请求把 206 改写为 200，
+  // 并保留 content-range 头 —— supabase-js 靠该头解析精确总数，200 同样属于 res.ok。
+  const status = countMode && upstream.status === 206 ? 200 : upstream.status
+  const statusText = status === upstream.status ? upstream.statusText : 'OK'
   return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
+    status,
+    statusText,
     headers: respHeaders,
   })
 }
@@ -153,12 +158,14 @@ export async function onRequest(context) {
   // 这里在服务端转发时加回 Prefer 头，并从上游路径里移除这个自定义参数。
   // 注意：绝对不要同时带 Range 头 —— 实测会让 PostgREST count=exact 触发 57014。
   let upstreamPath = targetPath
+  let countMode = false
   try {
     const [p, qs] = upstreamPath.split('?')
     const usp = new URLSearchParams(qs || '')
     if (usp.get('__count') === 'exact') {
       usp.delete('__count')
       headers.set('Prefer', 'count=exact')
+      countMode = true
       upstreamPath = p + (usp.toString() ? '?' + usp.toString() : '')
     }
   } catch (_) { /* path 无 query 时忽略 */ }
@@ -175,7 +182,7 @@ export async function onRequest(context) {
   for (let attempt = 0; attempt <= RETRY_ON_NETWORK_ERROR; attempt++) {
     try {
       const upstream = await proxyOnce(targetUrl, method, headers, body)
-      return buildResponse(upstream, req)
+      return buildResponse(upstream, req, countMode)
     } catch (err) {
       lastErr = err
       // 仅在网络层错误（超时 / 连接失败）时重试；4xx/5xx 不会进入这里

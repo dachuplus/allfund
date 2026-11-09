@@ -1,4 +1,4 @@
--- 基金主份额视图：fund_scores_main
+-- 基金主份额物化视图：fund_scores_main
 -- 规则（2026-11-09 用户确认）：
 --   1. 同一基金的不同份额，以「最早成立」的份额为主代码；
 --   2. 若成立日相同（或无法比较），则 A 份额为主代码；
@@ -13,8 +13,11 @@
 --   用 fd_kinds > 1 作为开关：仅当组内存在两个及以上不同有效成立日时才按日期排序。
 --   这样既能严格实现「最早成立」，又避免「主份额缺日期、其他份额有日期」被误判成更晚成立。
 
-CREATE OR REPLACE VIEW public.fund_scores_main
-WITH (security_invoker = true) AS
+-- ⚠️ 物化视图（2026-11-09）：普通视图做 count=exact / 全量扫描会触发
+--    57014 statement_timeout（DISTINCT ON + regexp 全表排序），无法给出精确总数。
+--    每次生产表切换后由 scripts/promote_staging.py 的 [2.2] 步 REFRESH。
+DROP MATERIALIZED VIEW IF EXISTS public.fund_scores_main;
+CREATE MATERIALIZED VIEW public.fund_scores_main AS
 WITH stat AS (
   SELECT
     regexp_replace(
@@ -45,5 +48,9 @@ ORDER BY
        ELSE 4 END,
   f.c;
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fsm_c ON public.fund_scores_main (c);
 GRANT SELECT ON public.fund_scores_main TO anon, authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
+
+-- 数据刷新：每日由 promote_staging.py 自动执行；手工可执行下一行
+-- REFRESH MATERIALIZED VIEW public.fund_scores_main;
