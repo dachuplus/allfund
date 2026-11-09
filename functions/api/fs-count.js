@@ -67,7 +67,7 @@ export async function onRequest(context) {
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
   try {
     const upstream = await fetch(SUPABASE_BASE + inner, {
-      method: 'HEAD',
+      method: 'GET',
       headers,
       signal: controller.signal,
       redirect: 'follow',
@@ -75,7 +75,14 @@ export async function onRequest(context) {
     const cr = upstream.headers.get('content-range')
     const m = cr && /\/(\d+)$/.exec(cr)
     if (m) return json({ count: Number(m[1]) })
-    return json({ count: null, error: 'upstream ' + upstream.status }, 502)
+    // 诊断信息：定位上游究竟返回了什么（状态码 / content-range / 响应片段）
+    const detail = await upstream.text().catch(() => '')
+    return json({
+      count: null,
+      error: 'upstream ' + upstream.status,
+      contentRange: cr,
+      detail: detail.slice(0, 220),
+    }, 502)
   } catch (e) {
     return json({ count: null, error: String((e && e.message) || e) }, 502)
   } finally {
