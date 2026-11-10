@@ -124,6 +124,12 @@ QDII_COMPLETE_RATIO = 0.90
 # 生产基线里「不由本脚本抓取」的大类：货币型由步骤2d 的专用接口产出后合并。
 # 这些类在生产表存在但本步骤恒为 0，若纳入基线硬校验必然误判（10/25 回归：货币型 0/956）。
 NOT_FETCHED_HERE = {'货币型'}
+# 生产基线比对只认这 7 个规范大类（与 promote_staging.py 的 CANON_CATS 一致）。
+# 生产表还存在 t0=''（分类未回填的新发基金）、Reits、商品 等「非本脚本职责」分类，
+# 它们由 reconcile / 其它脚本回填，本步骤恒抓不到。继续往黑名单补类会反复误杀：
+# 10/25 货币型 0/956、11/10 空分类 0/106（空分类数量越过 bn<100 噪声阈值后才爆）。
+# 故改白名单：非规范类一律跳过；7 大类若真没拉满，仍会被下面的 <50% 硬校验拦下。
+BASELINE_CATS = {'股票型', '混合型', '债券型', '指数型', 'FOF', 'QDII', '货币型'}
 # 各类完整性登记：{ft: {'got': int, 'declared': int}}，由 main 汇总校验
 FETCH_COMPLETENESS = {}
 
@@ -862,6 +868,11 @@ def main():
             got_map[key] = got_map.get(key, 0) + 1
         for t0, bn in sorted(base.items(), key=lambda x: -x[1]):
             gn = got_map.get(t0, 0)
+            # 非规范 / 非本脚本职责分类：只提示不校验。t0='' 是分类未回填的新发基金，
+            # 2026-11-10 累积到 106 只、越过下面的 bn<100 噪声阈值后被误判「远低于生产基线」。
+            if t0 not in BASELINE_CATS:
+                print(f'  - [{t0 or "空分类(新发基金)"}] 非本脚本职责分类，跳过基线校验（生产 {bn} 只）')
+                continue
             # 货币型不由本脚本抓取（走 fetch_currency_funds.py 的 hb rankhandler 单独接口，
             # 步骤2d 产出 currency_output.ndjson 后由 import_via_rest 合并）。纳入硬校验会
             # 恒为 0 → 误杀。此处只提示、不校验。
