@@ -29,7 +29,7 @@
       <GamesPanel />
     </div>
 
-    <!-- 奥数二级 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队 / 奥精 / 质数 / 乘法口诀 / 进位制 -->
+    <!-- 奥数二级 Tab：高斯 / 初联 / 蘑菇 / 学而思MC-club / 乐读集训队 / 奥精 / 质数 / 乘法口诀 / 平方数表 / 进位制 -->
     <div v-else-if="category === 'math'">
       <div class="cp-subtabs">
         <div
@@ -66,6 +66,7 @@
       <!-- 质数：判定方法 + 试除过程计算器 + 质数表 + 年代指数表 + 陷阱数 -->
       <PrimePanel v-else-if="mathTab === 'prime'" />
       <MultiplicationPanel v-else-if="mathTab === 'mul'" />
+      <SquareTable v-else-if="mathTab === 'square'" />
       <!-- 初联：初中联赛方法论体系 -->
       <JuniorPanel v-else />
     </div>
@@ -242,6 +243,7 @@ import YuwenPanel from '../../components/math/YuwenPanel.vue'
 import YuwenGushiwenPanel from '../../components/math/YuwenGushiwenPanel.vue'
 import PrimePanel from '../../components/math/PrimePanel.vue'
 import MultiplicationPanel from '../../components/math/MultiplicationPanel.vue'
+import SquareTable from '../../components/math/SquareTable.vue'
 import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import BaseCalculatorTool from '../../components/tools/BaseCalculatorTool.vue'
@@ -330,6 +332,7 @@ const mathTabs = [
   { key: 'aojing', label: '奥精', feature: 'math-aojing' },
   { key: 'prime', label: '质数', feature: 'math-prime' },
   { key: 'mul', label: '乘法口诀', feature: 'math-mul' },
+  { key: 'square', label: '平方数表', feature: 'math-square' },
   { key: 'base', label: '进位制', feature: 'math-base' },
 ]
 // 按功能开关（含父级 content-math / content）过滤可见的奥数机构 tab；管理员始终可见
@@ -399,6 +402,7 @@ const instMeta = {
   aojing: '《新编奥数精讲与测试》（熊斌、冯志刚 主编，上海科技教育出版社）：按出版社公开目录整理，四年级 20 讲、五年级 20 讲、六年级 22 讲（该套书无三年级分册），每讲沿用原书「知识要点 / 典例精讲 / 水平测试 A·B·C 卷」三栏目。',
   prime: '质数：奥数数论的第一道关口。含试除到 √n 的快速判定方法、可展示全过程的质数验证计算器、0–1000 质数表、1900–2999 年代指数质数表，以及考试常见陷阱数清单。',
   mul: '乘法口诀表：先列 8 条常用乘法巧算技巧（乘 11、尾 5 平方、头同尾合十、尾同头合十、接近整十整百、十几乘十几、乘 5/25/125、平方差），再给出 1×1 到 99×99 的完整乘法表，支持按被乘数定位行、查任意乘积并高亮所在格。',
+  square: '平方数速查表：列出 1 到 100 每个整数的平方（按 25 个一组分成四段），支持由数查平方与由平方反查原数、命中高亮定位；另附 100 以内的完全平方数清单和末位为 5、相邻递推、接近整百、平方差四条速算方法。',
   base: '进位制：任意进制（2/8/10/16 等）之间的数值转换工具，并支持多进制混合算式求值的进位制计算器（如 0x1A + 0b101）。',
 }
 const instDesc = computed(() => instMeta[mathTab.value] || '')

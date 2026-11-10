@@ -62,6 +62,7 @@ const DEFAULT_FLAGS = {
   'math-aojing': true,
   'math-prime': true,
   'math-mul': true,
+  'math-square': true,
   'math-base': true,
   // 娱乐 · 英文 · 三级
   'eng-unlock': true,
@@ -119,6 +120,7 @@ export const SUB_FEATURE_PARENTS = {
   'math-aojing': 'content-math',
   'math-prime': 'content-math',
   'math-mul': 'content-math',
+  'math-square': 'content-math',
   'math-base': 'content-math',
   // 娱乐 · 英文 · 三级
   'eng-unlock': 'content-eng',
@@ -201,6 +203,7 @@ export const FEATURE_GROUPS = [
       { key: 'math-aojing', label: '奥精', desc: '奥数下的奥数精讲与测试' },
       { key: 'math-prime', label: '质数', desc: '奥数下的质数' },
       { key: 'math-mul', label: '乘法口诀', desc: '奥数下的乘法口诀' },
+      { key: 'math-square', label: '平方数表', desc: '奥数下的 1–100 平方数速查表（含反查与速算方法）' },
       { key: 'math-base', label: '进位制', desc: '奥数下的进位制转换与进位制计算器' },
     ],
   },
