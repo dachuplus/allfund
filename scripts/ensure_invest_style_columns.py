@@ -78,25 +78,56 @@ def split_sql(text):
     return [s.strip() for s in body.split(';') if s.strip()]
 
 
+def view_columns():
+    rows = pg("""SELECT a.attname FROM pg_attribute a
+                 WHERE a.attrelid = 'public.fund_scores_main'::regclass
+                   AND a.attnum > 0 AND NOT a.attisdropped""")
+    return [r['attname'] for r in rows]
+
+
 def main():
     print(f'准备投资风格数据库对象（project: {PROJECT_REF}）', flush=True)
+    need_rebuild = False
 
     # 1) 幂等加列
     for col, dtype, comment in NEW_COLUMNS:
-        pg(f'ALTER TABLE public.fund_scores ADD COLUMN IF NOT EXISTS {col} {dtype};')
-        print(f'  ✓ {col} ({dtype}) — {comment}', flush=True)
+        exists = pg("""SELECT 1 AS ok FROM information_schema.columns
+                       WHERE table_schema='public' AND table_name='fund_scores'
+                         AND column_name='""" + col + "'")
+        if exists:
+            print(f'  ✓ {col} 已存在，跳过', flush=True)
+        else:
+            pg(f'ALTER TABLE public.fund_scores ADD COLUMN IF NOT EXISTS {col} {dtype};')
+            need_rebuild = True
+            print(f'  + 新增 {col} ({dtype}) — {comment}', flush=True)
 
-    # 2) 清理可能残留的旧结构备份表（见模块注释）
+    # 2) 视图列检查：物化视图列是创建时快照，加列后必须重建才会出现新列。
+    #    但**只在真的缺列时**重建 —— 每周 CI 无脑 DROP 会让线上「主代码」列表
+    #    在 DROP → CREATE 之间短暂不可用。
+    try:
+        have = view_columns()
+        missing = [c for c in ('invest_style', 'style_period', 'tags') if c not in have]
+        if missing:
+            need_rebuild = True
+            print(f'  物化视图缺列 {missing}，需要重建', flush=True)
+    except Exception:
+        need_rebuild = True
+        print('  物化视图不存在或不可读，需要重建', flush=True)
+
+    # 3) 清理可能残留的旧结构备份表（见模块注释；每次执行都无害）
     pg('DROP TABLE IF EXISTS public._fs_backup;')
-    print('  ✓ 已清理残留 _fs_backup（防止加列后按位置 INSERT 错位）', flush=True)
+    print('  ✓ 已检查残留 _fs_backup（防止加列后按位置 INSERT 错位）', flush=True)
 
-    # 3) 重建物化视图，让 f.* 带上新列
-    with open(VIEW_SQL_FILE, encoding='utf-8') as f:
-        statements = split_sql(f.read())
-    print(f'  重建 fund_scores_main：执行 {len(statements)} 条 SQL', flush=True)
-    for i, stmt in enumerate(statements, 1):
-        pg(stmt, timeout=600)
-        print(f'    [{i}/{len(statements)}] {stmt.splitlines()[0][:70]}', flush=True)
+    # 4) 按需重建物化视图
+    if need_rebuild:
+        with open(VIEW_SQL_FILE, encoding='utf-8') as f:
+            statements = split_sql(f.read())
+        print(f'  重建 fund_scores_main：执行 {len(statements)} 条 SQL', flush=True)
+        for i, stmt in enumerate(statements, 1):
+            pg(stmt, timeout=600)
+            print(f'    [{i}/{len(statements)}] {stmt.splitlines()[0][:70]}', flush=True)
+    else:
+        print('  ✓ 列与物化视图均已就绪，跳过重建（避免每周 DROP 视图影响线上）', flush=True)
 
     # 4) 验收
     cols = pg("""SELECT column_name FROM information_schema.columns
