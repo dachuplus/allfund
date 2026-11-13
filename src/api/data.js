@@ -26,11 +26,26 @@ export async function fetchTouguProducts(filters = {}) {
 // fund_scores 表实际列（核心视图）：代码/名称/分类/详情/评分
 // 合规：不再向前端下发短周期（<3 个月）评分列 k0w/k1m ——《证券投资基金评价业务管理暂行办法》
 // 第十四条第(七)项禁止发布单一指标排名期间少于 3 个月的结果，页面对应周期已一并下架。
-const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct'
+const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,invest_style,style_period,tags'
 export function fetchFundScores(params = {}) {
   const key = 'fundScores:' + JSON.stringify(params)
   return withCache(key, 60000, () => fetchFundScoresImpl(params))
 }
+
+// ========== 投资风格 / 概念·行业标签 ==========
+// 投资风格：来自公开网络 F10 特色数据页的最新报告期「基金投资风格」，
+// 取值为 规模(大/中/小盘) × 风格(价值/平衡/成长) 共 9 种，季度更新。
+export const INVEST_STYLE_OPTIONS = [
+  '大盘价值', '大盘平衡', '大盘成长',
+  '中盘价值', '中盘平衡', '中盘成长',
+  '小盘价值', '小盘平衡', '小盘成长',
+]
+export const INVEST_STYLE_UNDISCLOSED = '未披露'
+// 概念/行业标签直接复用「热门」tab 底层的 fund_tags（name + tag_type），
+// fund_scores.tags 是 text[]，夜间 promote_staging [2.5] 从 fund_tag_funds 重新应用。
+export const TAG_TYPE_CONCEPT = 'concept'
+export const TAG_TYPE_INDUSTRY = 'industry'
+export const TAG_UNDISCLOSED = '未标注'
 
 // 升序数组中 ≤ v 的元素个数（bisect_right），用于计算「严格大于 v」的数量
 function bisectRight(arr, v) {
@@ -328,7 +343,7 @@ export function scaleFilterExpr(ranges) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, countOnly = false } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, countOnly = false } = params
   if (supabase) {
     // 列表请求不带 count（22000+ 行 × 30 列曾触发 57014）。精确总数改由
     // countOnly 模式复用同一条过滤链，只 select c + head + count=exact（见下方），
@@ -431,6 +446,36 @@ async function fetchFundScoresImpl(params = {}) {
       ? holdingPeriodRegex(holdingPeriods)
       : (holding ? holdingPeriodRegex([holding]) : null)
     if (holdingRx) query = query.filter('n', 'match', holdingRx)
+    // 投资风格（多选，含「未披露」）：同一维度内取并集，服务端下推到
+    // fund_scores / fund_scores_main 两张表都有该列，默认「主代码」态同样生效。
+    // 单值走 eq（最稳），多值/含未披露走 or；不用 in.(...) 以免中文值被 PostgREST 误解析。
+    if (investStyles && investStyles.length) {
+      const known = investStyles.filter(s => s !== INVEST_STYLE_UNDISCLOSED)
+      const wantNone = known.length !== investStyles.length
+      if (known.length === 1 && !wantNone) {
+        query = query.eq('invest_style', known[0])
+      } else if (!known.length && wantNone) {
+        query = query.is('invest_style', null)
+      } else {
+        const parts = known.map(s => `invest_style.eq."${s}"`)
+        if (wantNone) parts.push('invest_style.is.null')
+        if (parts.length) query = query.or(parts.join(','))
+      }
+    }
+    // 概念/行业标签（合并多选，取并集）：fund_scores.tags 是 text[]，
+    // PostgREST 用 cs.{标签} 表达「数组包含」；多个标签用 or 串成并集。
+    // 两行 UI（概念、行业）在页面上是独立筛选控件，但底层共用一个并集条件。
+    if (tagFilters && tagFilters.length) {
+      const known = tagFilters.filter(t => t !== TAG_UNDISCLOSED)
+      const wantNone = known.length !== tagFilters.length
+      const parts = known.map(t => `tags.cs.{${t}}`)
+      if (wantNone) { parts.push('tags.is.null'); parts.push('tags.eq.{}') }
+      if (parts.length === 1) {
+        query = wantNone ? query.is('tags', null) : query.filter('tags', 'cs', `{${known[0]}}`)
+      } else if (parts.length > 1) {
+        query = query.or(parts.join(','))
+      }
+    }
     // 不再过滤 null 评分（否则债券型-混合二级等数据源未覆盖的分类会显示为空）
     // 改用 nullsFirst: false 让 null 排到最后
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；

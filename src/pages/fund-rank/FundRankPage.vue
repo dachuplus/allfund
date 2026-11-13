@@ -96,6 +96,48 @@
               <span class="more-modal-close" @click="cancelMoreFilter">&#x2715;</span>
             </div>
             <div class="more-modal-body">
+              <!-- 投资风格（多选）：公开网络最新报告期，季度更新 -->
+              <div class="filter-row">
+                <span class="filter-label">投资风格</span>
+                <div class="filter-chips">
+                  <div class="filter-chip" :class="{ active: filterInvestStyle.length === 0 }" @click="filterInvestStyle = []">全部</div>
+                  <div v-for="s in INVEST_STYLE_OPTIONS" :key="s" class="filter-chip" :class="{ active: filterInvestStyle.includes(s) }" @click="mToggleStyle(s)">{{ s }}</div>
+                  <div class="filter-chip" :class="{ active: filterInvestStyle.includes(INVEST_STYLE_UNDISCLOSED) }" @click="mToggleStyle(INVEST_STYLE_UNDISCLOSED)">未披露</div>
+                </div>
+              </div>
+
+              <!-- 概念标签（多选并集）：标签来自「热门」tab 底层 fund_tags -->
+              <div class="filter-row">
+                <span class="filter-label">概念</span>
+                <div class="tag-picker">
+                  <div class="tag-picker-bar">
+                    <div class="filter-chip" :class="{ active: filterConceptTags.length === 0 }" @click="filterConceptTags = []">全部</div>
+                    <input class="tag-search" v-model="tagSearch.concept" placeholder="搜概念标签" />
+                    <span class="tag-toggle" @click="tagExpanded.concept = !tagExpanded.concept">{{ tagExpanded.concept ? '收起' : '展开全部 ' + conceptTagOptions.length }}</span>
+                  </div>
+                  <div class="tag-chip-list" :class="{ expanded: tagExpanded.concept }">
+                    <div v-for="t in visibleTagOptions('concept')" :key="t" class="filter-chip" :class="{ active: filterConceptTags.includes(t) }" @click="mToggleTag('concept', t)">{{ t }}</div>
+                  </div>
+                  <div class="tag-selected" v-if="filterConceptTags.length">已选 {{ filterConceptTags.length }} 个：{{ filterConceptTags.join('、') }}</div>
+                </div>
+              </div>
+
+              <!-- 行业标签（多选并集） -->
+              <div class="filter-row">
+                <span class="filter-label">行业</span>
+                <div class="tag-picker">
+                  <div class="tag-picker-bar">
+                    <div class="filter-chip" :class="{ active: filterIndustryTags.length === 0 }" @click="filterIndustryTags = []">全部</div>
+                    <input class="tag-search" v-model="tagSearch.industry" placeholder="搜行业标签" />
+                    <span class="tag-toggle" @click="tagExpanded.industry = !tagExpanded.industry">{{ tagExpanded.industry ? '收起' : '展开全部 ' + industryTagOptions.length }}</span>
+                  </div>
+                  <div class="tag-chip-list" :class="{ expanded: tagExpanded.industry }">
+                    <div v-for="t in visibleTagOptions('industry')" :key="t" class="filter-chip" :class="{ active: filterIndustryTags.includes(t) }" @click="mToggleTag('industry', t)">{{ t }}</div>
+                  </div>
+                  <div class="tag-selected" v-if="filterIndustryTags.length">已选 {{ filterIndustryTags.length }} 个：{{ filterIndustryTags.join('、') }}</div>
+                </div>
+              </div>
+
               <!-- 份额类别（多选） -->
               <div class="filter-row">
                 <span class="filter-label">份额</span>
@@ -263,7 +305,7 @@
 
               <!-- 筛选说明 -->
               <div class="filter-tip">
-                注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。ETF/LOF/定开/申购状态/单日涨跌/异常基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。「异常」为收益数据合理性校验标注（如单月收益超 100%、债券型收益超上限、各期累计收益几乎相同等数据源脏值特征），名称旁带红标，选基时建议选「否」剔除。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
+                注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。投资风格来自公开网络最新报告期，按季度更新，未披露的产品不显示风格标签；概念/行业标签来自热门板块标签数据，两行多选均为「并集」，跨行也是并集。ETF/LOF/定开/申购状态/单日涨跌/异常基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。「异常」为收益数据合理性校验标注（如单月收益超 100%、债券型收益超上限、各期累计收益几乎相同等数据源脏值特征），名称旁带红标，选基时建议选「否」剔除。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
               </div>
             </div>
             <div class="more-modal-footer">
@@ -332,6 +374,9 @@
               基金经理<span class="th-arrow" v-if="sortField === 'fund_manager'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-t1">二级分类</th>
+            <th class="col-style">投资风格</th>
+            <th class="col-tags">概念</th>
+            <th class="col-tags">行业</th>
             <th class="col-scale sortable" @click="toggleColumnSort('fund_scale')">
               基金规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -366,6 +411,24 @@
             <td class="col-name"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.n || '基金' + fund.c }}</a><span v-if="fund.ret_anomaly" class="anom-badge" title="收益数据异常（疑似单点净值毛刺或源数据脏值），筛选「异常-否」可剔除">异常</span></td>
             <td class="col-manager" :title="fund.fund_manager">{{ fund.fund_manager || '--' }}</td>
             <td class="col-t1" :title="fund.t1_tt || fund.t1">{{ fund.t1_tt || fund.t1 || '--' }}</td>
+            <td class="col-style">
+              <span v-if="fund.invest_style" class="style-badge" :title="'投资风格：' + fund.invest_style + '（' + (fund.style_period || '最新报告期') + '）'">{{ fund.invest_style }}</span>
+              <span v-else class="tag-empty">--</span>
+            </td>
+            <td class="col-tags" :title="conceptOf(fund).join('、')">
+              <template v-if="conceptOf(fund).length">
+                <span v-for="t in conceptOf(fund).slice(0, 3)" :key="t" class="tag-badge concept">{{ t }}</span>
+                <span v-if="conceptOf(fund).length > 3" class="tag-more" :title="conceptOf(fund).slice(3).join('、')">+{{ conceptOf(fund).length - 3 }}</span>
+              </template>
+              <span v-else class="tag-empty">--</span>
+            </td>
+            <td class="col-tags" :title="industryOf(fund).join('、')">
+              <template v-if="industryOf(fund).length">
+                <span v-for="t in industryOf(fund).slice(0, 3)" :key="t" class="tag-badge industry">{{ t }}</span>
+                <span v-if="industryOf(fund).length > 3" class="tag-more" :title="industryOf(fund).slice(3).join('、')">+{{ industryOf(fund).length - 3 }}</span>
+              </template>
+              <span v-else class="tag-empty">--</span>
+            </td>
             <td class="col-scale">{{ fmtFundScale(fund.fund_scale) }}</td>
             <td class="col-fee">{{ fmtManageFee(fund.manage_fee) }}</td>
             <td class="col-ret" :style="{ color: retColor(fund.r1y) }">{{ fmtRetPlain(fund.r1y) }}</td>
@@ -423,6 +486,11 @@
           </span>
         </div>
         <div class="fund-card-mgr" v-if="fund.fund_manager">{{ fund.fund_manager }}</div>
+        <div class="fund-card-tags">
+          <span v-if="fund.invest_style" class="style-badge" :title="'投资风格：' + fund.invest_style + '（' + (fund.style_period || '最新报告期') + '）'">{{ fund.invest_style }}</span>
+          <span class="tag-line" v-if="conceptOf(fund).length"><em>概念</em>{{ conceptOf(fund).slice(0, 5).join('、') }}<span v-if="conceptOf(fund).length > 5"> 等 {{ conceptOf(fund).length }} 个</span></span>
+          <span class="tag-line" v-if="industryOf(fund).length"><em>行业</em>{{ industryOf(fund).slice(0, 5).join('、') }}<span v-if="industryOf(fund).length > 5"> 等 {{ industryOf(fund).length }} 个</span></span>
+        </div>
         <div class="fund-card-scale" v-if="fund.fund_scale != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 管理费%：{{ fmtManageFee(fund.manage_fee) }}</div>
         <div class="fund-card-ret">
           <span :style="{ color: retColor(fund.r1y) }">近1年收益 {{ fmtRetPlain(fund.r1y) }}</span>
@@ -712,7 +780,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
-import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, HOLDING_PERIOD_OPTIONS } from '../../api/data.js'
+import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
@@ -855,6 +923,15 @@ const filterBondMin = ref('')
 const filterBondMax = ref('')
 const filterCashMin = ref('')
 const filterCashMax = ref('')
+
+// 投资风格 / 概念·行业标签（2026-11-13）：
+// 标签元数据直接复用「热门」tab 底层的 fund_tags（name + tag_type），不另建表。
+const filterInvestStyle = ref([])   // 投资风格多选（可含「未披露」）
+const filterConceptTags = ref([])   // 概念标签多选
+const filterIndustryTags = ref([])  // 行业标签多选
+const tagMeta = ref([])             // [{ name, tag_type, ... }]
+const tagExpanded = reactive({ concept: false, industry: false })
+const tagSearch = reactive({ concept: '', industry: '' })
 
 /** 把输入框字符串转成数字，空/非法返回 undefined（与规模自定义区间 NaN 守卫同构） */
 function numOrUndef(v) {
@@ -1111,6 +1188,51 @@ function extractShareClass(name) {
 
 const shareClassOptions = VALID_SHARE_CLASSES
 
+// ========== 投资风格 / 概念·行业标签：选项、行内拆分、多选交互 ==========
+const tagTypeMap = computed(() => {
+  const m = {}
+  for (const t of tagMeta.value) m[t.name] = t.tag_type
+  return m
+})
+const conceptTagOptions = computed(() =>
+  tagMeta.value.filter(t => t.tag_type === TAG_TYPE_CONCEPT).map(t => t.name))
+const industryTagOptions = computed(() =>
+  tagMeta.value.filter(t => t.tag_type === TAG_TYPE_INDUSTRY).map(t => t.name))
+
+// 列表两列：把 fund.tags（text[]）按 fund_tags.tag_type 拆成概念 / 行业两组
+function conceptOf(f) {
+  return (Array.isArray(f.tags) ? f.tags : []).filter(t => tagTypeMap.value[t] === TAG_TYPE_CONCEPT)
+}
+function industryOf(f) {
+  return (Array.isArray(f.tags) ? f.tags : []).filter(t => tagTypeMap.value[t] === TAG_TYPE_INDUSTRY)
+}
+
+// 标签 101 + 85 个，默认只露前 12 个；可搜索或展开全部，避免撑爆弹窗
+function visibleTagOptions(type) {
+  let list = type === 'concept' ? conceptTagOptions.value : industryTagOptions.value
+  const q = (tagSearch[type] || '').trim()
+  if (q) list = list.filter(n => n.includes(q))
+  else if (!tagExpanded[type]) list = list.slice(0, 12)
+  return list
+}
+function mToggleTag(type, name) {
+  const r = type === 'concept' ? filterConceptTags : filterIndustryTags
+  r.value = r.value.includes(name) ? r.value.filter(x => x !== name) : r.value.concat(name)
+}
+function mToggleStyle(val) {
+  filterInvestStyle.value = filterInvestStyle.value.includes(val)
+    ? filterInvestStyle.value.filter(x => x !== val)
+    : filterInvestStyle.value.concat(val)
+}
+async function loadTagMeta() {
+  try {
+    const rows = await fetchFundTags()
+    if (Array.isArray(rows)) tagMeta.value = rows
+  } catch (e) {
+    console.warn('[fund-rank] 标签元数据加载失败（两列显示 --，不影响其它筛选）', e)
+  }
+}
+
 // ========== 数据加载 ==========
 const LOAD_TIMEOUT_MS = 60000 // 60 秒超时（Supabase 免费档偶尔响应偏慢，给足时间避免误报 0 只）
 const MAX_RETRIES = 1           // 失败后自动重试 1 次
@@ -1172,6 +1294,10 @@ async function loadData(reset = true, _retryCount = 0) {
       cashMax: numOrUndef(filterCashMax.value),
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
+      // 投资风格 / 概念·行业：两行 UI 共用一个标签并集条件，与列表同一条链
+      investStyles: filterInvestStyle.value.length ? filterInvestStyle.value : undefined,
+      tagFilters: (filterConceptTags.value.length || filterIndustryTags.value.length)
+        ? [...filterConceptTags.value, ...filterIndustryTags.value] : undefined,
     }
 
     // 并行拉取「真实总数」：复用与列表完全相同的过滤链做服务端 count=exact，
@@ -1274,6 +1400,13 @@ function clearMoreFilters() {
   filterBondMax.value = ''
   filterCashMin.value = ''
   filterCashMax.value = ''
+  filterInvestStyle.value = []
+  filterConceptTags.value = []
+  filterIndustryTags.value = []
+  tagExpanded.concept = false
+  tagExpanded.industry = false
+  tagSearch.concept = ''
+  tagSearch.industry = ''
 }
 
 // ========== 更多筛选弹窗（确认后才查询，取消恢复） ==========
@@ -1288,6 +1421,7 @@ function openMoreFilter() {
     psm: filterStockMin.value, psx: filterStockMax.value,
     pbm: filterBondMin.value, pbx: filterBondMax.value,
     pcm: filterCashMin.value, pcx: filterCashMax.value,
+    ist: [...filterInvestStyle.value], ct: [...filterConceptTags.value], it: [...filterIndustryTags.value],
   }
   showMoreFilter.value = true
 }
@@ -1317,6 +1451,9 @@ function cancelMoreFilter() {
     filterBondMax.value = moreFilterSnapshot.pbx
     filterCashMin.value = moreFilterSnapshot.pcm
     filterCashMax.value = moreFilterSnapshot.pcx
+    filterInvestStyle.value = [...(moreFilterSnapshot.ist || [])]
+    filterConceptTags.value = [...(moreFilterSnapshot.ct || [])]
+    filterIndustryTags.value = [...(moreFilterSnapshot.it || [])]
   }
   showMoreFilter.value = false
 }
@@ -1395,6 +1532,9 @@ const activeMoreFilterCount = computed(() => {
   if (filterStockMin.value !== '' || filterStockMax.value !== '') n++
   if (filterBondMin.value !== '' || filterBondMax.value !== '') n++
   if (filterCashMin.value !== '' || filterCashMax.value !== '') n++
+  if (filterInvestStyle.value.length) n++
+  if (filterConceptTags.value.length) n++
+  if (filterIndustryTags.value.length) n++
   return n
 })
 
@@ -1525,6 +1665,7 @@ onMounted(() => {
   fetchCategories()
   loadData()
   loadMeta()
+  loadTagMeta()
 })
 onActivated(() => {
   // keep-alive 缓存激活时：数据已存在（秒开），仅刷新 meta（更新时间）
@@ -1795,6 +1936,31 @@ onUnmounted(() => {
 .col-fee { width: 60px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .col-t1 { width: 100px; color: var(--text-secondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-ret { width: 90px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
+/* ===== 投资风格 / 概念·行业标签（2026-11-13，gov.uk 风格：无圆角/阴影/渐变） ===== */
+.col-style { width: 84px; text-align: left; }
+.col-tags { width: 156px; font-size: 12px; color: var(--text-secondary); }
+.style-badge, .tag-badge {
+  display: inline-block; padding: 1px 5px; margin: 1px 3px 1px 0;
+  font-size: 11px; line-height: 1.5; font-weight: 700;
+  border: 1px solid #1d70b8; color: #1d70b8; background: #fff; white-space: nowrap;
+}
+.style-badge { color: #fff; background: #1d70b8; }
+.tag-badge.industry { border-color: #505a5f; color: #505a5f; }
+.tag-more, .tag-empty { font-size: 12px; color: var(--text-secondary); }
+.tag-more { cursor: help; }
+
+/* 标签选择器：101 概念 + 85 行业，默认露出前 12 个，可搜索/展开 */
+.tag-picker { flex: 1; min-width: 0; }
+.tag-picker-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 0 8px; }
+.tag-search {
+  width: 130px; padding: 3px 6px; font-size: 13px; font-family: inherit;
+  border: 1px solid var(--border); background: #fff; color: var(--text-primary);
+}
+.tag-toggle { font-size: 13px; color: var(--link); cursor: pointer; text-decoration: underline; }
+.tag-chip-list { display: flex; flex-wrap: wrap; gap: 0; max-height: 72px; overflow: hidden; margin-top: 2px; }
+.tag-chip-list.expanded { max-height: 190px; overflow-y: auto; }
+.tag-selected { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
 .col-ret.sortable { cursor: pointer; user-select: none; }
 .col-ret.sortable:hover { background: #e0e7ef; }
 /* 表头字号略缩，确保「近N年收益%」与排序三角形同处一列不被截断 */
@@ -1814,6 +1980,8 @@ onUnmounted(() => {
 .fund-card-top {
   display: flex; align-items: center; gap: var(--space-sm);
 }
+.fund-card-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0 2px; font-size: 12px; color: var(--text-secondary); }
+.fund-card-tags .tag-line em { font-style: normal; font-weight: 700; color: #505a5f; margin-right: 4px; }
 
 .fund-code {
   font-size: 13px; font-weight: 700; color: var(--text-primary);

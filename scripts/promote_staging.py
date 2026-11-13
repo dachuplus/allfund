@@ -451,7 +451,10 @@ def main():
                    'net_sub_share', 'total_share_end', 'net_asset_end', 'nav_change_rate',
                    'inst_hold_pct', 'indiv_hold_pct', 'internal_hold_pct',
                    'fund_manager', 'fund_scale', 'manage_fee', 'company',
-                   'found_date', 'share_scale', 'custody_fee', 'sale_fee']
+                   'found_date', 'share_scale', 'custody_fee', 'sale_fee',
+                   # 投资风格（2026-11-13）：每周独立流水线写入，不由评分 staging 抓取，
+                   # 切换后必须像配置列一样从备份 COALESCE 回填，否则每晚被清成 NULL。
+                   'invest_style', 'style_period']
     _set = ', '.join([f'{c} = COALESCE(f.{c}, b.{c})' for c in _alloc_cols])
     try:
         pg(f'UPDATE fund_scores f SET {_set} FROM _fs_backup b WHERE f.c = b.c', timeout=300)
@@ -486,6 +489,18 @@ def main():
         print(f'  ✓ 已为 {tagged} 只基金标记标签', flush=True)
     except Exception as e:
         print(f'  [WARN] 标签重新应用失败（不影响评分切换）: {e}', flush=True)
+
+    # ── 2.6 最终刷新主份额物化视图（2026-11-13）──────────────────────────
+    # [2.2] 那次刷新发生在「配置列 COALESCE 回填」与「[2.5] 重新应用 tags」之前，
+    # 彼时切换进来的新行 invest_style / style_period / tags 都还是 NULL。若只刷一次，
+    # 默认「主代码」列表会丢失投资风格、概念/行业标签
+    # （实测线上 fund_scores_main 15510 行里只有 54 行带 tags，原表有 4481 行）。
+    # 故在所有回填与打标签完成后再刷一次，保证视图与生产表完全同步。
+    try:
+        pg('REFRESH MATERIALIZED VIEW public.fund_scores_main;', timeout=600)
+        print('  ✓ 已刷新物化视图 fund_scores_main（含投资风格与概念/行业标签）', flush=True)
+    except Exception as e:
+        print(f'  [WARN] 最终刷新 fund_scores_main 失败（不阻断切换）: {e}', flush=True)
 
     # ── 2.9 覆盖率守卫：季度评分刷新完整性 ──────────────────────────────
     print('\n[2.9] 季度评分覆盖率守卫（防 fund_combined 半成品污染）', flush=True)
