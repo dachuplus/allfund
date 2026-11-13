@@ -1607,7 +1607,7 @@ function exportCsv() {
     toast('暂无数据可导出', 'error')
     return
   }
-  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '基金规模(亿)', '管理费%', '近1年收益%', '近2年收益%', '近3年收益%', '近5年收益%']
+  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '投资风格', '概念', '行业', '基金规模(亿)', '管理费%', '近1年收益%', '近2年收益%', '近3年收益%', '近5年收益%']
   const periodHeaders = displayPeriods.value.map(p => p.label + '评分')
   const allHeaders = [...headers, ...periodHeaders]
 
@@ -1617,6 +1617,9 @@ function exportCsv() {
       f.n || '',
       f.fund_manager || '',
       f.t1_tt || f.t1 || '',
+      f.invest_style || '',
+      conceptOf(f).join('、'),
+      industryOf(f).join('、'),
       f.fund_scale != null ? f.fund_scale : '',
       f.manage_fee != null ? f.manage_fee : '',
       f.r1y != null ? f.r1y : '',
