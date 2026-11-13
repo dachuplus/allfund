@@ -363,6 +363,11 @@ async function fetchFundScoresImpl(params = {}) {
     let query = countOnly
       ? supabase.from(table).select('c')
       : supabase.from(table).select(FUND_SCORES_COLS)
+    // ⚠️ PostgREST 查询串只有一个 or= 参数，而 supabase-js 的 .or() 用 set() 而非 append()，
+    //    多次调用会互相覆盖 —— 「搜索 + 定开 + 规模多段 + 风格多选 + 概念/行业」同时启用时
+    //    只剩最后一组条件，其余静默失效。这里把每个维度内的并集收集成 orGroups，
+    //    末尾合成单个 and=(or(...),or(...))，保证「组内 OR、组间 AND」。
+    const orGroups = []
     // 分类筛选：直接采用 fund_scores 的「一级分类 t0」与「二级分类 t1_tt」
     // （从总表服务端过滤，而非客户端对前 100 条再筛）
     if (t1) {
@@ -379,7 +384,7 @@ async function fetchFundScoresImpl(params = {}) {
         query = query.eq('t0', t0)
       }
     }
-    if (search) query = query.or(`n.ilike.%${search}%,c.ilike.%${search}%`)
+    if (search) orGroups.push(`n.ilike.%${search}%,c.ilike.%${search}%`)
     // 服务端下推：产品类型/状态筛选（避免前端只过滤首页导致计数与展示不一致）
     if (etf) {
       if (etf === '1') query = query.ilike('n', '%ETF%')
@@ -390,7 +395,7 @@ async function fetchFundScoresImpl(params = {}) {
       else if (lof === '0') query = query.not('n', 'ilike', '%LOF%')
     }
     if (dk) {
-      if (dk === '1') query = query.or('n.ilike.%定开%,n.ilike.%定期开放%')
+      if (dk === '1') orGroups.push('n.ilike.%定开%,n.ilike.%定期开放%')
       else if (dk === '0') query = query.not('n', 'ilike', '%定开%').not('n', 'ilike', '%定期开放%')
     }
     if (sg) {
@@ -403,11 +408,11 @@ async function fetchFundScoresImpl(params = {}) {
     // 注：postgrest-js 无 .and() 方法，用链式 .ilike() 表达 AND（与 etf 过滤同构）。
     if (zz) {
       if (zz === '1') query = query.ilike('n', '%增强%').ilike('t1', '%指数%')
-      else if (zz === '0') query = query.or('n.not.ilike.%增强%,t1.not.ilike.%指数%')
+      else if (zz === '0') orGroups.push('n.not.ilike.%增强%,t1.not.ilike.%指数%')
     }
     if (dailyLimit) {
       if (dailyLimit === '1') query = query.gte('daily_change', 20)
-      else if (dailyLimit === '0') query = query.or('daily_change.lt.20,daily_change.is.null')
+      else if (dailyLimit === '0') orGroups.push('daily_change.lt.20,daily_change.is.null')
     }
     // 异常收益标注（2026-10-11）：'1' 仅看异常 / '0' 剔除异常（服务端 ret_anomaly 列）
     if (retAnomaly === '1') query = query.eq('ret_anomaly', true)
@@ -420,7 +425,7 @@ async function fetchFundScoresImpl(params = {}) {
         if (mx != null) query = query.lte('fund_scale', mx)
       } else {
         const expr = scaleFilterExpr(scaleRanges)
-        if (expr) query = query.or(expr)
+        if (expr) orGroups.push(expr)
       }
     } else {
       if (scaleMin != null) query = query.gte('fund_scale', scaleMin)
@@ -459,7 +464,7 @@ async function fetchFundScoresImpl(params = {}) {
       } else {
         const parts = known.map(s => `invest_style.eq."${s}"`)
         if (wantNone) parts.push('invest_style.is.null')
-        if (parts.length) query = query.or(parts.join(','))
+        if (parts.length) orGroups.push(parts.join(','))
       }
     }
     // 概念/行业标签（合并多选，取并集）：fund_scores.tags 是 text[]，
@@ -473,11 +478,23 @@ async function fetchFundScoresImpl(params = {}) {
       if (parts.length === 1) {
         query = wantNone ? query.is('tags', null) : query.filter('tags', 'cs', `{${known[0]}}`)
       } else if (parts.length > 1) {
-        query = query.or(parts.join(','))
+        orGroups.push(parts.join(','))
       }
     }
     // 不再过滤 null 评分（否则债券型-混合二级等数据源未覆盖的分类会显示为空）
     // 改用 nullsFirst: false 让 null 排到最后
+    // ── 统一下发所有 OR 组（2026-11-13）─────────────────────────────────
+    // ≥2 组时下发顶层 and=(or(g1),or(g2),...)：组内是并集，组间与其余 eq/gte/not
+    // 条件是交集。线上实测（sb-proxy + fs-count，均 HTTP 200）：
+    //   t0 OR = 12087 / 投资风格 OR = 54 / 两者 AND = 51 / 再叠加规模多段 = 25。
+    // 单组仍走原来的 or=(...) 查询串，保持既有行为逐字节不变，避免回归。
+    // 注意：这里刻意不再下发 or= 参数，and= 与 or= 同时出现虽合法但无必要。
+    if (orGroups.length === 1) {
+      query = query.or(orGroups[0])
+    } else if (orGroups.length > 1) {
+      const members = orGroups.map(g => `or(${g})`).join(',')
+      query.url.searchParams.set('and', `(${members})`)
+    }
     // 排序：若指定了列排序（sortField），则在整个 fund_scores 表（已按筛选条件过滤）基础上按该列排序；
     //       否则按靠谱分周期 kKey 排序。两种排序均在服务端完成，覆盖全表而非仅已加载的 100 条。
     // 精确总数：把「与列表完全相同的过滤链」序列化后交给服务端函数计数。
