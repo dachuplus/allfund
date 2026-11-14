@@ -38,31 +38,16 @@ const HOP_BY_HOP = new Set([
   'trailer',
 ])
 
-// 2026-11-14：只透传上游 PostgREST / GoTrue 真正需要的头。
-// 之前「全量透传」会把边缘层注入的转发头（含完整 URL）带给上游；概念 / 行业
-// 「未分类」的查询串较长时，其中某个头值会超过运行时的 4095 上限，出站 fetch
-// 直接抛 "Header value length invalid" → 列表 502。fs-count 用白名单头则完全正常，
-// 故这里同样收窄；正常请求头（apikey / authorization / prefer 等）全在白名单内。
-const FORWARD_HEADERS = new Set([
-  'apikey', 'authorization', 'content-type', 'accept', 'prefer',
-  'x-client-info', 'accept-profile', 'content-profile',
-  'range', 'range-unit', 'if-match', 'if-none-match',
-])
-
 function buildUpstreamHeaders(incoming) {
   const headers = new Headers()
   for (const [key, value] of incoming.entries()) {
     const lower = key.toLowerCase()
-    if (!FORWARD_HEADERS.has(lower)) continue
     if (HOP_BY_HOP.has(lower)) continue
     // 去掉 accept-encoding：让上游返回未压缩 JSON，避免经 EdgeOne 二次压缩导致正文损坏
     if (lower === 'accept-encoding') continue
     // 去掉浏览器 / 边缘网关注入的转发类伪头，避免干扰上游
     if (lower.startsWith('x-forwarded') || lower.startsWith('x-real-ip') || lower.startsWith('cf-')) continue
-    // 2026-11-14：概念 / 行业「未分类」会把该维度的全部标签名拼进查询串（约 3-6KB），
-    // 边缘层注入的个别转发头会带上完整 URL，值超过运行时的 4095 上限，导致出站 fetch
-    // 直接抛 "Header value length invalid"、列表 502。这类超长头对上游 PostgREST 没有意义，
-    // 直接丢弃；正常请求头（apikey / authorization / prefer 等）远低于该阈值。
+    // 防御：丢弃边缘层注入的超长转发头（正常请求头远低于此值）
     if (value.length > 3000) continue
     headers.set(key, value)
   }
@@ -187,7 +172,13 @@ export async function onRequest(context) {
     }
   } catch (_) { /* path 无 query 时忽略 */ }
 
-  const targetUrl = SUPABASE_BASE + (upstreamPath.startsWith('/') ? upstreamPath : '/' + upstreamPath)
+  const rawTarget = SUPABASE_BASE + (upstreamPath.startsWith('/') ? upstreamPath : '/' + upstreamPath)
+  // 2026-11-14：path 解码后含中文标签名时，把未编码的 URL 字符串直接交给 fetch，
+  // EdgeOne 运行时会以 "Header value length invalid. should not exceed 4095" 拒绝
+  // （概念 / 行业「未分类」的长查询串必现，列表 502、但 /api/fs-count 同链路正常）。
+  // 根因是 URL 未做百分号编码：fs-count.js 用 new URL(...).toString() 规范化后，
+  // 6KB 查询串实测 200。这里只在含非 ASCII 字符时同样规范化，纯 ASCII 请求保持原样。
+  const targetUrl = /[^\x00-\x7F]/.test(rawTarget) ? new URL(rawTarget).toString() : rawTarget
 
   // 读取 body（仅一次），重试时复用同一份 ArrayBuffer
   let body = undefined
