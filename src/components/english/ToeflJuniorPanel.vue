@@ -187,10 +187,11 @@
 /**
  * 小托福加油站（TOEFL Junior）练习面板。
  *
- * 数据来源：Week1-5 学生讲义 + 答案解析 PDF，解析为静态 JS 数据（零网络请求）。
+ * 数据来源：Week1-7 学生讲义 + 答案解析 PDF，解析为静态 JS 数据（零网络请求）。
  * 结构：周次 tab → PART A / PART B → 专项练习答案（折叠）
  *      → 考场实战题目（作答判定 + 解题逻辑折叠 + 只看错题）。
- * 听力音频为原讲义二维码解析出的外链，target=_blank 打开。
+ * 部分周的听力音频为原讲义二维码解析出的外链，target=_blank 打开；
+ * 未印出外链的周只提供听力原文，不臆造链接。
  */
 import { ref, computed, reactive, watch } from 'vue'
 
@@ -201,6 +202,7 @@ const WEEKS = [
   { key: 'w4', label: 'Week 4' },
   { key: 'w5', label: 'Week 5' },
   { key: 'w6', label: 'Week 6' },
+  { key: 'w7', label: 'Week 7' },
 ]
 const LOADERS = {
   w1: () => import('../../data/toeflJuniorW1.js'),
@@ -209,6 +211,7 @@ const LOADERS = {
   w4: () => import('../../data/toeflJuniorW4.js'),
   w5: () => import('../../data/toeflJuniorW5.js'),
   w6: () => import('../../data/toeflJuniorW6.js'),
+  w7: () => import('../../data/toeflJuniorW7.js'),
 }
 
 const weeks = WEEKS

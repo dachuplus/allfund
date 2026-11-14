@@ -214,7 +214,7 @@ export const FEATURE_GROUPS = [
       { key: 'eng-re', label: 'Reading Explorer', desc: '英文下的 Reading Explorer（国家地理非虚构阅读）' },
       { key: 'eng-ledu', label: '乐读', desc: '英文下的乐读（分级原版阅读）' },
       { key: 'eng-nce', label: '新概念', desc: '英文下的新概念英语' },
-      { key: 'eng-toefl', label: '小托福', desc: '英文下的小托福加油站（Week1-5 听力/阅读/语用）' },
+      { key: 'eng-toefl', label: '小托福', desc: '英文下的小托福加油站（Week1-7 听力/阅读/语用）' },
     ],
   },
   {
