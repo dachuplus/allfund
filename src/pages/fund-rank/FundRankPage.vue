@@ -112,6 +112,7 @@
                 <div class="tag-picker">
                   <div class="tag-picker-bar">
                     <div class="filter-chip" :class="{ active: filterConceptTags.length === 0 }" @click="filterConceptTags = []">全部</div>
+                    <div class="filter-chip" :class="{ active: filterConceptTags.includes(TAG_UNDISCLOSED) }" @click="mToggleTag('concept', TAG_UNDISCLOSED)">未分类</div>
                     <input class="tag-search" v-model="tagSearch.concept" placeholder="搜概念标签" />
                     <span class="tag-toggle" @click="tagExpanded.concept = !tagExpanded.concept">{{ tagExpanded.concept ? '收起' : '展开全部 ' + conceptTagOptions.length }}</span>
                   </div>
@@ -128,6 +129,7 @@
                 <div class="tag-picker">
                   <div class="tag-picker-bar">
                     <div class="filter-chip" :class="{ active: filterIndustryTags.length === 0 }" @click="filterIndustryTags = []">全部</div>
+                    <div class="filter-chip" :class="{ active: filterIndustryTags.includes(TAG_UNDISCLOSED) }" @click="mToggleTag('industry', TAG_UNDISCLOSED)">未分类</div>
                     <input class="tag-search" v-model="tagSearch.industry" placeholder="搜行业标签" />
                     <span class="tag-toggle" @click="tagExpanded.industry = !tagExpanded.industry">{{ tagExpanded.industry ? '收起' : '展开全部 ' + industryTagOptions.length }}</span>
                   </div>
@@ -780,7 +782,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
-import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY } from '../../api/data.js'
+import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY, TAG_UNDISCLOSED } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
@@ -927,8 +929,8 @@ const filterCashMax = ref('')
 // 投资风格 / 概念·行业标签（2026-11-13）：
 // 标签元数据直接复用「热门」tab 底层的 fund_tags（name + tag_type），不另建表。
 const filterInvestStyle = ref([])   // 投资风格多选（可含「未披露」）
-const filterConceptTags = ref([])   // 概念标签多选
-const filterIndustryTags = ref([])  // 行业标签多选
+const filterConceptTags = ref([])   // 概念标签多选（可含「未分类」哨兵）
+const filterIndustryTags = ref([])  // 行业标签多选（可含「未分类」哨兵）
 const tagMeta = ref([])             // [{ name, tag_type, ... }]
 const tagExpanded = reactive({ concept: false, industry: false })
 const tagSearch = reactive({ concept: '', industry: '' })
@@ -1294,10 +1296,13 @@ async function loadData(reset = true, _retryCount = 0) {
       cashMax: numOrUndef(filterCashMax.value),
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
-      // 投资风格 / 概念·行业：两行 UI 共用一个标签并集条件，与列表同一条链
+      // 投资风格 / 概念·行业：两行 UI 各自独立成组（组间取交集），与列表同一条链
       investStyles: filterInvestStyle.value.length ? filterInvestStyle.value : undefined,
-      tagFilters: (filterConceptTags.value.length || filterIndustryTags.value.length)
-        ? [...filterConceptTags.value, ...filterIndustryTags.value] : undefined,
+      conceptTagFilters: filterConceptTags.value.length ? [...filterConceptTags.value] : undefined,
+      industryTagFilters: filterIndustryTags.value.length ? [...filterIndustryTags.value] : undefined,
+      // 「未分类」需要该维度的全部标签名构造 not.ov（数据来自 fund_tags，加载失败时自动退化）
+      allConceptTags: conceptTagOptions.value.length ? [...conceptTagOptions.value] : undefined,
+      allIndustryTags: industryTagOptions.value.length ? [...industryTagOptions.value] : undefined,
     }
 
     // 并行拉取「真实总数」：复用与列表完全相同的过滤链做服务端 count=exact，

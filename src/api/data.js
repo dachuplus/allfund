@@ -45,7 +45,8 @@ export const INVEST_STYLE_UNDISCLOSED = '未披露'
 // fund_scores.tags 是 text[]，夜间 promote_staging [2.5] 从 fund_tag_funds 重新应用。
 export const TAG_TYPE_CONCEPT = 'concept'
 export const TAG_TYPE_INDUSTRY = 'industry'
-export const TAG_UNDISCLOSED = '未标注'
+// 「未分类」哨兵：概念 / 行业筛选里表示「本维度一个标签都没有」
+export const TAG_UNDISCLOSED = '未分类'
 
 // 升序数组中 ≤ v 的元素个数（bisect_right），用于计算「严格大于 v」的数量
 function bisectRight(arr, v) {
@@ -342,8 +343,40 @@ export function scaleFilterExpr(ranges) {
   return parts.length ? parts.join(',') : null
 }
 
+// ---------- 概念 / 行业标签 ----------
+/** PostgREST 数组字面量元素：含逗号 / 引号 / 花括号 / 反斜杠时用双引号包裹 */
+function pgArrayVal(v) {
+  const s = String(v)
+  return /[,"{}]/.test(s) || s.includes('\\')
+    ? '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+    : s
+}
+
+/**
+ * 概念 / 行业各自生成一个 OR 组（2026-11-14 增加「未分类」）。
+ * 组内是并集，两个维度分别成组，由顶层 and=(or(...),or(...)) 取交集。
+ * 「未分类」按维度判定，而不是「整只基金没标签」：
+ *   tags.is.null                      —— 完全没打标签
+ *   tags.eq.{}                        —— 空数组
+ *   tags.not.ov.{本维度全部标签}      —— 有标签但全部属于另一维度
+ * allTags 来自 fund_tags（按 tag_type 拆分）；元数据未加载时退化为「完全没标签」，不会报错。
+ */
+function tagGroupExpr(selected, allTags) {
+  if (!selected || !selected.length) return null
+  const known = selected.filter(t => t !== TAG_UNDISCLOSED)
+  const wantNone = known.length !== selected.length
+  const parts = known.map(t => `tags.cs.{${pgArrayVal(t)}}`)
+  if (wantNone) {
+    parts.push('tags.is.null', 'tags.eq.{}')
+    if (allTags && allTags.length) {
+      parts.push(`tags.not.ov.{${allTags.map(pgArrayVal).join(',')}}`)
+    }
+  }
+  return parts.length ? parts.join(',') : null
+}
+
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, countOnly = false } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, conceptTagFilters, industryTagFilters, allConceptTags, allIndustryTags, countOnly = false } = params
   if (supabase) {
     // 列表请求不带 count（22000+ 行 × 30 列曾触发 57014）。精确总数改由
     // countOnly 模式复用同一条过滤链，只 select c + head + count=exact（见下方），
@@ -467,10 +500,14 @@ async function fetchFundScoresImpl(params = {}) {
         if (parts.length) orGroups.push(parts.join(','))
       }
     }
-    // 概念/行业标签（合并多选，取并集）：fund_scores.tags 是 text[]，
-    // PostgREST 用 cs.{标签} 表达「数组包含」；多个标签用 or 串成并集。
-    // 两行 UI（概念、行业）在页面上是独立筛选控件，但底层共用一个并集条件。
-    if (tagFilters && tagFilters.length) {
+    // 概念 / 行业标签（2026-11-14）：两行 UI 各自独立成组，组内并集、组间交集。
+    // 「未分类」按维度判定 —— 只有行业标签的基金在概念维度算未分类，反之亦然。
+    const conceptExpr = tagGroupExpr(conceptTagFilters, allConceptTags)
+    if (conceptExpr) orGroups.push(conceptExpr)
+    const industryExpr = tagGroupExpr(industryTagFilters, allIndustryTags)
+    if (industryExpr) orGroups.push(industryExpr)
+    // 兼容旧调用：未传新参数时，仍支持原来「两行合并成一个并集」的 tagFilters。
+    if (!conceptExpr && !industryExpr && tagFilters && tagFilters.length) {
       const known = tagFilters.filter(t => t !== TAG_UNDISCLOSED)
       const wantNone = known.length !== tagFilters.length
       const parts = known.map(t => `tags.cs.{${t}}`)
@@ -544,13 +581,18 @@ async function fetchFundScoresImpl(params = {}) {
  */
 export async function fetchFundScoresCount(params = {}) {
   if (!supabase) return null
-  try {
-    const r = await fetchFundScoresImpl({ ...params, countOnly: true })
-    return typeof r.count === 'number' ? r.count : null
-  } catch (e) {
-    console.warn('[fetchFundScoresCount] 计数失败：', e)
-    return null
+  // 「未分类」等大范围筛选要走 20+ 页分页累加，上游偶发 500 会让本次计数变 null、
+  // 页面回退成「已加载条数」（1000）。失败重试 2 次，不改变查询口径。
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetchFundScoresImpl({ ...params, countOnly: true })
+      if (typeof r.count === 'number') return r.count
+    } catch (e) {
+      console.warn('[fetchFundScoresCount] 计数失败：', e)
+    }
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 400))
   }
+  return null
 }
 
 // ========== 基金分类（动态，来自 fund_scores 的 t0/t1_tt）==========

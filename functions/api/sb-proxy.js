@@ -47,6 +47,11 @@ function buildUpstreamHeaders(incoming) {
     if (lower === 'accept-encoding') continue
     // 去掉浏览器 / 边缘网关注入的转发类伪头，避免干扰上游
     if (lower.startsWith('x-forwarded') || lower.startsWith('x-real-ip') || lower.startsWith('cf-')) continue
+    // 2026-11-14：概念 / 行业「未分类」会把该维度的全部标签名拼进查询串（约 3-6KB），
+    // 边缘层注入的个别转发头会带上完整 URL，值超过运行时的 4095 上限，导致出站 fetch
+    // 直接抛 "Header value length invalid"、列表 502。这类超长头对上游 PostgREST 没有意义，
+    // 直接丢弃；正常请求头（apikey / authorization / prefer 等）远低于该阈值。
+    if (value.length > 3000) continue
     headers.set(key, value)
   }
   return headers
