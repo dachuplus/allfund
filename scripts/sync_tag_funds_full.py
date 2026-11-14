@@ -249,49 +249,25 @@ def main():
         print("  [ERROR] fund_scores.tags 更新失败")
         sys.exit(1)
 
-    # 6) 校验
+    # 6) 校验（2026-11-14 改为 Management API）
+    # 旧版用 requests 直连 PostgREST 做 count=exact，跨境链路常报 SSLEOFError，
+    # 导致脚本在 [3/5][4/5] 全部写完后以非零码退出；每日包装器会误判失败并回滚
+    # 刚同步好的数据。写入与校验统一走同一个已验证可用的 Management API 通道。
     print("\n[5/5] 校验...")
-    hdr = requests.get(
-        f"{BASE}/rest/v1/fund_scores?select=c&tags=not.is.null",
-        headers={"apikey": ANON, "Authorization": f"Bearer {ANON}", "Prefer": "count=exact"},
-        timeout=20,
-    ).headers
-    tagged = hdr.get("content-range", "/0").split("/")[-1]
-    print(f"  fund_scores 已标记标签的基金数: {tagged}")
-
-    tf_hdr = requests.get(
-        f"{BASE}/rest/v1/fund_tag_funds?select=tag_name",
-        headers={"apikey": ANON, "Authorization": f"Bearer {ANON}", "Prefer": "count=exact"},
-        timeout=20,
-    ).headers
-    tf_total = tf_hdr.get("content-range", "/0").split("/")[-1]
-    print(f"  fund_tag_funds 总映射条数: {tf_total}")
-
-    # 抽查光模块
-    vr = requests.get(
-        f"{BASE}/rest/v1/fund_tag_funds?tag_name=eq.%E5%85%89%E6%A8%A1%E5%9D%97&select=fund_code,fund_name&order=sort_order.asc",
-        headers={"apikey": ANON, "Authorization": f"Bearer {ANON}"},
-        timeout=20,
+    chk = requests.post(
+        MGMT_URL,
+        headers={"Authorization": f"Bearer {PAT}", "Content-Type": "application/json"},
+        json={"query": """SELECT
+              (SELECT count(*) FROM public.fund_tag_funds) AS mappings,
+              (SELECT count(DISTINCT fund_code) FROM public.fund_tag_funds) AS funds,
+              (SELECT count(DISTINCT tag_name) FROM public.fund_tag_funds) AS tags,
+              (SELECT count(*) FROM public.fund_scores WHERE tags IS NOT NULL) AS tagged,
+              (SELECT count(*) FROM public.fund_tags g
+               WHERE NOT EXISTS (SELECT 1 FROM public.fund_tag_funds t
+                                 WHERE t.tag_name = g.name)) AS empty_tags"""},
+        timeout=120,
     )
-    if vr.ok:
-        data = vr.json()
-        print(f"  光模块 -> {len(data)} 只（应为 ~440）:")
-        for f in data[:5]:
-            print(f"    {f['fund_code']} | {f['fund_name']}")
-
-    # 抽查某只有标签的基金在 fund_scores 中的 tags
-    vs_params = urllib.parse.urlencode({
-        "tags": 'cs.{"光模块"}',
-        "select": "c,n,tags",
-        "limit": "3",
-    })
-    vs = requests.get(
-        f"{BASE}/rest/v1/fund_scores?{vs_params}",
-        headers={"apikey": ANON, "Authorization": f"Bearer {ANON}"},
-        timeout=20,
-    )
-    if vs.ok:
-        print(f"  fund_scores 含'光模块'标签示例: {json.dumps(vs.json(), ensure_ascii=False)[:300]}")
+    print("  库内校验:", json.dumps(chk.json(), ensure_ascii=False))
 
     print("\n完成。")
 

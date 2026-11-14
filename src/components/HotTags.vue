@@ -22,6 +22,13 @@
       </div>
     </div>
 
+    <!-- 标签数据时间（2026-11-14）：数据过期必须一眼可见，避免长期不更新无人察觉 -->
+    <div class="tags-datastamp">
+      <span>标签列表时间：{{ tagListTime || '读取中' }}</span>
+      <span>关联基金数据：{{ tagFundsTime || '读取中' }}</span>
+      <span class="tags-stale" v-if="tagDataStale">数据已 {{ tagDataAgeDays }} 天未更新，请检查标签同步</span>
+    </div>
+
     <!-- 新增：排序类别 + 阶段选择控件（参考天天基金 ztjj 页面） -->
     <div class="hot-controls" v-if="displayTags.length > 0">
       <!-- 排序类别：按涨幅 / 按资金流入 -->
@@ -190,7 +197,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import QRCode from 'qrcode'
-import { fetchFundTags, fetchFundMeta } from '../api/data.js'
+import { fetchFundTags, fetchFundMeta, fetchTagFundsTime } from '../api/data.js'
 import { fmtRetPlain } from '../utils/format.js'
 
 function formatMetaTime(raw) {
@@ -230,6 +237,20 @@ const shareImage = ref(null) // 生成的分享图 dataURL
 const shareGenerating = ref(false)
 const shareUpdateTime = ref('') // 分享图数据截止时间（弹窗可见）
 const fundMetaUpdateTime = ref('') // fund_scores 更新时间
+// 标签数据可观测性：列表与关联基金各自的写入时间 + 过期提示
+const tagListTime = ref('')
+const tagFundsTime = ref('')
+const tagDataStale = computed(() => {
+  if (!tagFundsTime.value) return false
+  const t = new Date(tagFundsTime.value).getTime()
+  if (isNaN(t)) return false
+  return (Date.now() - t) > 2 * 24 * 3600 * 1000
+})
+const tagDataAgeDays = computed(() => {
+  if (!tagFundsTime.value) return 0
+  const t = new Date(tagFundsTime.value).getTime()
+  return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 86400000)
+})
 
 // ========== 排序/阶段状态 ==========
 const sortMode = ref('byReturn') // 'byReturn'（按涨幅，默认）| 'byInflow'（按资金流入）
@@ -849,6 +870,9 @@ async function loadTags() {
     const data = await fetchFundTags()
     if (Array.isArray(data)) {
       allTags.value = data
+      // fund_tags 自带 updated_at，取最新一条作为「标签列表时间」
+      const times = data.map(t => t.updated_at).filter(Boolean).sort()
+      if (times.length) tagListTime.value = formatMetaTime(times[times.length - 1])
     }
   } catch (e) {
     console.error('[HotTags] load error', e)
@@ -1362,10 +1386,20 @@ function saveShareImage() {
   document.body.removeChild(a)
 }
 
+/** 取 fund_tag_funds 最新写入时间；失败不阻断页面，时间显示「读取中」 */
+async function loadTagDataTime() {
+  try {
+    const ts = await fetchTagFundsTime()
+    if (ts) tagFundsTime.value = formatMetaTime(ts)
+  } catch (e) {
+    console.warn('[HotTags] 标签数据时间读取失败', e)
+  }
+}
+
 // ========== 生命周期 ==========
 onMounted(async () => {
   // 先并行加载标签列表与 ETL 阶段数据（含 tag_index_code），再发起实时拉取
-  await Promise.all([loadTags(), loadTagStageReturns()])
+  await Promise.all([loadTags(), loadTagStageReturns(), loadTagDataTime()])
   // Y 思路：前端直连 push2 实时行情（板块代码直连匹配）→ 覆盖 ETL 今日涨幅
   await fetchBoardRealtime()
   // 直连 push2his K线实时多周期 → 覆盖 ETL 近1周~今年来（best-effort，失败回退 ETL 快照）
@@ -1592,6 +1626,16 @@ defineExpose({ refresh: loadTags })
   padding: var(--space-md);
   font-size: 14px;
   color: var(--text-secondary);
+}
+/* 标签数据时间 / 过期提示（gov.uk 风格：纯文字 + 红色左边框，无圆角阴影） */
+.tags-datastamp {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+  font-size: 13px; color: var(--text-secondary);
+  padding: 6px 0 2px; line-height: 1.4;
+}
+.tags-stale {
+  color: #d4351c; font-weight: 700;
+  border-left: 4px solid #d4351c; padding-left: 8px;
 }
 .tags-footnote {
   font-size: 11px;

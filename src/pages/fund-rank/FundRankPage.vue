@@ -1300,9 +1300,6 @@ async function loadData(reset = true, _retryCount = 0) {
       investStyles: filterInvestStyle.value.length ? filterInvestStyle.value : undefined,
       conceptTagFilters: filterConceptTags.value.length ? [...filterConceptTags.value] : undefined,
       industryTagFilters: filterIndustryTags.value.length ? [...filterIndustryTags.value] : undefined,
-      // 「未分类」需要该维度的全部标签名构造 not.ov（数据来自 fund_tags，加载失败时自动退化）
-      allConceptTags: conceptTagOptions.value.length ? [...conceptTagOptions.value] : undefined,
-      allIndustryTags: industryTagOptions.value.length ? [...industryTagOptions.value] : undefined,
     }
 
     // 并行拉取「真实总数」：复用与列表完全相同的过滤链做服务端 count=exact，

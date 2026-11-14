@@ -38,24 +38,18 @@ const HOP_BY_HOP = new Set([
   'trailer',
 ])
 
-/**
- * 只透传上游 PostgREST / GoTrue 真正需要的头（2026-11-14）。
- * 旧版「全量透传」会把边缘层注入的 CDN-Loop / eo-* / edge-inner-plat-id /
- * X-NWS-LOG-UUID 等内部头一并带给上游，运行时据此生成的某个 header 值会超过
- * 4095 上限，出站 fetch 直接抛 "Header value length invalid"，列表 502。
- * /api/fs-count.js 一直只带 apikey / authorization，6KB 查询串也正常，故此处对齐。
- * Prefer（__count 模式）由 onRequest 后面自行 set，不依赖入站头。
- */
-const FORWARD_HEADERS = [
-  'apikey', 'authorization', 'content-type', 'accept', 'prefer',
-  'x-client-info', 'accept-profile', 'content-profile',
-  'range', 'range-unit', 'if-match', 'if-none-match',
-]
 function buildUpstreamHeaders(incoming) {
   const headers = new Headers()
-  for (const key of FORWARD_HEADERS) {
-    const value = incoming.get(key)
-    if (value && value.length <= 3000) headers.set(key, value)
+  for (const [key, value] of incoming.entries()) {
+    const lower = key.toLowerCase()
+    if (HOP_BY_HOP.has(lower)) continue
+    // 去掉 accept-encoding：让上游返回未压缩 JSON，避免经 EdgeOne 二次压缩导致正文损坏
+    if (lower === 'accept-encoding') continue
+    // 去掉浏览器 / 边缘网关注入的转发类伪头，避免干扰上游
+    if (lower.startsWith('x-forwarded') || lower.startsWith('x-real-ip') || lower.startsWith('cf-')) continue
+    // 防御：丢弃边缘层注入的超长转发头（正常请求头远低于此值）
+    if (value.length > 3000) continue
+    headers.set(key, value)
   }
   return headers
 }
@@ -110,7 +104,7 @@ function buildResponse(upstream, req, countMode = false) {
 }
 
 function jsonError(msg, status) {
-  return new Response(JSON.stringify({ error: msg, proxy: 'sb-proxy', ver: '20261114d' }), {
+  return new Response(JSON.stringify({ error: msg, proxy: 'sb-proxy' }), {
     status,
     headers: { 'Content-Type': 'application/json' },
   })

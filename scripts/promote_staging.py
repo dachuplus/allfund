@@ -487,6 +487,19 @@ def main():
               WHERE fs.c = sub.fund_code OR fs.c = sub.fund_code || '.OF';""", timeout=600)
         tagged = pg("SELECT count(*) AS cnt FROM fund_scores WHERE tags IS NOT NULL")[0]['cnt']
         print(f'  ✓ 已为 {tagged} 只基金标记标签', flush=True)
+        # 「未分类」按维度判定（2026-11-14）：把「本维度一个标签都没有」固化为布尔列，
+        # 供基金评分页概念 / 行业筛选走短查询串（避免把上百个中文标签名拼进 URL，
+        # 经同域代理会被 4095 上限拒绝）。tags 刚重新应用完，此处紧接着重算最准确。
+        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_concept boolean;", timeout=120)
+        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_industry boolean;", timeout=120)
+        pg("""UPDATE fund_scores fs SET
+                has_concept = EXISTS (
+                  SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
+                  JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'concept'),
+                has_industry = EXISTS (
+                  SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
+                  JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'industry');""", timeout=600)
+        print('  ✓ 已重算 has_concept / has_industry', flush=True)
     except Exception as e:
         print(f'  [WARN] 标签重新应用失败（不影响评分切换）: {e}', flush=True)
 

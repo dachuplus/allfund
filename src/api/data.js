@@ -355,22 +355,19 @@ function pgArrayVal(v) {
 /**
  * 概念 / 行业各自生成一个 OR 组（2026-11-14 增加「未分类」）。
  * 组内是并集，两个维度分别成组，由顶层 and=(or(...),or(...)) 取交集。
- * 「未分类」按维度判定，而不是「整只基金没标签」：
- *   tags.is.null                      —— 完全没打标签
- *   tags.eq.{}                        —— 空数组
- *   tags.not.ov.{本维度全部标签}      —— 有标签但全部属于另一维度
- * allTags 来自 fund_tags（按 tag_type 拆分）；元数据未加载时退化为「完全没标签」，不会报错。
+ * 「未分类」按维度判定，靠 fund_scores / fund_scores_main 上的布尔列
+ * has_concept / has_industry（由 promote_staging [2.5] 按 fund_tags.tag_type 重算）。
+ * 不用「把 101/85 个标签名拼成 not.ov」的写法：那种 3-6KB 中文查询串经
+ * EdgeOne 同域代理会被 4095 上限拒绝，列表 502。布尔列让查询串缩到几十字节。
+ * tags.is.null / tags.eq.{} 为兜底：布尔列尚未回填时退化为「完全无标签」，不会报错。
  */
-function tagGroupExpr(selected, allTags) {
+function tagGroupExpr(selected, flagCol) {
   if (!selected || !selected.length) return null
   const known = selected.filter(t => t !== TAG_UNDISCLOSED)
   const wantNone = known.length !== selected.length
   const parts = known.map(t => `tags.cs.{${pgArrayVal(t)}}`)
   if (wantNone) {
-    parts.push('tags.is.null', 'tags.eq.{}')
-    if (allTags && allTags.length) {
-      parts.push(`tags.not.ov.{${allTags.map(pgArrayVal).join(',')}}`)
-    }
+    parts.push('tags.is.null', 'tags.eq.{}', `${flagCol}.eq.false`)
   }
   return parts.length ? parts.join(',') : null
 }
@@ -502,9 +499,9 @@ async function fetchFundScoresImpl(params = {}) {
     }
     // 概念 / 行业标签（2026-11-14）：两行 UI 各自独立成组，组内并集、组间交集。
     // 「未分类」按维度判定 —— 只有行业标签的基金在概念维度算未分类，反之亦然。
-    const conceptExpr = tagGroupExpr(conceptTagFilters, allConceptTags)
+    const conceptExpr = tagGroupExpr(conceptTagFilters, 'has_concept')
     if (conceptExpr) orGroups.push(conceptExpr)
-    const industryExpr = tagGroupExpr(industryTagFilters, allIndustryTags)
+    const industryExpr = tagGroupExpr(industryTagFilters, 'has_industry')
     if (industryExpr) orGroups.push(industryExpr)
     // 兼容旧调用：未传新参数时，仍支持原来「两行合并成一个并集」的 tagFilters。
     if (!conceptExpr && !industryExpr && tagFilters && tagFilters.length) {
@@ -674,6 +671,25 @@ async function fetchFundTagsImpl() {
     return data || []
   }
   return []
+}
+
+/**
+ * 标签关联基金数据的最新写入时间（2026-11-14）。
+ * fund_tag_funds 由 scripts/sync_tag_funds_full.py 全量重写；若长期不更新，
+ * 热门页的概念/行业覆盖就会失真。页面据此显示数据时间并给出过期提示。
+ * 缓存 5 分钟，避免每次渲染都查库。
+ */
+export function fetchTagFundsTime() {
+  return withCache('tagFundsTime', 300000, async () => {
+    if (!supabase) return null
+    const { data, error } = await supabase
+      .from('fund_tag_funds')
+      .select('updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+    if (error) throw error
+    return (data && data[0] && data[0].updated_at) || null
+  })
 }
 
 // ========== 配置（API Key等）==========
