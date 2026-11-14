@@ -103,8 +103,8 @@ function buildResponse(upstream, req, countMode = false) {
   })
 }
 
-function jsonError(msg, status) {
-  return new Response(JSON.stringify({ error: msg, proxy: 'sb-proxy' }), {
+function jsonError(msg, status, diag) {
+  return new Response(JSON.stringify({ error: msg, proxy: 'sb-proxy', ver: '20261114c', diag: diag || null }), {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
@@ -205,7 +205,11 @@ export async function onRequest(context) {
     lastErr && lastErr.name === 'AbortError'
       ? `upstream timeout after ${UPSTREAM_TIMEOUT_MS}ms`
       : (lastErr && lastErr.message) || 'upstream fetch failed'
-  const errResp = jsonError(msg, 502)
+  const errResp = jsonError(msg, 502, {
+    urlLen: rawTarget.length,
+    encodedLen: targetUrl.length,
+    hdrs: [...req.headers.entries()].map(([k, v]) => `${k}:${v.length}`).join('|').slice(0, 800),
+  })
   for (const [k, v] of Object.entries(corsHeaders(req))) errResp.headers.set(k, v)
   return errResp
 }
