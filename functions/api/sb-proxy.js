@@ -38,10 +38,22 @@ const HOP_BY_HOP = new Set([
   'trailer',
 ])
 
+// 2026-11-14：只透传上游 PostgREST / GoTrue 真正需要的头。
+// 之前「全量透传」会把边缘层注入的转发头（含完整 URL）带给上游；概念 / 行业
+// 「未分类」的查询串较长时，其中某个头值会超过运行时的 4095 上限，出站 fetch
+// 直接抛 "Header value length invalid" → 列表 502。fs-count 用白名单头则完全正常，
+// 故这里同样收窄；正常请求头（apikey / authorization / prefer 等）全在白名单内。
+const FORWARD_HEADERS = new Set([
+  'apikey', 'authorization', 'content-type', 'accept', 'prefer',
+  'x-client-info', 'accept-profile', 'content-profile',
+  'range', 'range-unit', 'if-match', 'if-none-match',
+])
+
 function buildUpstreamHeaders(incoming) {
   const headers = new Headers()
   for (const [key, value] of incoming.entries()) {
     const lower = key.toLowerCase()
+    if (!FORWARD_HEADERS.has(lower)) continue
     if (HOP_BY_HOP.has(lower)) continue
     // 去掉 accept-encoding：让上游返回未压缩 JSON，避免经 EdgeOne 二次压缩导致正文损坏
     if (lower === 'accept-encoding') continue
