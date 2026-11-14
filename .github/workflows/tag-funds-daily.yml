@@ -3,7 +3,15 @@ name: 热门标签关联基金每日同步
 # 2026-11-14：fund_tag_funds 曾自 2026-07-13 起 4 个月未更新（上游「高端制造」
 # 板块已有 2687 只、库内仅 1008 只），且页面没有任何数据时间提示。此工作流
 # 每日重拉一次，配合热门页显示的「标签数据时间」与过期红字提示形成闭环。
-# UTC 21:00 = 北京 05:00，与 21:30 的评分流水线错开，避免同时改写 fund_scores.tags。
+#
+# 2026-11-14 架构改造（按用户要求）：抓取全程只写中间表
+# public.fund_tag_funds_staging，全部拉完并校验通过后由数据库函数
+# public.apply_fund_tag_funds(true) 在单个事务内统一落地正式表、
+# fund_scores.tags / has_concept / has_industry 与物化视图；函数起始的
+# pg_advisory_xact_lock 与评分流水线 promote_staging.py [2.5]（调用同一函数）
+# 串行化写入。因此【数据一致性不再依赖调度时间错开】，即使两条流水线同时跑
+# 也不会互相清空。UTC 21:00 = 北京 05:00 只是避开 21:30 评分流水线高峰、
+# 减少锁等待的调度偏好，可随时调整。
 
 on:
   schedule:
@@ -13,7 +21,7 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,7 +29,7 @@ jobs:
           python-version: '3.11'
       - name: 安装依赖
         run: pip install requests
-      - name: 全量重拉标签-基金映射（含备份 / 校验 / 失败回滚 / 刷新物化视图）
+      - name: 全量重拉标签-基金映射（中间表 → 校验 → 单事务统一落地）
         env:
           SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
         run: python scripts/tag_sync_daily.py

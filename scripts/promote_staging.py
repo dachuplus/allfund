@@ -476,32 +476,44 @@ def main():
         print(f'  [WARN] ret_anomaly 重算失败（不影响评分切换）: {e}', flush=True)
 
     # ── 2.5 重新应用标签（tags）到 fund_scores ──────────────────────────
-    print('\n[2.5] 重新应用标签到 fund_scores（来源 fund_tag_funds）', flush=True)
+    # 2026-11-14 架构改造：改调数据库函数 public.apply_fund_tag_funds(false)，
+    # 在【单事务 + pg_advisory_xact_lock】内一次性完成 tags / has_concept /
+    # has_industry 全量重算与物化视图刷新。标签每日同步调用同一函数
+    # （p_from_staging=true），两边写入被同一把事务级锁串行化，
+    # 不再依赖「把 cron 错开 21:30」来防止互相清空；事务提交前外部只能看到旧快照。
+    # 函数真源 scripts/tag_apply_function.sql，由 sync_tag_funds_full.py 每次运行
+    # 幂等创建。若函数尚未部署则回退原分步逻辑，保证评分流水线不被标签侧阻断。
+    print('\n[2.5] 重新应用标签到 fund_scores（单事务统一落地）', flush=True)
     try:
-        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS tags text[];", timeout=120)
-        pg("UPDATE fund_scores SET tags = NULL;", timeout=300)
-        pg("""UPDATE fund_scores fs
-              SET tags = sub.tags
-              FROM (SELECT fund_code, array_agg(DISTINCT tag_name) AS tags
-                    FROM fund_tag_funds GROUP BY fund_code) sub
-              WHERE fs.c = sub.fund_code OR fs.c = sub.fund_code || '.OF';""", timeout=600)
-        tagged = pg("SELECT count(*) AS cnt FROM fund_scores WHERE tags IS NOT NULL")[0]['cnt']
-        print(f'  ✓ 已为 {tagged} 只基金标记标签', flush=True)
-        # 「未分类」按维度判定（2026-11-14）：把「本维度一个标签都没有」固化为布尔列，
-        # 供基金评分页概念 / 行业筛选走短查询串（避免把上百个中文标签名拼进 URL，
-        # 经同域代理会被 4095 上限拒绝）。tags 刚重新应用完，此处紧接着重算最准确。
-        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_concept boolean;", timeout=120)
-        pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_industry boolean;", timeout=120)
-        pg("""UPDATE fund_scores fs SET
-                has_concept = EXISTS (
-                  SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
-                  JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'concept'),
-                has_industry = EXISTS (
-                  SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
-                  JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'industry');""", timeout=600)
-        print('  ✓ 已重算 has_concept / has_industry', flush=True)
+        _r = pg('SELECT public.apply_fund_tag_funds(false) AS r;', timeout=1200)
+        print(f'  ✓ 统一落地函数返回: {_r}', flush=True)
     except Exception as e:
-        print(f'  [WARN] 标签重新应用失败（不影响评分切换）: {e}', flush=True)
+        print(f'  [WARN] 统一落地函数不可用，回退原有分步重贴: {e}', flush=True)
+        try:
+            pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS tags text[];", timeout=120)
+            pg("UPDATE fund_scores SET tags = NULL;", timeout=300)
+            pg("""UPDATE fund_scores fs
+                  SET tags = sub.tags
+                  FROM (SELECT fund_code, array_agg(DISTINCT tag_name) AS tags
+                        FROM fund_tag_funds GROUP BY fund_code) sub
+                  WHERE fs.c = sub.fund_code OR fs.c = sub.fund_code || '.OF';""", timeout=600)
+            tagged = pg("SELECT count(*) AS cnt FROM fund_scores WHERE tags IS NOT NULL")[0]['cnt']
+            print(f'  ✓ 已为 {tagged} 只基金标记标签', flush=True)
+            # 「未分类」按维度判定（2026-11-14）：把「本维度一个标签都没有」固化为布尔列，
+            # 供基金评分页概念 / 行业筛选走短查询串（避免把上百个中文标签名拼进 URL，
+            # 经同域代理会被 4095 上限拒绝）。tags 刚重新应用完，此处紧接着重算最准确。
+            pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_concept boolean;", timeout=120)
+            pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_industry boolean;", timeout=120)
+            pg("""UPDATE fund_scores fs SET
+                    has_concept = EXISTS (
+                      SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
+                      JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'concept'),
+                    has_industry = EXISTS (
+                      SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
+                      JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'industry');""", timeout=600)
+            print('  ✓ 已重算 has_concept / has_industry', flush=True)
+        except Exception as e2:
+            print(f'  [WARN] 标签重新应用失败（不影响评分切换）: {e2}', flush=True)
 
     # ── 2.6 最终刷新主份额物化视图（2026-11-13）──────────────────────────
     # [2.2] 那次刷新发生在「配置列 COALESCE 回填」与「[2.5] 重新应用 tags」之前，
