@@ -26,10 +26,12 @@ const LS_LOGIN_AT_LEGACY = 'allfund_auth_login_at'
 export const ADMIN_EMAIL = '57502460@qq.com'
 
 // 可授予用户的功能清单（数据中心「用户权限管理」勾选用）
-// ⚠️ 必须与一级 tab 保持一致：娱乐(content) / 博客(content-blog) / 策略(signal) / 选品(fund-rank) / 组合(portfolio) / 管理(admin)
+// ⚠️ 必须与一级 tab 保持一致：娱乐(content) / 博客(content-blog) / 选题(news) / 投教(toujiao) / 策略(signal) / 选品(fund-rank) / 组合(portfolio) / 管理(admin)
 export const FEATURES = [
   { key: 'content',       label: '娱乐', desc: '娱乐：个人观点、影视、美食、游戏等内容发布与管理' },
   { key: 'content-blog',  label: '博客', desc: '博客：独立性研究文章（独立一级 tab，与娱乐分开授权）' },
+  { key: 'news',          label: '选题', desc: '选题：资讯聚合，在线拉取各站点公开内容（默认公开可读）' },
+  { key: 'toujiao',       label: '投教', desc: '投教：基金公司投资者教育基地公开内容（默认公开可读）' },
   { key: 'signal',        label: '策略', desc: '宏观信号、股债性价比、风格因子、行业估值' },
   { key: 'fund-rank',     label: '选品', desc: '靠谱指数评分、基金详情、基金对比' },
   { key: 'portfolio',     label: '组合', desc: '个人组合、智能选基、组合回测' },

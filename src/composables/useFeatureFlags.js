@@ -20,6 +20,8 @@ const DEFAULT_FLAGS = {
   signal: true,
   portfolio: true,
   content: true,
+  news: true,        // 选题（/news）：一级根节点，默认公开可读
+  toujiao: true,     // 投教（/toujiao）：一级根节点，默认公开可读
   'login-wall': false,  // 首页权限墙：默认关闭（公开可读）。
                         // 注意：此前默认 true，但 feature_flags 查询失败（Supabase 抖动/表异常）
                         // 会回退到此默认→误弹墙+锁门外。改为 false 避免「一抖就锁门」。
@@ -144,6 +146,8 @@ export const FEATURE_GROUPS = [
     items: [
       { key: 'content', label: '娱乐', desc: '娱乐内容，公开可读（无需登录）' },
       { key: 'content-blog', label: '博客', desc: '博客内容，公开可读（无需登录）；关闭后博客 Tab 与文章全站不可见。' },
+      { key: 'news', label: '选题', desc: '资讯聚合（/news），按影视/美食/基金/股票/科技/军事实时聚合公开内容；默认公开可读，关闭后入口隐藏且栏目不可访问。' },
+      { key: 'toujiao', label: '投教', desc: '投教基地（/toujiao），聚合公募基金公司投资者教育公开内容；默认公开可读，关闭后入口隐藏且栏目不可访问。' },
       { key: 'signal', label: '策略', desc: '宏观信号、股债性价比、风格因子、行业估值' },
       { key: 'fund-rank', label: '选品', desc: '靠谱指数评分、基金详情、基金对比' },
       { key: 'portfolio', label: '组合', desc: '个人组合、智能选基、组合回测' },

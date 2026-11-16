@@ -29,6 +29,7 @@ const routes = [
     component: () => import('../pages/news/NewsAggregatorPage.vue'),
     meta: {
       tab: 'news',
+      feature: 'news',
       title: '选题',
       description: '资讯聚合：按影视、美食、基金、股票、科技、军事分类，在线拉取各站点公开内容，实时聚合、不落地存储，仅作便捷阅读入口，不构成投资建议。',
       keywords: '资讯聚合,影视资讯,美食资讯,基金资讯,股票资讯,科技资讯,军事资讯,新闻聚合'
@@ -39,6 +40,7 @@ const routes = [
     component: () => import('../pages/news/ToujiaoPage.vue'),
     meta: {
       tab: 'toujiao',
+      feature: 'toujiao',
       title: '投教基地',
       description: '投教基地：聚合 100 家公募基金公司投资者教育基地公开内容，按公募管理规模排序，标题即跳转链接，一键直达各公司投教原文。',
       keywords: '投教基地,投资者教育,基金公司投教,公募投教,基金投教内容'

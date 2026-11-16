@@ -354,8 +354,8 @@ function handleRequestAccess() {
 
 /* ---- 全局金刚区 ---- */
 const quickLinks = [
-  { path: '/news',             label: '选题', feature: null },
-  { path: '/toujiao',          label: '投教', feature: null },
+  { path: '/news',             label: '选题', feature: 'news' },
+  { path: '/toujiao',          label: '投教', feature: 'toujiao' },
   { path: '/content',          label: '娱乐', feature: 'content' },
   { path: '/blog',             label: '博客', feature: 'content-blog' },
   { path: '/signal',           label: '策略', feature: 'signal' },
@@ -398,8 +398,8 @@ const routeState = computed(() => {
   // 受限（开放但需申请权限才能访问）：未登录与已登录无权限统一走「无访问权限」卡片，
   // 文案与按钮由模板按 isLoggedIn 区分（未登录→登录/注册，已登录→申请访问权限）
   if (featureRestricted(feat)) return hasFeature(feat) ? 'allowed' : 'apply'
-  // 公开内容（内容/博客）：开放即可读
-  if (feat === 'content' || feat === 'content-blog') return 'allowed'
+  // 公开内容（娱乐/博客/选题/投教）：开放即可读，不弹权限墙
+  if (feat === 'content' || feat === 'content-blog' || feat === 'news' || feat === 'toujiao') return 'allowed'
   // 其余功能：需登录且已开通权限
   return hasFeature(feat) ? 'allowed' : 'apply'
 })
