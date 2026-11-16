@@ -16,6 +16,7 @@
       <HanoiGame v-else-if="activeGame === 'hanoi'" />
       <EulerGame v-else-if="activeGame === 'euler'" />
       <ColorGame v-else-if="activeGame === 'color'" />
+      <McQuiz v-else-if="activeGame === 'mcquiz'" />
       <MiniMinecraft v-else />
     </div>
   </div>
@@ -29,6 +30,7 @@ import HanoiGame from './HanoiGame.vue'
 import EulerGame from './EulerGame.vue'
 import ColorGame from './ColorGame.vue'
 import MiniMinecraft from './MiniMinecraft.vue'
+import McQuiz from './McQuiz.vue'
 
 const GAMES = [
   { key: 'minesweeper', label: '扫雷' },
@@ -37,6 +39,7 @@ const GAMES = [
   { key: 'euler', label: '一笔画' },
   { key: 'color', label: '染色' },
   { key: 'minecraft', label: '方块世界' },
+  { key: 'mcquiz', label: 'MC图鉴' },
 ]
 
 const activeGame = ref('minesweeper')
