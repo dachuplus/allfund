@@ -1001,6 +1001,9 @@
     <div class="card" v-show="activeTab==='users'">
       <div class="card-title">功能开放控制</div>
       <p class="section-desc">
+        当前登录账号：<strong>{{ user?.email || '未登录' }}</strong>　·　权限：<strong>{{ isSuperAdmin ? '可修改' : '只读' }}</strong>
+      </p>
+      <p class="section-desc">
         每个功能可设为三态：<strong>公开</strong>（展示且任何人可访问）、<strong>需权限</strong>（展示但需登录并申请权限后才能访问）、<strong>关闭</strong>（不展示、不可访问，且父级关闭会连带关闭全部子级）。
         仅主管理员 <strong>{{ adminEmail }}</strong> 可修改，其余授权账户仅可查看。
       </p>
@@ -2231,7 +2234,10 @@ const featureTree = computed(() => {
     children: childrenOf(t.key).map(c => ({ ...c, children: childrenOf(c.key) })),
   }))
 })
-const isSuperAdmin = computed(() => user.value?.email === adminEmail)
+// 与页面准入口径（路由 ownerOnly → isOwner）保持一致。
+// 此前只认 user.email，而路由放行的是「主管理员邮箱 或 DB 标记 is_admin 的授权管理员」，
+// 两者不一致时会出现「页面打得开、但所有开关按钮被禁用且静默无反应」。
+const isSuperAdmin = computed(() => isOwner.value || user.value?.email === adminEmail)
 const savingFlag = ref('')
 
 /** 节点自身「开放」原始值（不沿父链推导）：未配置视为开放 */
@@ -2245,7 +2251,10 @@ function featureRestrictedRaw(key) {
 
 /** 三态切换：open(公开) / restricted(需权限) / closed(关闭) */
 async function setFeatureState(key, state) {
-  if (!isSuperAdmin.value) return
+  if (!isSuperAdmin.value) {
+    toast('当前账户无权修改功能开关，请用主管理员账号登录后再试', 'error')
+    return
+  }
   const open = state !== 'closed'
   const restricted = state === 'restricted'
   savingFlag.value = key
