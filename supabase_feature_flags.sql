@@ -45,8 +45,10 @@ security definer
 set search_path = public
 as $$
 begin
-  -- 硬约束：仅主管理员账户可调用，杜绝其他管理员越权
-  if auth.email() <> '57502460@qq.com' then
+  -- 硬约束：仅主管理员账户可调用，杜绝其他管理员越权。
+  -- 必须用 is distinct from：匿名调用时 auth.email() 为 NULL，
+  -- 旧写法 `NULL <> '...'` 结果是 NULL、IF 不触发，会绕过校验导致匿名可写。
+  if auth.email() is distinct from '57502460@qq.com' then
     raise exception 'permission denied: only the primary admin can toggle feature flags';
   end if;
 

@@ -1007,6 +1007,10 @@
         每个功能可设为三态：<strong>公开</strong>（展示且任何人可访问）、<strong>需权限</strong>（展示但需登录并申请权限后才能访问）、<strong>关闭</strong>（不展示、不可访问，且父级关闭会连带关闭全部子级）。
         仅主管理员 <strong>{{ adminEmail }}</strong> 可修改，其余授权账户仅可查看。
       </p>
+      <div v-if="flagDiag" class="flag-diag" :class="flagDiag.ok ? 'flag-diag--ok' : 'flag-diag--err'" role="status">
+        <strong>最近一次开关操作：{{ flagDiag.ok ? '成功' : '失败' }}</strong>
+        <span>{{ flagDiag.text }}</span>
+      </div>
       <div class="feature-tree">
         <div v-for="lvl1 in featureTree" :key="lvl1.key" class="ft-node ft-lvl1">
           <div class="feature-flag-row">
@@ -2239,6 +2243,9 @@ const featureTree = computed(() => {
 // 两者不一致时会出现「页面打得开、但所有开关按钮被禁用且静默无反应」。
 const isSuperAdmin = computed(() => isOwner.value || user.value?.email === adminEmail)
 const savingFlag = ref('')
+// 开关操作结果常驻显示：toast 一闪而过无法定位「点击不生效」，
+// 这里把成功/失败与服务端返回的完整错误留在页面上，便于一次截图定位。
+const flagDiag = ref(null)
 
 /** 节点自身「开放」原始值（不沿父链推导）：未配置视为开放 */
 function featureOpenRaw(key) {
@@ -2252,7 +2259,9 @@ function featureRestrictedRaw(key) {
 /** 三态切换：open(公开) / restricted(需权限) / closed(关闭) */
 async function setFeatureState(key, state) {
   if (!isSuperAdmin.value) {
-    toast('当前账户无权修改功能开关，请用主管理员账号登录后再试', 'error')
+    const text = '当前账户无权修改功能开关，请用主管理员账号登录后再试'
+    flagDiag.value = { ok: false, text: `账号 ${user.value?.email || '未登录'} · ${text}` }
+    toast(text, 'error')
     return
   }
   const open = state !== 'closed'
@@ -2261,9 +2270,14 @@ async function setFeatureState(key, state) {
   try {
     await setFeatureFlag(key, open, restricted)
     const label = state === 'open' ? '公开' : state === 'restricted' ? '需权限' : '关闭'
-    toast(`「${key}」已设为${label}`, 'success')
+    const text = `「${key}」已设为${label}（服务端写入成功）`
+    flagDiag.value = { ok: true, text }
+    toast(text, 'success')
   } catch (e) {
-    toast('操作失败：' + (e?.message || '无权限'), 'error')
+    const parts = [e?.message, e?.code, e?.details, e?.hint, e?.status].filter(Boolean)
+    const text = '操作失败：' + (parts.join(' | ') || '无权限或网络异常')
+    flagDiag.value = { ok: false, text }
+    toast(text, 'error')
   } finally {
     savingFlag.value = ''
   }
@@ -3397,6 +3411,11 @@ watch(isOwner, (val) => {
 .switch input:checked + .switch__track .switch__thumb { transform: translateX(24px); background: #ffffff; }
 .switch__state { font-size: 14px; font-weight: 700; min-width: 32px; color: var(--text-primary); }
 .feature-flag-readonly { margin-top: var(--space-md); color: #d4351c; font-weight: 700; }
+.flag-diag { margin-top: var(--space-md); padding: var(--space-sm) var(--space-md); border-left: 4px solid #d4351c; background: #fff; font-size: 14px; line-height: 1.6; }
+.flag-diag strong { display: block; margin-bottom: 4px; }
+.flag-diag span { display: block; word-break: break-all; color: var(--text-secondary); }
+.flag-diag--ok { border-left-color: #00703c; }
+.flag-diag--err { border-left-color: #d4351c; }
 
 /* 三态开关：公开 / 需权限 / 关闭（gov.uk 风格分段控件） */
 .ft-state { display: inline-flex; border: 2px solid #0b0c0c; border-radius: 0; overflow: hidden; flex-shrink: 0; }
