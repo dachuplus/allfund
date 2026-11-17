@@ -354,12 +354,12 @@ function handleRequestAccess() {
 
 /* ---- 全局金刚区 ---- */
 const quickLinks = [
-  { path: '/news',             label: '选题', feature: 'news' },
-  { path: '/toujiao',          label: '投教', feature: 'toujiao' },
   { path: '/content',          label: '娱乐', feature: 'content' },
   { path: '/blog',             label: '博客', feature: 'content-blog' },
+  { path: '/news',             label: '选题', feature: 'news' },
+  { path: '/toujiao',          label: '投教', feature: 'toujiao' },
   { path: '/signal',           label: '策略', feature: 'signal' },
-  { path: '/tools',  label: '选品', feature: 'fund-rank' },
+  { path: '/tools',            label: '选品', feature: 'fund-rank' },
   { path: '/portfolio',        label: '组合', feature: 'portfolio' },
 ]
 // 按全局开关过滤可见的金刚区入口（全部展示，权限由路由级 routeAllowed 拦截）
