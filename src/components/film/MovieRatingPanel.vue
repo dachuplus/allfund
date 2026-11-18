@@ -11,15 +11,6 @@
         <input v-model="keyword" type="search" placeholder="输入中文或英文片名" @keyup.enter="reload" />
         <button class="mr-btn" @click="reload">搜索</button>
       </label>
-      <label class="mr-order">
-        <span class="mr-label">排序</span>
-        <select v-model="order" @change="reload">
-          <option value="rank">综合排名</option>
-          <option value="vote_average">评分高低</option>
-          <option value="vote_count">评分人数</option>
-          <option value="year">上映年份</option>
-        </select>
-      </label>
     </div>
 
     <p v-if="loading && !rows.length" class="mr-status">正在加载电影评分…</p>
@@ -36,10 +27,26 @@
         <thead>
           <tr>
             <th class="mr-col-rank">#</th>
-            <th class="mr-col-title">片名</th>
-            <th class="mr-col-score">评分</th>
-            <th class="mr-col-votes">评分人数</th>
-            <th class="mr-col-year">年份</th>
+            <th
+              class="mr-col-title mr-sortable"
+              :class="{ 'mr-active': order === 'title' }"
+              @click="sortBy('title')"
+            >片名 <span class="mr-arrow">{{ sortArrow('title') }}</span></th>
+            <th
+              class="mr-col-score mr-sortable"
+              :class="{ 'mr-active': order === 'vote_average' }"
+              @click="sortBy('vote_average')"
+            >评分 <span class="mr-arrow">{{ sortArrow('vote_average') }}</span></th>
+            <th
+              class="mr-col-votes mr-sortable"
+              :class="{ 'mr-active': order === 'vote_count' }"
+              @click="sortBy('vote_count')"
+            >评分人数 <span class="mr-arrow">{{ sortArrow('vote_count') }}</span></th>
+            <th
+              class="mr-col-year mr-sortable"
+              :class="{ 'mr-active': order === 'year' }"
+              @click="sortBy('year')"
+            >年份 <span class="mr-arrow">{{ sortArrow('year') }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +83,9 @@ import { fetchMovieRatings, fetchMovieRatingsFetchDate, TMDB_ATTR } from '../../
 
 const rows = ref([])
 const keyword = ref('')
-const order = ref('rank')
+// 默认按评分降序；ascending=false 即降序。
+const order = ref('vote_average')
+const ascending = ref(false)
 const loading = ref(false)
 const error = ref('')
 const hasMore = ref(false)
@@ -88,7 +97,7 @@ async function load(reset = true) {
   error.value = ''
   try {
     const from = reset ? 0 : rows.value.length
-    const res = await fetchMovieRatings({ keyword: keyword.value, order: order.value, from })
+    const res = await fetchMovieRatings({ keyword: keyword.value, order: order.value, ascending: ascending.value, from })
     rows.value = reset ? res.rows : rows.value.concat(res.rows)
     hasMore.value = res.hasMore
   } catch (e) {
@@ -101,8 +110,24 @@ async function load(reset = true) {
 function reload() { load(true) }
 function loadMore() { load(false) }
 
+// 点击表头排序：同一列切换升/降；换列时数值列默认降序、片名默认升序。
+function sortBy(col) {
+  if (order.value === col) {
+    ascending.value = !ascending.value
+  } else {
+    order.value = col
+    ascending.value = col === 'title'
+  }
+  reload()
+}
+function sortArrow(col) {
+  if (order.value !== col) return ''
+  return ascending.value ? '▲' : '▼'
+}
+
 function displayRank(row, i) {
-  return order.value === 'rank' && row.rank ? row.rank : i + 1
+  // 排名列始终显示序号（当前排序下的位次），不再固定显示 TMDB 抓取排名。
+  return i + 1
 }
 function fmtScore(v) {
   if (v === null || v === undefined || v === '') return '--'
@@ -127,7 +152,6 @@ onMounted(async () => {
 .mr-controls { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px; }
 .mr-label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #0b0c0c; }
 .mr-search input { padding: 8px 10px; font-size: 16px; border: 2px solid #0b0c0c; min-width: 240px; }
-.mr-order select { padding: 8px 10px; font-size: 16px; border: 2px solid #0b0c0c; background: #fff; }
 .mr-btn { padding: 8px 16px; font-size: 16px; background: #1d70b8; color: #fff; border: 0; cursor: pointer; }
 .mr-btn:hover { background: #003078; }
 .mr-btn:disabled { background: #b1b4b6; cursor: default; }
@@ -136,6 +160,10 @@ onMounted(async () => {
 .mr-table-wrap { overflow-x: auto; }
 .mr-table { width: 100%; border-collapse: collapse; font-size: 16px; }
 .mr-table th { text-align: left; border-bottom: 2px solid #b1b4b6; padding: 8px 10px; white-space: nowrap; }
+.mr-sortable { cursor: pointer; user-select: none; }
+.mr-sortable:hover { color: #1d70b8; background: #f3f2f1; }
+.mr-active { color: #0b0c0c; }
+.mr-arrow { font-size: 12px; margin-left: 2px; color: #1d70b8; }
 .mr-table td { border-bottom: 1px solid #b1b4b6; padding: 10px; vertical-align: top; }
 .mr-col-rank { width: 56px; color: #505a5f; }
 .mr-col-title a { color: #1d70b8; text-decoration: underline; }

@@ -13,22 +13,24 @@ const PAGE_SIZE = 50
 
 /**
  * 拉取电影评分列表。
- * @param {{ keyword?:string, order?:string, from?:number, pageSize?:number }} opts
- *   order: 'rank' | 'vote_average' | 'vote_count' | 'year'
+ * @param {{ keyword?:string, order?:string, ascending?:boolean, from?:number, pageSize?:number }} opts
+ *   order: 'rank' | 'title' | 'vote_average' | 'vote_count' | 'year'
+ *   ascending: true=升序 / false=降序（默认按评分降序）
  * @returns {Promise<{rows:Array, hasMore:boolean}>}
  */
 export async function fetchMovieRatings(opts = {}) {
   const keyword = (opts.keyword || '').trim()
-  const order = opts.order || 'rank'
+  const order = opts.order || 'vote_average'
+  const ascending = opts.ascending === undefined ? false : !!opts.ascending
   const from = opts.from || 0
   const pageSize = opts.pageSize || PAGE_SIZE
 
-  const orderCol = ({ rank: 'rank', vote_average: 'vote_average', vote_count: 'vote_count', year: 'year' })[order] || 'rank'
+  const orderCol = ({ rank: 'rank', title: 'title', vote_average: 'vote_average', vote_count: 'vote_count', year: 'year' })[order] || 'vote_average'
 
   let q = supabase
     .from('movie_ratings')
     .select('tmdb_id,title,original_title,year,vote_average,vote_count,poster_path,source_url,fetch_date,rank')
-    .order(orderCol, { ascending: order === 'rank' })
+    .order(orderCol, { ascending })
     .range(from, from + pageSize - 1)
 
   if (keyword) {
