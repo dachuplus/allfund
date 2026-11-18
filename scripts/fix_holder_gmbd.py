@@ -47,14 +47,24 @@ if not _PAT:
 _MGMT = 'https://api.supabase.com/v1/projects/tqhtegazxykkqfcpejky/database/query'
 
 
-def PG(sql, timeout=300):
-    req = urllib.request.Request(
-        _MGMT, data=json.dumps({'query': sql}).encode('utf-8'),
-        headers={'Authorization': f'Bearer {_PAT}', 'Content-Type': 'application/json',
-                 'User-Agent': 'Mozilla/5.0'}, method='POST')
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        raw = r.read().decode('utf-8')
-    return json.loads(raw) if raw else []
+def PG(sql, timeout=300, retries=5):
+    """Management API SQL，带指数退避重试（沙箱代理偶发 502 / 隧道失败）。
+    写库语句（UPDATE/INSERT）幂等，重试安全。"""
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                _MGMT, data=json.dumps({'query': sql}).encode('utf-8'),
+                headers={'Authorization': f'Bearer {_PAT}', 'Content-Type': 'application/json',
+                         'User-Agent': 'Mozilla/5.0'}, method='POST')
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read().decode('utf-8')
+            return json.loads(raw) if raw else []
+        except Exception as e:
+            last = e
+            if attempt < retries - 1:
+                time.sleep(1.5 * (attempt + 1))
+    raise last
 
 PROGRESS_TABLE = 'public.fix_holder_progress'
 
