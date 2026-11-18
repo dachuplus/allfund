@@ -1,0 +1,74 @@
+name: 每周更新电影评分库
+
+# 独立流水线：只负责 movie_ratings / movie_ratings_staging 两张表。
+# 每周从 TMDB Discover 抓电影 Top 1 万评分，写 staging → 校验 → 单事务切正式表。
+# 不碰任何基金/评分流水线；未配置 TMDB key 时安静跳过（不算失败）。
+#
+# 前端：娱乐 → 评分 tab 只读正式表 movie_ratings，点片名跳 TMDB 原页。
+# 密钥：TMDB_READ_TOKEN（优先）或 TMDB_API_KEY，SUPABASE_MGMT_TOKEN 写库。
+#
+# 调度：UTC 周日 20:00 = 北京时间周一 04:00（错开投资风格 03:00）。
+
+on:
+  schedule:
+    - cron: '0 20 * * 0'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '抓取条数（0 = 全量 10000，调试用可传 200）'
+        required: false
+        type: string
+        default: '0'
+      dry_run:
+        description: '只抓取不写库（调试用）'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  movie-ratings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      TMDB_READ_TOKEN: ${{ secrets.TMDB_READ_TOKEN }}
+      TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 检查 TMDB key 是否配置
+        id: check_key
+        run: |
+          if [ -n "$TMDB_READ_TOKEN" ] || [ -n "$TMDB_API_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "TMDB key 已配置，开始同步"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未配置 TMDB_READ_TOKEN / TMDB_API_KEY，跳过本周电影评分同步"
+          fi
+
+      - name: 幂等确保表结构存在
+        if: steps.check_key.outputs.configured == 'true'
+        run: python scripts/create_movie_ratings_tables.py
+
+      - name: 抓取 TMDB Top1万并切换正式表
+        if: steps.check_key.outputs.configured == 'true'
+        run: |
+          LIMIT="${{ inputs.limit || '0' }}"
+          if [ "$LIMIT" = "0" ]; then LIMIT_ARGS=""; else LIMIT_ARGS="--limit $LIMIT"; fi
+          DRY=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then DRY="--dry-run"; fi
+          python scripts/fetch_tmdb_top_movies.py $LIMIT_ARGS $DRY

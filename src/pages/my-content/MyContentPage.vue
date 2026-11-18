@@ -99,6 +99,11 @@
       />
     </div>
 
+    <!-- 评分二级 Tab：电影评分库（TMDB 单源，Top1万，每周同步，点片名跳 TMDB 原页） -->
+    <div v-else-if="category === 'rating'">
+      <MovieRatingPanel />
+    </div>
+
     <!-- 美食二级 Tab：下辖两个三级 Tab —— 大厨榜-上海 / 必吃榜-上海（2017-2025） -->
     <div v-else-if="category === 'food'">
       <div class="cp-subtabs">
@@ -248,6 +253,7 @@ import MediaTools from '../../components/MediaTools.vue'
 import BaseConverterTool from '../../components/tools/BaseConverterTool.vue'
 import BaseCalculatorTool from '../../components/tools/BaseCalculatorTool.vue'
 import RankBoard from '../../components/rank/RankBoard.vue'
+import MovieRatingPanel from '../../components/film/MovieRatingPanel.vue'
 import MustEatBoard from '../../components/rank/MustEatBoard.vue'
 import AsciiTable from '../../components/xinao/AsciiTable.vue'
 import { FILM_RANK, FILM_DIMS } from '../../data/filmRank.js'
@@ -297,6 +303,7 @@ const categories = computed(() => isBlogMode.value
   ? [{ key: 'blog', label: '博客', feature: 'content-blog' }]
   : [
       { key: 'film', label: '影视', feature: 'content-film' },
+      { key: 'rating', label: '评分', feature: 'content-rating' },
       { key: 'food', label: '美食', feature: 'content-food' },
       { key: 'tool', label: '工具', feature: 'content-tool' },
       { key: 'game', label: '游戏', feature: 'content-game' },

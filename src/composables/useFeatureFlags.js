@@ -46,6 +46,7 @@ const DEFAULT_FLAGS = {
   // 娱乐 · 二级
   'content-blog': true,
   'content-film': true,
+  'content-rating': true,
   'content-food': true,
   'content-math': true,
   'content-yuwen': true,
@@ -105,6 +106,7 @@ export const SUB_FEATURE_PARENTS = {
   'factor-commodity': 'signal-factor',
   // 娱乐 · 二级（注意：content-blog 已提升为独立一级根节点，见 FEATURE_GROUPS[0]，不再挂 content 下）
   'content-film': 'content',
+  'content-rating': 'content',
   'content-food': 'content',
   'content-math': 'content',
   'content-yuwen': 'content',
@@ -188,6 +190,7 @@ export const FEATURE_GROUPS = [
     title: '娱乐 · 二级 Tab',
     items: [
       { key: 'content-film', label: '影视', desc: '娱乐下的影视内容' },
+      { key: 'content-rating', label: '评分', desc: '娱乐下的电影评分库（TMDB 单源，Top1万，每周同步，点片名跳 TMDB 原页）' },
       { key: 'content-food', label: '美食', desc: '娱乐下的美食（含三级：大厨榜 / 必吃榜）' },
       { key: 'content-game', label: '游戏', desc: '娱乐下的游戏内容' },
       { key: 'content-math', label: '奥数', desc: '娱乐下的奥数（含三级：各机构）' },
