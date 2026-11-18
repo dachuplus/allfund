@@ -21,6 +21,7 @@
   python3 scripts/fix_holder_gmbd.py --shard 0 --shards 4     # 分片并行
   python3 scripts/fix_holder_gmbd.py --limit 100 --dry-run     # 冒烟不写库
   python3 scripts/fix_holder_gmbd.py --reset-progress          # 清空进度重跑
+  python3 scripts/fix_holder_gmbd.py --retry-null             # 忽略进度，重抓 9 列存在 NULL 的基金
 """
 import argparse
 import json
@@ -129,23 +130,41 @@ def flush(batch):
         return False
 
 
-def fetch_one(code):
+def fetch_one(code, attempts=3):
+    """抓一只基金的 9 列。东财接口会瞬时返回空内容，单attempt会把真值误写成 NULL，
+    因此每类接口独立重试并保留字段最全的一次结果。"""
+    g_keys = ('sub_purchase', 'sub_redemption', 'net_sub_share',
+              'total_share_end', 'net_asset_end', 'nav_change_rate')
+    c_keys = ('inst_hold_pct', 'indiv_hold_pct', 'internal_hold_pct')
+
+    def _fetch(fn, keys):
+        best, best_n = None, -1
+        for attempt in range(attempts):
+            data = None
+            try:
+                data = fn(code)
+            except Exception:
+                data = None
+            n = sum(1 for k in keys if data and data.get(k) is not None)
+            if n > best_n:
+                best, best_n = data, n
+            if best_n == len(keys):
+                break
+            if attempt < attempts - 1:
+                time.sleep(0.15 * (attempt + 1))
+        return best if best_n > 0 else None
+
     row = {}
-    try:
-        g = fa.fetch_gmbd(code)
-        if g and g.get('sub_purchase') is not None:
-            for k in ('sub_purchase', 'sub_redemption', 'net_sub_share',
-                      'total_share_end', 'net_asset_end', 'nav_change_rate'):
-                row[k] = g.get(k)
-    except Exception:
-        pass
-    try:
-        c = fa.fetch_cyrjg(code)
-        if c and c.get('inst_hold_pct') is not None:
-            for k in ('inst_hold_pct', 'indiv_hold_pct', 'internal_hold_pct'):
-                row[k] = c.get(k)
-    except Exception:
-        pass
+    g = _fetch(fa.fetch_gmbd, g_keys)
+    if g:
+        for k in g_keys:
+            if g.get(k) is not None:
+                row[k] = g[k]
+    c = _fetch(fa.fetch_cyrjg, c_keys)
+    if c:
+        for k in c_keys:
+            if c.get(k) is not None:
+                row[k] = c[k]
     return row
 
 
@@ -158,6 +177,8 @@ def main():
     ap.add_argument('--delay', type=float, default=0.1)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--reset-progress', action='store_true')
+    ap.add_argument('--retry-null', action='store_true',
+                    help='忽略进度，重抓当前 9 列存在 NULL 的基金（接口重试版）')
     args = ap.parse_args()
 
     print('=' * 60, flush=True)
@@ -173,8 +194,13 @@ def main():
         print('  DRY-RUN 完成，未写库', flush=True)
         return
 
-    codes = get_codes()
-    done = get_done()
+    if args.retry_null:
+        cond = ' or '.join(f'{c} is null' for c in FIX_COLS)
+        codes = [r['c'] for r in PG(f'SELECT c FROM fund_scores WHERE {cond} ORDER BY c', timeout=120)]
+        done = set()  # 第二轮忽略进度，只按当前空值清单重抓
+    else:
+        codes = get_codes()
+        done = get_done()
     todo = [c for c in codes if c not in done]
     if args.shard is not None:
         todo = [c for i, c in enumerate(todo) if i % args.shards == args.shard]

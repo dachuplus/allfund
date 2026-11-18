@@ -12,6 +12,10 @@ name: 每日更新资产配置与季度评分（方案B-B）
 #   - allocation-shard 使用 fetch_fund_allocation.py --to-prod：仅 UPDATE 生产
 #     fund_scores 的 12 配置列（COALESCE 保护，不覆盖其余列），不碰 staging 快照、
 #     不碰整体 TRUNCATE 切换 → 与 A 的原子切换顺序无关、互不冲突。
+#   - holder-backfill 在 allocation-shard 之后跑 fix_holder_gmbd.py --retry-null：
+#     东财 gmbd/cyrjg 瞬时返回空会误写成 NULL，这里每类接口重试 3 次并只重抓当前
+#     9 列含 NULL 的基金，用裸码强制覆盖真值，避免机构占比长期停在有错的旧值。
+#   - refresh-main-view 最后刷新 fund_scores_main，前端默认 MAIN 份额读到最新机构占比。
 #   - quarterly-shard 仅写 fund_quarterly_scores（quarterly_data），评分由
 #     quarterly-score 单 job 读库统一重算横截面，避免分片内失真。
 #   - rebuild-combined 跑 sync_fund_combined_scores.py，基于最新 fund_quarterly_scores
@@ -103,6 +107,74 @@ jobs:
             MSG="分片 ${{ matrix.shard }}/8 资产配置 12 列已直写生产"
           fi
           python3 scripts/log_etl_step.py --step "配置季度 · 资产配置分片 #${{ matrix.shard }}" --status "$ST" --duration "$DUR" --message "$MSG" --run-date "$RUN_DATE"
+
+  # ───────────────────────────────────────────────────────────────
+  # holder-backfill：机构持仓/规模变动 9 列空值带重试回补（4 片并行）
+  # 只处理当前 9 列存在 NULL 的行；东财瞬时空返回不再被误写成 NULL。
+  # ───────────────────────────────────────────────────────────────
+  holder-backfill:
+    needs: [allocation-shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    continue-on-error: true
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装 Python 依赖（psycopg2 直连驱动 + requests）
+        run: pip install psycopg2-binary requests
+
+      - name: 步骤3b — 机构持仓/规模变动空值重试回补（分片 ${{ matrix.shard }}/4）
+        run: |
+          echo "============================================"
+          echo "  步骤3b[shard=${{ matrix.shard }}/4]: 重抓 9 列含 NULL 的基金（裸码 + 每接口 3 次重试）"
+          echo "  开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "============================================"
+          python scripts/fix_holder_gmbd.py --retry-null --shard ${{ matrix.shard }} --shards 4 --batch 40 --delay 0.05 2>&1 | tee "$GITHUB_WORKSPACE/holder-backfill-${{ matrix.shard }}.log"
+          echo "机构持仓回补完成(分片 ${{ matrix.shard }}): $(date '+%Y-%m-%d %H:%M:%S')"
+
+  # ───────────────────────────────────────────────────────────────
+  # refresh-main-view：回补后刷新主份额物化视图
+  # ───────────────────────────────────────────────────────────────
+  refresh-main-view:
+    needs: [holder-backfill]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: REFRESH MATERIALIZED VIEW public.fund_scores_main
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          pat = os.environ['SUPABASE_PAT']
+          ref = os.environ.get('SUPABASE_PROJECT_REF') or 'tqhtegazxykkqfcpejky'
+          url = f'https://api.supabase.com/v1/projects/{ref}/database/query'
+          payload = json.dumps({'query': 'REFRESH MATERIALIZED VIEW public.fund_scores_main'}).encode('utf-8')
+          req = urllib.request.Request(url, data=payload, method='POST', headers={
+              'Authorization': f'Bearer {pat}',
+              'Content-Type': 'application/json',
+              'User-Agent': 'allfund-ci',
+          })
+          with urllib.request.urlopen(req, timeout=300) as r:
+              print(r.read().decode('utf-8') or 'refresh ok')
+          PY
 
   # ───────────────────────────────────────────────────────────────
   # quarterly-shard：matrix 8 片并行刷 fund_quarterly_scores（仅 quarterly_data）
@@ -289,7 +361,7 @@ jobs:
   # notify：汇总通知（任一分片失败也提醒，但不阻断）
   # ───────────────────────────────────────────────────────────────
   notify:
-    needs: [allocation-shard, quarterly-shard, quarterly-score, rebuild-combined]
+    needs: [allocation-shard, holder-backfill, refresh-main-view, quarterly-shard, quarterly-score, rebuild-combined]
     if: ${{ failure() || cancelled() }}
     runs-on: ubuntu-latest
     steps:
