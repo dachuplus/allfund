@@ -391,25 +391,25 @@
             <th class="col-tags">概念</th>
             <th class="col-tags">行业</th>
             <th class="col-scale sortable" @click="toggleColumnSort('fund_scale')">
-              基金规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-fee sortable" @click="toggleColumnSort('manage_fee')">
-              管理费%<span class="th-arrow" v-if="sortField === 'manage_fee'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              费率<span class="th-arrow" v-if="sortField === 'manage_fee'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-inst sortable" @click="toggleColumnSort('inst_hold_pct')" title="机构持有比例（最近报告期，来自公开披露）">
-              机构%<span class="th-arrow" v-if="sortField === 'inst_hold_pct'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              机构占比<span class="th-arrow" v-if="sortField === 'inst_hold_pct'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-ret sortable" @click="toggleColumnSort('r1y')">
-              近1年收益%<span class="th-arrow" v-if="sortField === 'r1y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              近1年<span class="th-arrow" v-if="sortField === 'r1y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-ret sortable" @click="toggleColumnSort('r2y')">
-              近2年收益%<span class="th-arrow" v-if="sortField === 'r2y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              近2年<span class="th-arrow" v-if="sortField === 'r2y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-ret sortable" @click="toggleColumnSort('r3y')">
-              近3年收益%<span class="th-arrow" v-if="sortField === 'r3y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              近3年<span class="th-arrow" v-if="sortField === 'r3y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th class="col-ret sortable" @click="toggleColumnSort('r5y')">
-              近5年收益%<span class="th-arrow" v-if="sortField === 'r5y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              近5年<span class="th-arrow" v-if="sortField === 'r5y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th v-for="p in displayPeriods" :key="p.key" class="col-score sortable" :class="{ 'col-sort': currentPeriod === p.key }" @click="switchPeriod(p.key)">
               {{ p.label }}评分<span class="th-arrow" v-if="currentPeriod === p.key">{{ sortAsc ? '▲' : '▼' }}</span>
@@ -508,7 +508,7 @@
           <span class="tag-line" v-if="conceptOf(fund).length"><em>概念</em>{{ conceptOf(fund).slice(0, 5).join('、') }}<span v-if="conceptOf(fund).length > 5"> 等 {{ conceptOf(fund).length }} 个</span></span>
           <span class="tag-line" v-if="industryOf(fund).length"><em>行业</em>{{ industryOf(fund).slice(0, 5).join('、') }}<span v-if="industryOf(fund).length > 5"> 等 {{ industryOf(fund).length }} 个</span></span>
         </div>
-        <div class="fund-card-scale" v-if="fund.fund_scale != null || fund.inst_hold_pct != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 管理费%：{{ fmtManageFee(fund.manage_fee) }} · 机构%：{{ fmtInstPct(fund.inst_hold_pct) }}</div>
+        <div class="fund-card-scale" v-if="fund.fund_scale != null || fund.inst_hold_pct != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 费率：{{ fmtManageFee(fund.manage_fee) }} · 机构占比：{{ fmtInstPct(fund.inst_hold_pct) }}</div>
         <div class="fund-card-ret">
           <span :style="{ color: retColor(fund.r1y) }">近1年收益 {{ fmtRetPlain(fund.r1y) }}</span>
           <span :style="{ color: retColor(fund.r2y) }">近2年收益 {{ fmtRetPlain(fund.r2y) }}</span>
@@ -1641,7 +1641,7 @@ function exportCsv() {
     toast('暂无数据可导出', 'error')
     return
   }
-  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '投资风格', '概念', '行业', '基金规模(亿)', '管理费%', '近1年收益%', '近2年收益%', '近3年收益%', '近5年收益%']
+  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '投资风格', '概念', '行业', '基金规模(亿)', '费率', '近1年', '近2年', '近3年', '近5年']
   const periodHeaders = displayPeriods.value.map(p => p.label + '评分')
   const allHeaders = [...headers, ...periodHeaders]
 
