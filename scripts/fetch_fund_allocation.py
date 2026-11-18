@@ -200,8 +200,11 @@ def fetch_gmbd(code):
 
     返回 dict 或 None（取最新报告期一行）
     """
-    url = f'https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=gmbd&code={code}&per=1&page=1'
-    raw = _http_get(url, headers={'Referer': f'https://fundf10.eastmoney.com/gmbd_{code}.html'})
+    # ⚠️ 东财 FundArchivesDatas 接口不认 .OF 后缀：带后缀会回退到同一个默认基金，
+    #    返回一堆相同错值（如 cyrjg 恒为 0.45/99.55）。必须用裸代码请求。
+    bare = _strip_suffix(code)
+    url = f'https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=gmbd&code={bare}&per=1&page=1'
+    raw = _http_get(url, headers={'Referer': f'https://fundf10.eastmoney.com/gmbd_{bare}.html'})
 
     content = _extract_api_content(raw, 'gmbd')
     if not content:
@@ -246,8 +249,10 @@ def fetch_cyrjg(code):
 
     返回 dict 或 None（取最新公告期一行）
     """
-    url = f'https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=cyrjg&code={code}&per=1&page=1'
-    raw = _http_get(url, headers={'Referer': f'https://fundf10.eastmoney.com/cyrjg_{code}.html'})
+    # ⚠️ 同 gmbd：必须用裸代码，带 .OF 会返回统一错误默认值（0.45/99.55）。
+    bare = _strip_suffix(code)
+    url = f'https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=cyrjg&code={bare}&per=1&page=1'
+    raw = _http_get(url, headers={'Referer': f'https://fundf10.eastmoney.com/cyrjg_{bare}.html'})
 
     content = _extract_api_content(raw, 'cyrjg')
     if not content:
