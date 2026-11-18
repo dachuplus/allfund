@@ -95,10 +95,11 @@ FIX_COLS = ['sub_purchase', 'sub_redemption', 'net_sub_share',
 
 
 def flush(batch):
-    """batch: list[(code, dict)]。每列强制覆盖；不传的列保持 NULL 但用 COALESCE 兜底防局部抓空。"""
+    """batch: list[(code, dict)]。9 列全部直接覆盖为真实值；抓不到的列写 NULL
+    清掉错误的旧默认值（旧值 0.45/99.55 是 .OF bug 产物，必须清除，不能 COALESCE 保留）。"""
     if not batch:
         return
-    set_clause = ', '.join(f'{c} = COALESCE(t.{c}, f.{c})' for c in FIX_COLS)
+    set_clause = ', '.join(f'{c} = t.{c}' for c in FIX_COLS)
     vals = []
     for code, data in batch:
         safe = code.replace("'", "''")
@@ -175,8 +176,10 @@ def main():
     batch_results = []
     for i, code in enumerate(todo, 1):
         row = fetch_one(code)
+        # 无论是否抓到真实数据，都进批次：抓到的覆盖为真值，抓不到的写 NULL
+        # 清掉旧 .OF bug 的错误默认值（0.45/99.55/1.51...），全部 mark_done 避免反复重抓。
+        batch_results.append((code, row))
         if row:
-            batch_results.append((code, row))
             stats['ok'] += 1
         else:
             stats['empty'] += 1
