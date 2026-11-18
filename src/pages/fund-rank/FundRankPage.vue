@@ -305,6 +305,17 @@
                 </div>
               </div>
 
+              <!-- 机构持有比例区间（%） -->
+              <div class="filter-row">
+                <span class="filter-label">机构比例</span>
+                <div class="filter-scale-range">
+                  <input type="number" class="scale-input" v-model="filterInstMin" placeholder="最小" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-dash">—</span>
+                  <input type="number" class="scale-input" v-model="filterInstMax" placeholder="最大" @keyup.enter="applyMoreFilters" />
+                  <span class="scale-unit">%</span>
+                </div>
+              </div>
+
               <!-- 筛选说明 -->
               <div class="filter-tip">
                 注：份额/持有期/规模可<strong>多选</strong>（同一行内多选为「并集」，不同行之间为「且」）。投资风格来自公开网络最新报告期，按季度更新，未披露的产品不显示风格标签；概念/行业标签来自热门板块标签数据，两行多选均为「并集」，跨行也是并集。ETF/LOF/定开/申购状态/单日涨跌/异常基于数据库字段精确筛选；场内/份额类别/持有期基于基金名称识别，可能存在少量误判。「异常」为收益数据合理性校验标注（如单月收益超 100%、债券型收益超上限、各期累计收益几乎相同等数据源脏值特征），名称旁带红标，选基时建议选「否」剔除。持有期按名称中的「7天/30天/1个月/一年」等字样归类；「无限制」指名称不含「持有」字样的产品（即无持有期条款，其中含少量定期开放产品，可用上方「定开」进一步区分）。规模自定义区间与预设区间互斥。<br>
@@ -385,6 +396,9 @@
             <th class="col-fee sortable" @click="toggleColumnSort('manage_fee')">
               管理费%<span class="th-arrow" v-if="sortField === 'manage_fee'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
+            <th class="col-inst sortable" @click="toggleColumnSort('inst_hold_pct')" title="机构持有比例（最近报告期，来自公开披露）">
+              机构%<span class="th-arrow" v-if="sortField === 'inst_hold_pct'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="col-ret sortable" @click="toggleColumnSort('r1y')">
               近1年收益%<span class="th-arrow" v-if="sortField === 'r1y'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -433,6 +447,7 @@
             </td>
             <td class="col-scale">{{ fmtFundScale(fund.fund_scale) }}</td>
             <td class="col-fee">{{ fmtManageFee(fund.manage_fee) }}</td>
+            <td class="col-inst">{{ fmtInstPct(fund.inst_hold_pct) }}</td>
             <td class="col-ret" :style="{ color: retColor(fund.r1y) }">{{ fmtRetPlain(fund.r1y) }}</td>
             <td class="col-ret" :style="{ color: retColor(fund.r2y) }">{{ fmtRetPlain(fund.r2y) }}</td>
             <td class="col-ret" :style="{ color: retColor(fund.r3y) }">{{ fmtRetPlain(fund.r3y) }}</td>
@@ -493,7 +508,7 @@
           <span class="tag-line" v-if="conceptOf(fund).length"><em>概念</em>{{ conceptOf(fund).slice(0, 5).join('、') }}<span v-if="conceptOf(fund).length > 5"> 等 {{ conceptOf(fund).length }} 个</span></span>
           <span class="tag-line" v-if="industryOf(fund).length"><em>行业</em>{{ industryOf(fund).slice(0, 5).join('、') }}<span v-if="industryOf(fund).length > 5"> 等 {{ industryOf(fund).length }} 个</span></span>
         </div>
-        <div class="fund-card-scale" v-if="fund.fund_scale != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 管理费%：{{ fmtManageFee(fund.manage_fee) }}</div>
+        <div class="fund-card-scale" v-if="fund.fund_scale != null || fund.inst_hold_pct != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 管理费%：{{ fmtManageFee(fund.manage_fee) }} · 机构%：{{ fmtInstPct(fund.inst_hold_pct) }}</div>
         <div class="fund-card-ret">
           <span :style="{ color: retColor(fund.r1y) }">近1年收益 {{ fmtRetPlain(fund.r1y) }}</span>
           <span :style="{ color: retColor(fund.r2y) }">近2年收益 {{ fmtRetPlain(fund.r2y) }}</span>
@@ -925,6 +940,8 @@ const filterBondMin = ref('')
 const filterBondMax = ref('')
 const filterCashMin = ref('')
 const filterCashMax = ref('')
+const filterInstMin = ref('')   // 机构持有比例区间（%）：与仓位筛选同构
+const filterInstMax = ref('')
 
 // 投资风格 / 概念·行业标签（2026-11-13）：
 // 标签元数据直接复用「热门」tab 底层的 fund_tags（name + tag_type），不另建表。
@@ -1294,6 +1311,8 @@ async function loadData(reset = true, _retryCount = 0) {
       bondMax: numOrUndef(filterBondMax.value),
       cashMin: numOrUndef(filterCashMin.value),
       cashMax: numOrUndef(filterCashMax.value),
+      instMin: numOrUndef(filterInstMin.value),
+      instMax: numOrUndef(filterInstMax.value),
       sortField: sortField.value || undefined,
       sortDir: sortDir.value || undefined,
       // 投资风格 / 概念·行业：两行 UI 各自独立成组（组间取交集），与列表同一条链
@@ -1402,6 +1421,8 @@ function clearMoreFilters() {
   filterBondMax.value = ''
   filterCashMin.value = ''
   filterCashMax.value = ''
+  filterInstMin.value = ''
+  filterInstMax.value = ''
   filterInvestStyle.value = []
   filterConceptTags.value = []
   filterIndustryTags.value = []
@@ -1423,6 +1444,7 @@ function openMoreFilter() {
     psm: filterStockMin.value, psx: filterStockMax.value,
     pbm: filterBondMin.value, pbx: filterBondMax.value,
     pcm: filterCashMin.value, pcx: filterCashMax.value,
+    pim: filterInstMin.value, pix: filterInstMax.value,
     ist: [...filterInvestStyle.value], ct: [...filterConceptTags.value], it: [...filterIndustryTags.value],
   }
   showMoreFilter.value = true
@@ -1453,6 +1475,8 @@ function cancelMoreFilter() {
     filterBondMax.value = moreFilterSnapshot.pbx
     filterCashMin.value = moreFilterSnapshot.pcm
     filterCashMax.value = moreFilterSnapshot.pcx
+    filterInstMin.value = moreFilterSnapshot.pim || ''
+    filterInstMax.value = moreFilterSnapshot.pix || ''
     filterInvestStyle.value = [...(moreFilterSnapshot.ist || [])]
     filterConceptTags.value = [...(moreFilterSnapshot.ct || [])]
     filterIndustryTags.value = [...(moreFilterSnapshot.it || [])]
@@ -1563,6 +1587,14 @@ function toggleColumnSort(field) {
   }
   // 触发服务端重新拉取（排序已下推到数据库，覆盖全表而非仅已加载的 100 条）
   loadData(true)
+}
+
+/** 机构持有比例：数值百分比，保留两位小数加 %；无数据显示 -- */
+function fmtInstPct(v) {
+  if (v == null || v === '') return '--'
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '--'
+  return n.toFixed(2) + '%'
 }
 
 /** 收益涨跌幅颜色：涨红跌绿（中国习惯），0/空为次要文本色 */
@@ -1939,6 +1971,9 @@ onUnmounted(() => {
 .col-sort { background: #e8f0fe; }
 .col-actions { width: 84px; text-align: center; }
 .col-fee { width: 60px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.col-inst { width: 68px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.col-inst.sortable { cursor: pointer; user-select: none; }
+.col-inst.sortable:hover { background: #e0e7ef; }
 .col-t1 { width: 100px; color: var(--text-secondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-ret { width: 90px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 

@@ -26,7 +26,7 @@ export async function fetchTouguProducts(filters = {}) {
 // fund_scores 表实际列（核心视图）：代码/名称/分类/详情/评分
 // 合规：不再向前端下发短周期（<3 个月）评分列 k0w/k1m ——《证券投资基金评价业务管理暂行办法》
 // 第十四条第(七)项禁止发布单一指标排名期间少于 3 个月的结果，页面对应周期已一并下架。
-const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,invest_style,style_period,tags'
+const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,inst_hold_pct,invest_style,style_period,tags'
 export function fetchFundScores(params = {}) {
   const key = 'fundScores:' + JSON.stringify(params)
   return withCache(key, 60000, () => fetchFundScoresImpl(params))
@@ -373,7 +373,7 @@ function tagGroupExpr(selected, flagCol) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, conceptTagFilters, industryTagFilters, allConceptTags, allIndustryTags, countOnly = false } = params
+  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, instMin, instMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, conceptTagFilters, industryTagFilters, allConceptTags, allIndustryTags, countOnly = false } = params
   if (supabase) {
     // 列表请求不带 count（22000+ 行 × 30 列曾触发 57014）。精确总数改由
     // countOnly 模式复用同一条过滤链，只 select c + head + count=exact（见下方），
@@ -468,6 +468,9 @@ async function fetchFundScoresImpl(params = {}) {
     if (bondMax != null) query = query.lte('bond_pct', bondMax)
     if (cashMin != null) query = query.gte('cash_pct', cashMin)
     if (cashMax != null) query = query.lte('cash_pct', cashMax)
+    // 机构持有比例（%）：服务端下推 gte/lte（与仓位筛选同构）
+    if (instMin != null) query = query.gte('inst_hold_pct', instMin)
+    if (instMax != null) query = query.lte('inst_hold_pct', instMax)
     // 份额（多选，含「主代码」）：名称 regex 服务端下推；mainOnly 已由视图完成去重，无需再筛
     const shareFilter = mainOnly ? null : ((shareClasses && shareClasses.length)
       ? shareClassFilter(shareClasses)
