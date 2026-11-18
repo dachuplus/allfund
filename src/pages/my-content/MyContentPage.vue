@@ -179,10 +179,10 @@
 
     <!-- 博客：文章列表 -->
     <template v-else>
-    <div v-if="canManageContent" class="cp-viewswitch">
+    <div class="cp-viewswitch">
       <button :class="{ active: view === 'published' }" @click="setView('published')">已发布</button>
-      <button :class="{ active: view === 'mine' }" @click="setView('mine')">我的全部（含草稿）</button>
-      <router-link :to="isBlogMode ? '/blog/editor' : '/content/editor'" class="cp-view-tab">写文章</router-link>
+      <button v-if="canManageContent" :class="{ active: view === 'mine' }" @click="setView('mine')">我的全部（含草稿）</button>
+      <router-link v-if="canManageContent" :to="isBlogMode ? '/blog/editor' : '/content/editor'" class="cp-view-tab">写文章</router-link>
     </div>
 
     <div v-if="loading && !articles.length" class="cp-loading">
