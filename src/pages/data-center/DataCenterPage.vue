@@ -248,6 +248,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-19</td>
+              <td><code>efd14f3c</code></td>
+              <td><span class="version-history">历史版本（股票风格因子修复）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-19</td>
               <td><code>1b2b10c7</code></td>
               <td><span class="version-history">历史版本</span></td>
             </tr>
