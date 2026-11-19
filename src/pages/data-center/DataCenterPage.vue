@@ -234,10 +234,22 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>v4.0.57</strong></td>
+              <td><strong>v{{ liveVersion.bv || '4.0.57' }}</strong></td>
+              <td>{{ liveVersion.buildTime ? liveVersion.buildTime.slice(0, 10) : '读取中…' }}</td>
+              <td><code>{{ liveVersion.commit ? liveVersion.commit.slice(0, 8) : '读取中…' }}</code></td>
+              <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-19</td>
+              <td><code>d0c99a73</code></td>
+              <td><span class="version-history">历史版本</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
               <td>2026-11-19</td>
               <td><code>1b2b10c7</code></td>
-              <td><span class="version-current">当前线上</span></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td>v4.0.57</td>

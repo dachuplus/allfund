@@ -133,8 +133,13 @@ def run_sql(sql):
 
 
 def fetch_index_close(symbol):
-    """拉取指数日线收盘价序列（腾讯源 akshare），返回 (prices, dates)"""
-    df = ak.stock_zh_index_daily(symbol=symbol)
+    """拉取指数日线收盘价序列（新浪源 akshare），返回 (prices, dates)。
+    akshare 1.20.44 起 stock_zh_index_daily 更名为 index_zh_daily_sina，
+    列名/参数不变；优先新接口，老环境回退旧接口，避免股票风格全部被跳过。"""
+    fn = getattr(ak, 'index_zh_daily_sina', None) or getattr(ak, 'stock_zh_index_daily', None)
+    if fn is None:
+        raise RuntimeError('akshare 未提供指数日线接口（index_zh_daily_sina / stock_zh_index_daily）')
+    df = fn(symbol=symbol)
     if df is None or df.empty or len(df) < 30:
         return None, None
     df['date'] = df['date'].astype(str).str[:10]
