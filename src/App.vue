@@ -398,10 +398,9 @@ const routeState = computed(() => {
   // 受限（开放但需申请权限才能访问）：未登录与已登录无权限统一走「无访问权限」卡片，
   // 文案与按钮由模板按 isLoggedIn 区分（未登录→登录/注册，已登录→申请访问权限）
   if (featureRestricted(feat)) return hasFeature(feat) ? 'allowed' : 'apply'
-  // 公开内容（娱乐/博客/选题/投教）：开放即可读，不弹权限墙
-  if (feat === 'content' || feat === 'content-blog' || feat === 'news' || feat === 'toujiao') return 'allowed'
-  // 其余功能：需登录且已开通权限
-  return hasFeature(feat) ? 'allowed' : 'apply'
+  // 公开（open=true 且 restricted=false）：所有人均可访问，不再要求登录/已开通权限。
+  // 这一条覆盖选品/策略/组合等所有一级功能；数据面板里点「公开」才会真正生效。
+  return 'allowed'
 })
 const currentFeatureLabel = computed(() => {
   if (route.meta?.ownerOnly) return '管理/编辑'
