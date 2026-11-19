@@ -242,12 +242,35 @@ def _last(macro_metric):
     return None
 
 
+def _last_date(macro_metric):
+    """取 macro_history 该指标最新数据的真实日期，用于文案标注截止时间"""
+    try:
+        rows = pg(f"SELECT date FROM macro_history WHERE metric='{macro_metric}' ORDER BY date DESC LIMIT 1")
+        if rows and rows[0].get('date'):
+            return str(rows[0]['date'])[:10]
+    except Exception:
+        pass
+    return ''
+
+
+def _range_label(dates):
+    """近1月 = 最近22个交易日，返回真实起止日区间标签（用于文案标注截止时间）"""
+    if not dates or len(dates) < 22:
+        return ''
+    return f'{dates[-22]} 至 {dates[-1]}'
+
+
+def _m(label, text):
+    """给'近1月'类文案加真实日期区间；无可用日期时退回原'近1月'表述"""
+    return f'近1月（{label}）{text}' if label else f'近1月{text}'
+
+
 def build_bond():
     out = []
-    long_p, _, long_s = _try_fetch(BOND_IDX['long'])
-    short_p, _, short_s = _try_fetch(BOND_IDX['short'])
-    credit_p, _, credit_s = _try_fetch(BOND_IDX['credit'])
-    gov_p, _, gov_s = _try_fetch(BOND_IDX['gov'])
+    long_p, long_d, long_s = _try_fetch(BOND_IDX['long'])
+    short_p, short_d, short_s = _try_fetch(BOND_IDX['short'])
+    credit_p, credit_d, credit_s = _try_fetch(BOND_IDX['credit'])
+    gov_p, gov_d, gov_s = _try_fetch(BOND_IDX['gov'])
 
     long_r = _ret_1m(long_p)
     short_r = _ret_1m(short_p)
@@ -257,18 +280,25 @@ def build_bond():
     y10 = _last('cn10y')      # 10Y国债收益率(%)
     shibor = _last('shibor_on')  # Shibor隔夜(%)
 
+    # 时间口径标注：近1月用指数序列真实起止交易日，杠杆用 macro 数据真实日期
+    dur_range = _range_label(long_d)
+    cr_range = _range_label(credit_d)
+    macro_date = _last_date('cn10y') or _last_date('shibor_on')
+    macrop = f'截至{macro_date}，' if macro_date else ''
+
     print(f'  债券数据: 长期国债近1月={long_r} 短期国债近1月={short_r} 信用债近1月={credit_r} 国债近1月={gov_r} 10Y={y10}% shibor={shibor}%')
+    print(f'  时间口径: 近1月区间(久期)={dur_range} 近1月区间(信用)={cr_range} macro数据日={macro_date}')
 
     # 久期风格
     if long_r is not None and short_r is not None:
         if long_r > short_r + 0.5:
-            sig, slabel, color, reason = 'cheap', '拉长久期', '#00703c', f'近1月长期利率债({long_r}%)显著跑赢短端({short_r}%)，曲线牛平、利率下行，可适度拉长久期获取资本利得。'
+            sig, slabel, color, reason = 'cheap', '拉长久期', '#00703c', _m(dur_range, f'长期利率债({long_r}%)显著跑赢短端({short_r}%)，曲线牛平、利率下行，可适度拉长久期获取资本利得。')
             score = 75
         elif long_r < short_r - 0.5:
-            sig, slabel, color, reason = 'expensive', '缩短久期', '#d4351c', f'近1月短端({short_r}%)强于长端({long_r}%)，曲线熊陡/资金偏紧，建议缩短久期、控制利率风险。'
+            sig, slabel, color, reason = 'expensive', '缩短久期', '#d4351c', _m(dur_range, f'短端({short_r}%)强于长端({long_r}%)，曲线熊陡/资金偏紧，建议缩短久期、控制利率风险。')
             score = 25
         else:
-            sig, slabel, color, reason = 'neutral', '久期中性', '#1d70b8', f'长端({long_r}%)与短端({short_r}%)近1月表现接近，曲线形态平稳，久期保持中性即可。'
+            sig, slabel, color, reason = 'neutral', '久期中性', '#1d70b8', _m(dur_range, f'长端({long_r}%)与短端({short_r}%)表现接近，曲线形态平稳，久期保持中性即可。')
             score = 50
     else:
         sig, slabel, color, reason, score = 'neutral', '久期中性', '#1d70b8', '利率数据暂缺，久期保持中性。', 50
@@ -279,13 +309,13 @@ def build_bond():
     # 信用风格
     if credit_r is not None and gov_r is not None:
         if credit_r > gov_r + 0.3:
-            sig, slabel, color, reason = 'cheap', '信用下沉', '#00703c', f'近1月信用债({credit_r}%)跑赢利率债({gov_r}%)，利差压缩、carry占优，可适度信用下沉增厚收益。'
+            sig, slabel, color, reason = 'cheap', '信用下沉', '#00703c', _m(cr_range, f'信用债({credit_r}%)跑赢利率债({gov_r}%)，利差压缩、carry占优，可适度信用下沉增厚收益。')
             score = 75
         elif credit_r < gov_r - 0.3:
-            sig, slabel, color, reason = 'expensive', '提升资质', '#d4351c', f'近1月信用债({credit_r}%)弱于利率债({gov_r}%)，避险情绪下利差走阔，建议提升资质、规避低评级。'
+            sig, slabel, color, reason = 'expensive', '提升资质', '#d4351c', _m(cr_range, f'信用债({credit_r}%)弱于利率债({gov_r}%)，避险情绪下利差走阔，建议提升资质、规避低评级。')
             score = 25
         else:
-            sig, slabel, color, reason = 'neutral', '信用中性', '#1d70b8', f'信用债({credit_r}%)与利率债({gov_r}%)近1月表现接近，信用利差平稳，保持中性。'
+            sig, slabel, color, reason = 'neutral', '信用中性', '#1d70b8', _m(cr_range, f'信用债({credit_r}%)与利率债({gov_r}%)表现接近，信用利差平稳，保持中性。')
             score = 50
     else:
         sig, slabel, color, reason, score = 'neutral', '信用中性', '#1d70b8', '信用数据暂缺，信用保持中性。', 50
@@ -297,13 +327,13 @@ def build_bond():
     if y10 is not None and shibor is not None:
         carry = y10 - shibor
         if carry > 0.8:
-            sig, slabel, color, reason = 'cheap', '适度加杠杆', '#00703c', f'10Y国债收益率({y10}%)与Shibor隔夜({shibor}%)套息空间约{carry:.2f}%，正carry充足，可适度加杠杆增厚收益。'
+            sig, slabel, color, reason = 'cheap', '适度加杠杆', '#00703c', f'{macrop}10Y国债收益率({y10}%)与Shibor隔夜({shibor}%)套息空间约{carry:.2f}%，正carry充足，可适度加杠杆增厚收益。'
             score = 75
         elif carry < 0.3:
-            sig, slabel, color, reason = 'expensive', '降低杠杆', '#d4351c', f'套息空间仅约{carry:.2f}%，杠杆收益薄、资金波动风险大，建议降低杠杆。'
+            sig, slabel, color, reason = 'expensive', '降低杠杆', '#d4351c', f'{macrop}套息空间仅约{carry:.2f}%，杠杆收益薄、资金波动风险大，建议降低杠杆。'
             score = 25
         else:
-            sig, slabel, color, reason = 'neutral', '杠杆中性', '#1d70b8', f'套息空间约{carry:.2f}%，杠杆收益中性，保持当前杠杆水平。'
+            sig, slabel, color, reason = 'neutral', '杠杆中性', '#1d70b8', f'{macrop}套息空间约{carry:.2f}%，杠杆收益中性，保持当前杠杆水平。'
             score = 50
     else:
         sig, slabel, color, reason, score = 'neutral', '杠杆中性', '#1d70b8', '利率数据暂缺，杠杆保持中性。', 50
