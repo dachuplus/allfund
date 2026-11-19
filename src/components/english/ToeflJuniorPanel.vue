@@ -15,7 +15,39 @@
       >{{ w.label }}</button>
     </div>
 
-    <p v-if="loading" class="tj-sub">加载中…</p>
+    <!-- 不规则动词表（独立 tab，与周次并列） -->
+    <div v-if="isVerbs" class="tj-verbs">
+      <div class="tj-head">
+        <h3 class="tj-title">小托福 · 不规则动词表</h3>
+        <p class="tj-subject">共 {{ IRREGULAR_VERBS.length }} 个词条 · 来源：Week 4 讲义末页</p>
+      </div>
+      <div class="tj-vb-tools">
+        <label class="tj-vb-search">
+          <span>搜索动词</span>
+          <input v-model="verbQuery" type="search" placeholder="输入原形/过去式/过去分词" />
+        </label>
+        <span class="tj-vb-count">显示 {{ filteredVerbs.length }} / {{ IRREGULAR_VERBS.length }}</span>
+      </div>
+      <div v-if="filteredVerbs.length === 0" class="tj-empty">没有匹配的动词</div>
+      <div v-else class="tj-vb-table-wrap">
+        <table class="tj-vb-table">
+          <thead>
+            <tr><th>原形</th><th>过去式</th><th>过去分词</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(v, i) in filteredVerbs" :key="i">
+              <td class="tj-vb-base">{{ v.base }}</td>
+              <td>{{ v.past }}</td>
+              <td>{{ v.pp }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <template v-else-if="loading">
+      <p class="tj-sub">加载中…</p>
+    </template>
 
     <template v-else-if="week">
       <div class="tj-head">
@@ -194,6 +226,7 @@
  * 未印出外链的周只提供听力原文，不臆造链接。
  */
 import { ref, computed, reactive, watch } from 'vue'
+import { IRREGULAR_VERBS } from '../../data/toeflJuniorIrregularVerbs.js'
 
 const WEEKS = [
   { key: 'w1', label: 'Week 1' },
@@ -203,6 +236,7 @@ const WEEKS = [
   { key: 'w5', label: 'Week 5' },
   { key: 'w6', label: 'Week 6' },
   { key: 'w7', label: 'Week 7' },
+  { key: 'verbs', label: '不规则动词表' },
 ]
 const LOADERS = {
   w1: () => import('../../data/toeflJuniorW1.js'),
@@ -218,6 +252,19 @@ const weeks = WEEKS
 const loading = ref(false)
 const weekKey = ref('w1')
 const week = ref(null)
+
+// 不规则动词表
+const isVerbs = computed(() => weekKey.value === 'verbs')
+const verbQuery = ref('')
+const filteredVerbs = computed(() => {
+  const q = verbQuery.value.trim().toLowerCase()
+  if (!q) return IRREGULAR_VERBS
+  return IRREGULAR_VERBS.filter((v) =>
+    v.base.toLowerCase().includes(q) ||
+    v.past.toLowerCase().includes(q) ||
+    v.pp.toLowerCase().includes(q)
+  )
+})
 
 // 作答状态：uid -> 选中下标
 const answers = reactive({})
@@ -241,9 +288,13 @@ async function loadWeek(k) {
 }
 
 function switchWeek(k) {
-  if (k === weekKey.value && week.value) return
+  if (k === weekKey.value && (week.value || k === 'verbs')) return
   weekKey.value = k
   resetAll()
+  if (k === 'verbs') {
+    verbQuery.value = ''
+    return
+  }
   loadWeek(k)
 }
 
@@ -466,4 +517,38 @@ loadWeek('w1')
 .tj-why-text { font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
 .tj-why-list { margin: 4px 0 0; padding-left: 20px; }
 .tj-why-list li { font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
+
+/* 不规则动词表 */
+.tj-verbs { user-select: text; }
+.tj-vb-tools {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+  border: 1px solid #b1b4b6; background: #f3f2f1;
+  padding: 10px 12px; margin-bottom: 14px;
+}
+.tj-vb-search { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #0b0c0c; }
+.tj-vb-search input {
+  border: 1px solid #b1b4b6; background: #fff; padding: 6px 8px;
+  font-size: 14px; color: #0b0c0c; min-width: 260px; max-width: 100%;
+}
+.tj-vb-search input:focus { outline: 2px solid #1d70b8; outline-offset: -1px; border-color: #1d70b8; }
+.tj-vb-count { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+.tj-vb-table-wrap { overflow-x: auto; border: 1px solid #b1b4b6; }
+.tj-vb-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tj-vb-table th, .tj-vb-table td {
+  border-bottom: 1px solid #b1b4b6; padding: 7px 12px; text-align: left;
+  color: #0b0c0c; line-height: 1.5;
+}
+.tj-vb-table thead th {
+  background: #1d70b8; color: #fff; font-weight: 700;
+  position: sticky; top: 0; border-bottom: 2px solid #1d70b8;
+}
+.tj-vb-table tbody tr:nth-child(even) { background: #f3f2f1; }
+.tj-vb-table tbody tr:hover { background: #e6f1fb; }
+.tj-vb-base { font-weight: 700; color: #1d70b8; }
+
+@media (max-width: 640px) {
+  .tj-vb-search input { min-width: 0; width: 100%; }
+  .tj-vb-count { margin-left: 0; }
+  .tj-vb-table th, .tj-vb-table td { padding: 6px 8px; font-size: 13px; }
+}
 </style>
