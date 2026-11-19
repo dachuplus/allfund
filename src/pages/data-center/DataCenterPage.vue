@@ -226,7 +226,7 @@
 
       <div class="version-block">
         <div class="version-block-title">稳定版本 · Stable Releases</div>
-        <p class="section-desc">每次发版同步更新 package.json、GitHub tag、EdgeOne Pages 部署。本节作为版本锚点，供回滚与比对参考。</p>
+        <p class="section-desc">每次发版同步更新 package.json、GitHub tag、EdgeOne Pages 部署。本节作为版本锚点，供回滚与比对参考；同一版本号的多次线上部署也逐条记录（日期 + Git Commit）。</p>
 
         <table class="version-table">
           <thead>
@@ -235,9 +235,21 @@
           <tbody>
             <tr>
               <td><strong>v4.0.57</strong></td>
-              <td>2026-10-28</td>
-              <td><code>见下方发版日志</code></td>
+              <td>2026-11-19</td>
+              <td><code>1b2b10c7</code></td>
               <td><span class="version-current">当前线上</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-18</td>
+              <td><code>67a4b136</code></td>
+              <td><span class="version-history">历史版本</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-10-28</td>
+              <td><code>早期版本</code></td>
+              <td><span class="version-history">历史版本</span></td>
             </tr>
             <tr>
               <td><strong>v4.0.49</strong></td>
