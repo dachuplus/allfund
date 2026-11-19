@@ -12,6 +12,11 @@ build_style_factors.py — 计算指标信号·风格因子全部三类信号 �
       波动率 中证500 (000905)        高波动指数=贵
   category = 'bond'    债券风格（明确三信号：久期/信用/杠杆）
       久期风格 / 信用风格 / 杠杆风格，各给明确信号结论 + 依据
+      数据源：新浪实时债券指数/ETF（000012 国债指数、000101 5年信用、
+      511260 十年国债ETF、511010 国债ETF），全部实时更新到当日；
+      文案强制标注"近1月"真实起止交易日。原中证 000786/000820/000829/000833
+      在新浪源停更于 2016/2018，已弃用。杠杆用国债指数近1月收益作利率环境代理
+      （无实时免费的 10Y-Shibor 绝对值源），不再依赖停更的 macro_history。
   category = 'commodity' 大宗商品（十几种主流期货，5年价格分位）
       每只商品：估值分(价格分位) + 性价比分(100-分位) + 信号 + 依据
       并标注性价比最高者及依据
@@ -91,12 +96,13 @@ STOCK_FACTORS = [
     {'key': 'yield',      'name': '红利',   'symbols': ['sh000922'], 'type': 'yield_inv', 'idx': '中证红利'},
     {'key': 'volatility', 'name': '波动率', 'symbols': ['sh000905'], 'type': 'pe',   'idx': '中证500'},
 ]
-# 债券：久期/信用用长期&短期国债指数；信用用信用债指数；杠杆用carry(10Y-shibor)
+# 债券：全部改用新浪实时可取的债券指数/ETF（原中证000786/000820/000829/000833已停更于2016/2018）
+#   实盘核验 2026-11-19：以下代码 K 线均实时更新到当日。
 BOND_IDX = {
-    'long':   ['sh000833', 'sh000012'],   # 长期国债(7-10年 / 总国债)
-    'short':  ['sh000829', 'sh000827'],   # 1-3年国债 / 短融
-    'credit': ['sh000786', 'sh000820'],   # 信用债指数 / 企业债指数
-    'gov':    ['sh000012', 'sh000833'],   # 国债指数(总)
+    'long':   ['sh511260', 'sh000012'],   # 长端利率债：十年国债ETF(511260) / 国债指数兜底
+    'short':  ['sh511010', 'sh000012'],   # 短端利率债：国债ETF(511010) / 国债指数兜底
+    'credit': ['sh000101', 'sh000116'],   # 信用债：5年信用(000101) / 信用100兜底
+    'gov':    ['sh000012'],               # 国债基准指数
 }
 # 大宗商品（新浪期货主力连续）：代码/中文名
 COMMODITIES = [
@@ -213,14 +219,29 @@ def build_stock():
 
 
 # ============ 债券风格（久期/信用/杠杆） ============
+def fetch_sina_kline(sym, n=60):
+    """直接走新浪日K接口取债券指数/ETF收盘价，返回 (prices, dates)。
+    比 akshare 的指数接口更稳：中证老债券指数在新浪源停更于2016/2018，
+    但上证债券指数(000xxx)与债券ETF(511xxx)均实时更新到当日。"""
+    url = ('https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/'
+           f'CN_MarketData.getKLineData?symbol={sym}&scale=240&ma=no&datalen={n}')
+    r = subprocess.run(['curl', '-s', '--max-time', '20', url], capture_output=True, text=True, timeout=30)
+    data = json.loads(r.stdout)
+    if not isinstance(data, list) or len(data) < 30:
+        return None, None
+    dates = [str(x['day'])[:10] for x in data]
+    prices = [float(x['close']) for x in data]
+    return prices, dates
+
+
 def _try_fetch(syms):
     for s in syms:
         try:
-            p, d = fetch_index_close(s)
+            p, d = fetch_sina_kline(s)
             if p:
                 return p, d, s
-        except Exception:
-            pass
+        except Exception as e:
+            print(f'    {s} 抓取失败: {str(e)[:80]}')
         time.sleep(0.1)
     return None, None, None
 
@@ -277,17 +298,13 @@ def build_bond():
     credit_r = _ret_1m(credit_p)
     gov_r = _ret_1m(gov_p)
 
-    y10 = _last('cn10y')      # 10Y国债收益率(%)
-    shibor = _last('shibor_on')  # Shibor隔夜(%)
-
-    # 时间口径标注：近1月用指数序列真实起止交易日，杠杆用 macro 数据真实日期
+    # 时间口径标注：全部用指数序列真实起止交易日（数据源均实时更新到当日）
     dur_range = _range_label(long_d)
     cr_range = _range_label(credit_d)
-    macro_date = _last_date('cn10y') or _last_date('shibor_on')
-    macrop = f'截至{macro_date}，' if macro_date else ''
+    gov_range = _range_label(gov_d)
 
-    print(f'  债券数据: 长期国债近1月={long_r} 短期国债近1月={short_r} 信用债近1月={credit_r} 国债近1月={gov_r} 10Y={y10}% shibor={shibor}%')
-    print(f'  时间口径: 近1月区间(久期)={dur_range} 近1月区间(信用)={cr_range} macro数据日={macro_date}')
+    print(f'  债券数据: 长端(十年国债ETF)近1月={long_r} 短端(国债ETF)近1月={short_r} 信用债(5年信用)近1月={credit_r} 国债指数近1月={gov_r}')
+    print(f'  时间口径: 久期={dur_range} 信用={cr_range} 杠杆={gov_range}')
 
     # 久期风格
     if long_r is not None and short_r is not None:
@@ -323,17 +340,17 @@ def build_bond():
                 'percentile': score, 'value_score': score, 'value_label': '—', 'cost_score': 100 - score,
                 'cost_label': '—', 'signal': sig, 'signal_label': slabel, 'reason': reason, 'color': color})
 
-    # 杠杆风格（套息 = 10Y收益率 - Shibor）
-    if y10 is not None and shibor is not None:
-        carry = y10 - shibor
-        if carry > 0.8:
-            sig, slabel, color, reason = 'cheap', '适度加杠杆', '#00703c', f'{macrop}10Y国债收益率({y10}%)与Shibor隔夜({shibor}%)套息空间约{carry:.2f}%，正carry充足，可适度加杠杆增厚收益。'
+    # 杠杆风格：10Y-Shibor 绝对值无实时免费源，改用国债指数近1月收益作为利率环境代理
+    #   国债指数走强=利率下行=套息环境改善；走弱=利率上行=资金波动风险上升。
+    if gov_r is not None:
+        if gov_r > 0.4:
+            sig, slabel, color, reason = 'cheap', '适度加杠杆', '#00703c', _m(gov_range, f'国债指数({gov_r}%)走强，利率下行、套息环境改善，正carry相对充足，可适度加杠杆增厚收益。')
             score = 75
-        elif carry < 0.3:
-            sig, slabel, color, reason = 'expensive', '降低杠杆', '#d4351c', f'{macrop}套息空间仅约{carry:.2f}%，杠杆收益薄、资金波动风险大，建议降低杠杆。'
+        elif gov_r < -0.2:
+            sig, slabel, color, reason = 'expensive', '降低杠杆', '#d4351c', _m(gov_range, f'国债指数({gov_r}%)走弱，利率上行、资金波动风险加大，建议降低杠杆、控制久期敞口。')
             score = 25
         else:
-            sig, slabel, color, reason = 'neutral', '杠杆中性', '#1d70b8', f'{macrop}套息空间约{carry:.2f}%，杠杆收益中性，保持当前杠杆水平。'
+            sig, slabel, color, reason = 'neutral', '杠杆中性', '#1d70b8', _m(gov_range, f'国债指数({gov_r}%)窄幅波动，利率环境平稳、套息中性，保持当前杠杆水平。')
             score = 50
     else:
         sig, slabel, color, reason, score = 'neutral', '杠杆中性', '#1d70b8', '利率数据暂缺，杠杆保持中性。', 50
