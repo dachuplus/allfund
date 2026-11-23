@@ -29,17 +29,23 @@ async function loadCredential(account, env) {
   const sbUrl = SUPABASE_URL
   const sbKey = env.SUPABASE_SERVICE_ROLE_KEY || FILE_SB_KEY || ''
   if (!sbUrl || !sbKey) return null
-  try {
-    const url = `${sbUrl}/rest/v1/wechat_credentials?account_key=eq.${encodeURIComponent(account)}&enabled=eq.true&select=name,appid,appsecret,thumb_media_id,raw_id&limit=1`
-    const res = await fetch(url, {
-      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
-    })
-    if (!res.ok) return null
-    const rows = await res.json()
-    return rows && rows[0] ? rows[0] : null
-  } catch (_) {
-    return null
+  const url = `${sbUrl}/rest/v1/wechat_credentials?account_key=eq.${encodeURIComponent(account)}&enabled=eq.true&select=name,appid,appsecret,thumb_media_id,raw_id&limit=1`
+  // EdgeOne(海外)→Supabase(新加坡) 跨境链路偶发 502/超时，重试最多 3 次；只接受 2xx 且非空。
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+        signal: AbortSignal.timeout(6000),
+      })
+      if (res.ok) {
+        const rows = await res.json()
+        if (rows && rows[0]) return rows[0]
+      }
+    } catch (_) {
+      // 网络抖动，继续重试
+    }
   }
+  return null
 }
 
 /**
