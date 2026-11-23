@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-23</td>
+              <td><code>f403240d</code></td>
+              <td><span class="version-history">历史版本（正文默认排版17px/1.6/段后24/两端对齐，公众号草稿同步）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-23</td>
               <td><code>b4d574bd</code></td>
               <td><span class="version-history">历史版本（基金评分更多筛选默认值）</span></td>
             </tr>
