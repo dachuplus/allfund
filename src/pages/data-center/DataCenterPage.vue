@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-23</td>
+              <td><code>20d4c0fb</code></td>
+              <td><span class="version-history">历史版本（公众号密钥入库,代码明文清零）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-23</td>
               <td><code>f642c509</code></td>
               <td><span class="version-history">历史版本（公众号无发布权限降级草稿箱）</span></td>
             </tr>
