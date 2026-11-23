@@ -5,10 +5,11 @@
 const BRANCH = 'pcf-data'
 const REPO = 'dachuplus/allfund'
 
-// 双 CDN 回退：jsDelivr 主，raw.githubusercontent 备（国内访问任一可达即可）
+// 三级回退：jsDelivr CDN → raw CDN → 本站同源代理（国内个别网络访问 CDN 不稳时兜底）
 const SOURCES = [
   (path, t) => `https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/${path}?t=${t}`,
   (path, t) => `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${path}?t=${t}`,
+  (path, t) => `/api/pcf-data?path=${encodeURIComponent(path)}&t=${t}`,
 ]
 
 const cache = new Map() // path -> { at, data }（5 分钟内存缓存）
