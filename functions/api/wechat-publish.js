@@ -31,11 +31,11 @@ async function loadCredential(account, env) {
   if (!sbUrl || !sbKey) return null
   const url = `${sbUrl}/rest/v1/wechat_credentials?account_key=eq.${encodeURIComponent(account)}&enabled=eq.true&select=name,appid,appsecret,thumb_media_id,raw_id&limit=1`
   // EdgeOne(海外)→Supabase(新加坡) 跨境链路偶发 502/超时，重试最多 3 次；只接受 2xx 且非空。
+  // 注意：EdgeOne 运行时下 AbortSignal 行为异常（见 sb-proxy.js 注释），此处不用 AbortSignal.timeout。
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
-        signal: AbortSignal.timeout(6000),
       })
       if (res.ok) {
         const rows = await res.json()
@@ -243,7 +243,9 @@ export async function onRequestPost(context) {
     }
 
     if (!useAppId || !useAppSecret) {
-      return jsonResp({ success: false, error: '缺少 AppID 或 AppSecret（请检查数据库中该公众号凭据是否已配置）', egress_ip: egressIP }, 400)
+      const diagEnv = !!env.SUPABASE_SERVICE_ROLE_KEY
+      const diagFile = !!FILE_SB_KEY
+      return jsonResp({ success: false, error: `缺少 AppID 或 AppSecret（读库失败：envKey=${diagEnv ? '有' : '无'} fileKey=${diagFile ? '有' : '无'}，请检查数据库凭据或服务端凭证）`, egress_ip: egressIP }, 400)
     }
     if (!title || !content) {
       return jsonResp({ success: false, error: '缺少标题或正文', egress_ip: egressIP }, 400)
