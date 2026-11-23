@@ -1,0 +1,82 @@
+name: 主动ETF PCF 每日更新
+
+# 静态 JSON 方案（不落数据库、不占 Supabase 空间）：
+# 每交易日盘前抓上交所(581×9)+深交所(1589×9)共18只主动ETF的申赎清单(PCF)，
+# 生成结构化 JSON 推送到独立分支 pcf-data（pcf/YYYY-MM-DD.json + pcf/latest.json）。
+# 前端 /tools/etf-pcf 通过 jsDelivr CDN 直读 latest.json，无需重新部署网站。
+#
+# 数据源（交易所公开接口，无需 Playwright）：
+#   上交所 query.sse.com.cn JSONP（基本信息 + 成分股）
+#   深交所 www.szse.cn/api/report/ShowReport/data → reportdocs.static.szse.cn GBK txt
+#
+# 合规：PCF=申赎篮子≠全部真实持仓；仅作"基于PCF的组合观察"，非实时持仓/推荐。
+#
+# 调度：UTC 00:30 = 北京时间 08:30（周一至周五交易日盘前）。
+
+on:
+  schedule:
+    - cron: '30 0 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: '交易日 YYYY-MM-DD（留空=当天北京时间）'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: etf-pcf-daily
+  cancel-in-progress: false
+
+jobs:
+  pcf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 计算交易日
+        id: d
+        run: |
+          D="${{ inputs.date }}"
+          if [ -z "$D" ]; then
+            D=$(TZ=Asia/Shanghai date +%F)
+          fi
+          echo "date=$D" >> "$GITHUB_OUTPUT"
+          echo "交易日: $D"
+
+      - name: 抓取18只主动ETF PCF
+        run: |
+          python scripts/fetch_etf_pcf.py \
+            --date "${{ steps.d.outputs.date }}" \
+            --out /tmp/pcf.json \
+            --workers 6 --retry 3
+
+      - name: 数据体检
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/pcf.json'))
+          print(f"日期 {d['date']}  成功 {d['count']} 只  失败 {len(d['errors'])}")
+          for f in d['funds']:
+            print(f"  {f['code']} {f['fund_name']} 成分{f['component_count']} 来源{f['source']}")
+          assert d['count'] >= 15, f"成功数 {d['count']} < 15，疑似上游异常"
+          for f in d['funds']:
+            assert f['component_count'] > 0, f"{f['code']} 成分股为空"
+          print("体检通过")
+          PY
+
+      - name: 推送到 pcf-data 分支
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/push_pcf_data.py --src /tmp/pcf.json --date "${{ steps.d.outputs.date }}"

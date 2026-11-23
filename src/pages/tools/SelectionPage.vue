@@ -34,6 +34,7 @@ const toolTabs = [
   { to: '/tools/index',      name: 'tools-index',      label: '指数',     feature: 'tools-index' },
   { to: '/tools/tougu',      name: 'tools-tougu',      label: '投顾',     feature: 'tools-tougu' },
   { to: '/tools/manager',    name: 'tools-manager',    label: '经理',     feature: 'fund-manager' },
+  { to: '/tools/pcf',        name: 'tools-pcf',        label: '主动ETF',  feature: 'tools-pcf' },
 ]
 const visibleToolTabs = computed(() => toolTabs.filter(t => featureEnabled(t.feature)))
 </script>

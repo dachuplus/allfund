@@ -32,6 +32,7 @@ const DEFAULT_FLAGS = {
   'tools-fund-index': true,
   'fund-manager': true,
   'tools-tougu': true,
+  'tools-pcf': true,   // 选品下的主动ETF PCF 组合观察
   // 策略 · 二级
   'signal-macro': true,
   'signal-asset': true,
@@ -93,6 +94,7 @@ export const SUB_FEATURE_PARENTS = {
   'tools-fund-index': 'fund-rank',
   'fund-manager': 'fund-rank',
   'tools-tougu': 'fund-rank',
+  'tools-pcf': 'fund-rank',
   // 策略 · 二级
   'signal-macro': 'signal',
   'signal-asset': 'signal',
@@ -165,6 +167,7 @@ export const FEATURE_GROUPS = [
       { key: 'tools-fund-index', label: '基金指数', desc: '选品下的基金指数行情与分类指数' },
       { key: 'fund-manager', label: '经理', desc: '选品下的基金经理图鉴（东方财富在线数据，不落库）' },
       { key: 'tools-tougu', label: '投顾', desc: '选品下的投顾产品公开数据' },
+      { key: 'tools-pcf', label: '主动ETF', desc: '选品下的主动ETF PCF 组合观察（每交易日盘前披露的申赎清单，经 CDN 读取静态 JSON，不落库）' },
     ],
   },
   {

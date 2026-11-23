@@ -131,6 +131,18 @@ const routes = [
           description: '基金经理图鉴：在线拉取东方财富公开基金经理数据（不落库），覆盖全部/股票型/混合型/债券型/收益型，支持按公司、姓名、产品数量、管理规模、最佳回报等 10 个维度筛选。',
           keywords: '基金经理,经理图鉴,基金经理筛选,基金从业'
         }
+      },
+      {
+        path: 'pcf',
+        name: 'tools-pcf',
+        component: () => import('../pages/tools/PcfPage.vue'),
+        meta: {
+          tab: 'tools',
+          feature: 'tools-pcf',
+          title: '选品 · 主动ETF PCF 组合观察',
+          description: '首批主动管理ETF每交易日盘前披露的申购赎回清单（PCF），整理各产品申赎参数与成分证券，支持跨日对比成分数量变化；基于公开PCF的组合观察，非实时持仓。',
+          keywords: '主动ETF,PCF,申购赎回清单,成分证券,组合观察'
+        }
       }
     ]
   },
