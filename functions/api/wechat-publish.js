@@ -2,8 +2,11 @@
  * EdgeOne Pages Function — 微信公众号同步发布代理
  * 路由：POST /api/wechat-publish
  *
- * 安全说明：AppSecret 仅在此函数内使用，不落库、不返回前端。
- * 流程：检测出口IP → 获取 access_token → 创建草稿 → 发布 → 返回结果（含实际出口IP）。
+ * 安全说明（2026-11-23 重构）：AppID/AppSecret/thumb 等凭据统一存 Supabase
+ * public.wechat_credentials 表，RLS 开启且 anon/authenticated 零权限（实测直读 401），
+ * 只有 service_role 可读。本函数用服务端凭证读库，凭据不进公开仓库、不下发前端。
+ * 前端只传 account 标识；context.env 同名环境变量可覆盖（最高优先级）。
+ * 流程：检测出口IP → 读库取凭据 → 获取 access_token → 创建草稿 → 发布 → 返回结果。
  *
  * 微信 API 文档：
  *   - 获取 token: GET https://api.weixin.qq.com/cgi-bin/token
@@ -11,41 +14,40 @@
  *   - 发布:     POST https://api.weixin.qq.com/cgi-bin/freepublish/submit
  */
 
+import { SUPABASE_SERVICE_ROLE_KEY as FILE_SB_KEY } from './_supabase_service.js'
+
 const WECHAT_API_BASE = 'https://api.weixin.qq.com'
+// Supabase 项目 URL 是公开信息（前端 VITE_SUPABASE_URL 同源），内联为常量，无需环境变量。
+const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
 
 /**
- * 预设公众号凭据（仅服务端使用，绝不下发到前端 chunk）。
- * 前端只传 account 标识；这里优先读 EdgeOne 环境变量（context.env），
- * 未配置时回退到内置值，与 deepseek-proxy.js 的密钥处理模式一致。
- * 密钥不在前端出现，避免任何访客从公开 JS 中获取。
+ * 从 Supabase 读预设公众号凭据（服务端专用，service_role）。
+ * 返回 { name, appid, appsecret, thumb_media_id, raw_id } 或 null。
+ * 环境变量 SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL 优先，未配置则用 gitignore 文件值。
  */
-const WECHAT_ACCOUNTS = {
-  'changzhou-xiaochu': {
-    name: '常州小厨',
-    appidEnv: 'WECHAT_CZ_XIAOCHU_APPID',
-    secretEnv: 'WECHAT_CZ_XIAOCHU_SECRET',
-    appid: 'wx3478c62d65127915',
-    appsecret: '658954dd21c164354a19acc364c13a5a',
-    rawId: 'gh_cff2d7232497',
-  },
-  'changzhou-dachu': {
-    name: '常州大厨',
-    appidEnv: 'WECHAT_CZ_DACHU_APPID',
-    secretEnv: 'WECHAT_CZ_DACHU_SECRET',
-    appid: 'wxb60097797ddc5e75',
-    appsecret: '3df9cb4146ac96f1377100cd18b78aa1',
-    rawId: '',
-  },
+async function loadCredential(account, env) {
+  const sbUrl = SUPABASE_URL
+  const sbKey = env.SUPABASE_SERVICE_ROLE_KEY || FILE_SB_KEY || ''
+  if (!sbUrl || !sbKey) return null
+  try {
+    const url = `${sbUrl}/rest/v1/wechat_credentials?account_key=eq.${encodeURIComponent(account)}&enabled=eq.true&select=name,appid,appsecret,thumb_media_id,raw_id&limit=1`
+    const res = await fetch(url, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    })
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows && rows[0] ? rows[0] : null
+  } catch (_) {
+    return null
+  }
 }
 
 /**
- * 微信 draft/add 强制要求 thumb_media_id，传空会报 40007 invalid media_id。
- * 按账号复用素材库里既有的固定永久素材（media_id 按 AppID 隔离，不能跨号）。
- * 2026-11-23 实测两个 ID 均有效（draft/add 返回 errcode=0）。
+ * 预设公众号环境变量覆盖键（最高优先级兜底；凭据默认来自数据库）。
  */
-const DEFAULT_THUMB_BY_APPID = {
-  'wx3478c62d65127915': 'f2LKlfMHNU-JVKmgGSC9WQ8L70ju932KSgboR4-AwD9lXIgLcotSgXShxu2FYqq8', // 常州小厨
-  'wxb60097797ddc5e75': 'y_BukCRxHb3jIDUdsuEGtCrnlGNp8Icn3iYOvqxrN4u2eumg4kNvqQWBxKZ3enot', // 常州大厨
+const ACCOUNT_ENV_KEYS = {
+  'changzhou-xiaochu': { name: '常州小厨', appidEnv: 'WECHAT_CZ_XIAOCHU_APPID', secretEnv: 'WECHAT_CZ_XIAOCHU_SECRET' },
+  'changzhou-dachu': { name: '常州大厨', appidEnv: 'WECHAT_CZ_DACHU_APPID', secretEnv: 'WECHAT_CZ_DACHU_SECRET' },
 }
 
 /**
@@ -218,20 +220,24 @@ export async function onRequestPost(context) {
     const body = await context.request.json()
     const { account, appid, appsecret, title, content, summary, cover_image, author } = body
 
-    // 解析目标公众号：优先用预设 account 标识，否则用调用方直接传来的 appid/appsecret（兼容旧用法）
+    // 解析目标公众号：预设 account → 从 Supabase 读凭据；否则用调用方直传 appid/appsecret（兼容旧用法）
+    const env = context.env || {}
     let useAppId = appid
     let useAppSecret = appsecret
+    let useThumb = ''
     let accountName = ''
-    if (account && WECHAT_ACCOUNTS[account]) {
-      const preset = WECHAT_ACCOUNTS[account]
-      const env = context.env || {}
-      useAppId = env[preset.appidEnv] || preset.appid
-      useAppSecret = env[preset.secretEnv] || preset.appsecret
-      accountName = preset.name
+    if (account && ACCOUNT_ENV_KEYS[account]) {
+      const meta = ACCOUNT_ENV_KEYS[account]
+      const cred = await loadCredential(account, env) // 凭据来自数据库（service_role）
+      accountName = (cred && cred.name) || meta.name
+      // 环境变量优先级最高（若配置了则覆盖库值）
+      useAppId = env[meta.appidEnv] || (cred && cred.appid) || ''
+      useAppSecret = env[meta.secretEnv] || (cred && cred.appsecret) || ''
+      useThumb = (cred && cred.thumb_media_id) || ''
     }
 
     if (!useAppId || !useAppSecret) {
-      return jsonResp({ success: false, error: '缺少 AppID 或 AppSecret', egress_ip: egressIP }, 400)
+      return jsonResp({ success: false, error: '缺少 AppID 或 AppSecret（请检查数据库中该公众号凭据是否已配置）', egress_ip: egressIP }, 400)
     }
     if (!title || !content) {
       return jsonResp({ success: false, error: '缺少标题或正文', egress_ip: egressIP }, 400)
@@ -243,9 +249,8 @@ export async function onRequestPost(context) {
     // 2. 获取 access_token
     const token = await getAccessToken(useAppId, useAppSecret)
 
-    // 3. 创建草稿（按 AppID 取固定封面素材 ID，避免 40007 invalid media_id）
-    const thumbMediaId = DEFAULT_THUMB_BY_APPID[useAppId] || ''
-    const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author, thumbMediaId)
+    // 3. 创建草稿（封面素材 ID 来自数据库凭据，避免 40007 invalid media_id）
+    const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author, useThumb)
 
     // 4. 发布：认证号可直接群发；个人未认证号无群发权限（48001），降级为「已入草稿箱，去后台手动发布」
     let publishResult = null
