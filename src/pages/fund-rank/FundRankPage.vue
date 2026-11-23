@@ -797,7 +797,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
-import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY, TAG_UNDISCLOSED } from '../../api/data.js'
+import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, HOLDING_NO_LIMIT, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY, TAG_UNDISCLOSED } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
@@ -915,22 +915,29 @@ const filterT1 = ref('')
 
 // 更多筛选
 const showMoreFilter = ref(false)
+// 默认筛选（用户 2026-11-23 指定）：进入页面即应用，「重置」也回到这组值。
+// 定开=否 / 持有期=无限制 / 规模=大于2亿(gt2)；下方角标把这组默认视为「未主动筛选」。
+const DEFAULT_MORE_FILTERS = {
+  dk: '0',
+  holding: [HOLDING_NO_LIMIT],
+  scalePicks: ['gt2'],
+}
 // 默认「主代码」：只显示每只基金的主份额（服务端去重视图 fund_scores_main），
 // 避免 A/C/Y/后端份额并列造成「重复基金」观感。点「全部」或任一字母档即可查看其它份额。
 const filterSC = ref(['MAIN'])  // 份额（多选）：可含 'MAIN' 主代码 与 份额字母 A/B/C/...（空数组=全部）
-const filterHolding = ref([])  // 持有期（多选）：可含 '无限制' 与 7天/30天/…/5年（空数组=全部）
+const filterHolding = ref([...DEFAULT_MORE_FILTERS.holding])  // 持有期（多选）：默认「无限制」
 const filterETF = ref('')
 const filterLOF = ref('')
 const filterFOF = ref('')
 const filterZZ = ref('')       // 指增（指数增强）：''全部 '1'是 '0'否
 const filterAnomaly = ref('')  // 异常收益标注：''全部 '1'仅看异常 '0'剔除异常
 const filterCN = ref('')       // 场内：''全部 '1'是(ETF/LOF/REITs不计联接) '0'否(场外+ETF联接)
-const filterDK = ref('')
+const filterDK = ref(DEFAULT_MORE_FILTERS.dk)  // 定开：默认「否」
 const filterDailyLimit = ref('')
 const filterSG = ref('')       // 申购状态：''全部 '1'可申购 '0'暂停申购
 const filterScaleMin = ref('')  // 基金规模区间（亿元）自定义最小值
 const filterScaleMax = ref('')  // 基金规模区间（亿元）自定义最大值
-const scalePicks = ref([])      // 规模预设（多选）：gt2/2to5/5to10/10to20/20to50/50to100/gt100（空数组=全部）
+const scalePicks = ref([...DEFAULT_MORE_FILTERS.scalePicks])  // 规模预设（多选）：默认「大于2亿」(gt2)
 const scaleCustom = ref(false)  // 规模自定义区间开关（与预设多选互斥）
 
 // 资产配置仓位区间（%）：股票/债券/货币(现金)仓位，与规模筛选同构
@@ -1401,19 +1408,19 @@ function setT1(val) {
 /** 清除所有更多筛选条件（份额回到默认「主代码」） */
 function clearMoreFilters() {
   filterSC.value = ['MAIN']
-  filterHolding.value = []
+  filterHolding.value = [...DEFAULT_MORE_FILTERS.holding]
   filterCN.value = ''
   filterETF.value = ''
   filterLOF.value = ''
   filterFOF.value = ''
   filterZZ.value = ''
   filterAnomaly.value = ''
-  filterDK.value = ''
+  filterDK.value = DEFAULT_MORE_FILTERS.dk
   filterDailyLimit.value = ''
   filterSG.value = ''
   filterScaleMin.value = ''
   filterScaleMax.value = ''
-  scalePicks.value = []
+  scalePicks.value = [...DEFAULT_MORE_FILTERS.scalePicks]
   scaleCustom.value = false
   filterStockMin.value = ''
   filterStockMax.value = ''
@@ -1544,17 +1551,20 @@ const activeMoreFilterCount = computed(() => {
   let n = 0
   // 默认「主代码」不算用户主动筛选，避免「更多筛选」按钮默认就显示 1
   if (filterSC.value.length && !(filterSC.value.length === 1 && filterSC.value[0] === 'MAIN')) n++
-  if (filterHolding.value.length) n++
+  // 默认「无限制」不算主动筛选
+  if (filterHolding.value.length && !(filterHolding.value.length === 1 && filterHolding.value[0] === HOLDING_NO_LIMIT)) n++
   if (filterETF.value) n++
   if (filterLOF.value) n++
   if (filterFOF.value) n++
   if (filterZZ.value) n++
   if (filterAnomaly.value) n++
   if (filterCN.value) n++
-  if (filterDK.value) n++
+  // 默认「否」不算主动筛选
+  if (filterDK.value && filterDK.value !== DEFAULT_MORE_FILTERS.dk) n++
   if (filterDailyLimit.value) n++
   if (filterSG.value) n++
-  if (scaleRanges.value.length) n++
+  // 默认「大于2亿」不算主动筛选
+  if (scaleRanges.value.length && !(scaleCustom.value === false && scalePicks.value.length === 1 && scalePicks.value[0] === DEFAULT_MORE_FILTERS.scalePicks[0])) n++
   if (filterStockMin.value !== '' || filterStockMax.value !== '') n++
   if (filterBondMin.value !== '' || filterBondMax.value !== '') n++
   if (filterCashMin.value !== '' || filterCashMax.value !== '') n++
