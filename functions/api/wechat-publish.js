@@ -156,11 +156,11 @@ function markdownToWechatHtml(md) {
     .replace(/^- (.+)$/gm, '<li style="margin:4px 0;list-style:disc inside;">$1</li>')
     .replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;list-style:decimal inside;">$1</li>')
     .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #ddd;margin:16px 0;" />')
-    .replace(/\n\n+/g, '</p><p style="margin:12px 0;font-size:15px;line-height:1.8;">')
+    .replace(/\n\n+/g, '</p><p style="margin:0 0 24px;font-size:17px;line-height:1.6;text-align:justify;text-justify:inter-ideograph;">')
     .replace(/\n/g, '<br />')
 
   if (!html.startsWith('<')) {
-    html = '<p style="margin:12px 0;font-size:15px;line-height:1.8;">' + html + '</p>'
+    html = '<p style="margin:0 0 24px;font-size:17px;line-height:1.6;text-align:justify;text-justify:inter-ideograph;">' + html + '</p>'
   }
   return html
 }

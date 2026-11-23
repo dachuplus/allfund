@@ -691,9 +691,9 @@ function mdToWechatHtml(md) {
     .replace(/^- (.+)$/gm, '<li style="margin:4px 0;list-style:disc inside;">$1</li>')
     .replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;list-style:decimal inside;">$1</li>')
     .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #ddd;margin:16px 0;" />')
-    .replace(/\n\n+/g, '</p><p style="margin:12px 0;font-size:15px;line-height:1.8;">')
+    .replace(/\n\n+/g, '</p><p style="margin:0 0 24px;font-size:17px;line-height:1.6;text-align:justify;text-justify:inter-ideograph;">')
     .replace(/\n/g, '<br />')
-  if (!html.startsWith('<')) html = '<p style="margin:12px 0;font-size:15px;line-height:1.8;">' + html + '</p>'
+  if (!html.startsWith('<')) html = '<p style="margin:0 0 24px;font-size:17px;line-height:1.6;text-align:justify;text-justify:inter-ideograph;">' + html + '</p>'
   return html
 }
 
@@ -894,8 +894,10 @@ onMounted(load)
   border-top: none;
   padding: 14px 16px;
   min-height: 360px;
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 17px;
+  line-height: 1.6;
+  text-align: justify;
+  text-justify: inter-ideograph;
   color: var(--text-primary);
   word-break: break-word;
   background: #fff;
@@ -996,7 +998,7 @@ onMounted(load)
 .ed-preview :deep(h1) { font-size: 22px; }
 .ed-preview :deep(h2) { font-size: 20px; }
 .ed-preview :deep(h3) { font-size: 18px; }
-.ed-preview :deep(p) { margin: 0 0 12px; }
+.ed-preview :deep(p) { margin: 0 0 24px; }
 .ed-preview :deep(ul),
 .ed-preview :deep(ol) { padding-left: 24px; margin: 0 0 12px; }
 .ed-preview :deep(li) { margin-bottom: 6px; }

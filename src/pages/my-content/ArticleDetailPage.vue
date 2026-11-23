@@ -287,8 +287,10 @@ watch(() => route.params.id, (newId) => {
   display: block;
 }
 .dp-content {
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 17px;
+  line-height: 1.6;
+  text-align: justify;
+  text-justify: inter-ideograph;
   color: var(--text-primary);
   word-break: break-word;
 }
@@ -303,7 +305,7 @@ watch(() => route.params.id, (newId) => {
 .dp-content :deep(h1) { font-size: 22px; }
 .dp-content :deep(h2) { font-size: 20px; }
 .dp-content :deep(h3) { font-size: 18px; }
-.dp-content :deep(p) { margin: 0 0 var(--space-md); }
+.dp-content :deep(p) { margin: 0 0 24px; }
 .dp-content :deep(ul),
 .dp-content :deep(ol) { padding-left: 24px; margin: 0 0 var(--space-md); }
 .dp-content :deep(li) { margin-bottom: 6px; }
