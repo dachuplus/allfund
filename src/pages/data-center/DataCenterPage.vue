@@ -242,7 +242,7 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-23</td>
-              <td><code>pending</code></td>
+              <td><code>ca026071</code></td>
               <td><span class="version-history">历史版本（主动ETF PCF：新增同源代理 /api/pcf-data 作为 CDN 国内回退）</span></td>
             </tr>
             <tr>
