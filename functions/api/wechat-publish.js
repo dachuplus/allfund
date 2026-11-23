@@ -39,6 +39,16 @@ const WECHAT_ACCOUNTS = {
 }
 
 /**
+ * 微信 draft/add 强制要求 thumb_media_id，传空会报 40007 invalid media_id。
+ * 按账号复用素材库里既有的固定永久素材（media_id 按 AppID 隔离，不能跨号）。
+ * 2026-11-23 实测两个 ID 均有效（draft/add 返回 errcode=0）。
+ */
+const DEFAULT_THUMB_BY_APPID = {
+  'wx3478c62d65127915': 'f2LKlfMHNU-JVKmgGSC9WQ8L70ju932KSgboR4-AwD9lXIgLcotSgXShxu2FYqq8', // 常州小厨
+  'wxb60097797ddc5e75': 'y_BukCRxHb3jIDUdsuEGtCrnlGNp8Icn3iYOvqxrN4u2eumg4kNvqQWBxKZ3enot', // 常州大厨
+}
+
+/**
  * 检测当前函数的出口公网 IP（与后续微信 API 调用使用同一连接）
  */
 async function detectEgressIP() {
@@ -164,13 +174,13 @@ async function getAccessToken(appId, appSecret) {
 }
 
 /** 创建草稿并返回 media_id */
-async function createDraft(accessToken, title, content, summary, coverImage, author) {
+async function createDraft(accessToken, title, content, summary, coverImage, author, thumbMediaId) {
   const articles = [{
     title,
     author: author || '',
     digest: summary || '',
     content,
-    thumb_media_id: '',
+    thumb_media_id: thumbMediaId || '',
     need_open_comment: 0,
     only_fans_can_comment: 0,
   }]
@@ -233,8 +243,9 @@ export async function onRequestPost(context) {
     // 2. 获取 access_token
     const token = await getAccessToken(useAppId, useAppSecret)
 
-    // 3. 创建草稿
-    const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author)
+    // 3. 创建草稿（按 AppID 取固定封面素材 ID，避免 40007 invalid media_id）
+    const thumbMediaId = DEFAULT_THUMB_BY_APPID[useAppId] || ''
+    const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author, thumbMediaId)
 
     // 4. 发布
     const publishResult = await publishDraft(token, mediaId)
