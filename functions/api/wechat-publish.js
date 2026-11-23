@@ -247,16 +247,32 @@ export async function onRequestPost(context) {
     const thumbMediaId = DEFAULT_THUMB_BY_APPID[useAppId] || ''
     const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author, thumbMediaId)
 
-    // 4. 发布
-    const publishResult = await publishDraft(token, mediaId)
+    // 4. 发布：认证号可直接群发；个人未认证号无群发权限（48001），降级为「已入草稿箱，去后台手动发布」
+    let publishResult = null
+    let message = ''
+    let draftOnly = false
+    try {
+      publishResult = await publishDraft(token, mediaId)
+      message = `已成功推送到${accountName || '公众号'}（publish_id: ${publishResult.publish_id}）`
+    } catch (publishErr) {
+      const pm = String((publishErr && publishErr.message) || publishErr || '')
+      if (pm.indexOf('48001') !== -1) {
+        // 草稿已建成功（实测个人号可用），仅群发被拒——按用户铁律：只推正文、去后台手动发布
+        draftOnly = true
+        message = `已存入${accountName || '公众号'}草稿箱（该号未开通发布接口权限），请到公众号后台手动发布`
+      } else {
+        throw publishErr
+      }
+    }
 
     return jsonResp({
       success: true,
+      draft_only: draftOnly,
       account: account || 'custom',
       account_name: accountName || '自定义公众号',
       publish_result: publishResult,
       media_id: mediaId,
-      message: `已成功推送到${accountName || '公众号'}（publish_id: ${publishResult.publish_id}）`,
+      message,
       egress_ip: egressIP,
     })
 
