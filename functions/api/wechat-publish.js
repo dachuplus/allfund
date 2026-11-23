@@ -14,6 +14,31 @@
 const WECHAT_API_BASE = 'https://api.weixin.qq.com'
 
 /**
+ * 预设公众号凭据（仅服务端使用，绝不下发到前端 chunk）。
+ * 前端只传 account 标识；这里优先读 EdgeOne 环境变量（context.env），
+ * 未配置时回退到内置值，与 deepseek-proxy.js 的密钥处理模式一致。
+ * 密钥不在前端出现，避免任何访客从公开 JS 中获取。
+ */
+const WECHAT_ACCOUNTS = {
+  'changzhou-xiaochu': {
+    name: '常州小厨',
+    appidEnv: 'WECHAT_CZ_XIAOCHU_APPID',
+    secretEnv: 'WECHAT_CZ_XIAOCHU_SECRET',
+    appid: 'wx3478c62d65127915',
+    appsecret: '658954dd21c164354a19acc364c13a5a',
+    rawId: 'gh_cff2d7232497',
+  },
+  'changzhou-dachu': {
+    name: '常州大厨',
+    appidEnv: 'WECHAT_CZ_DACHU_APPID',
+    secretEnv: 'WECHAT_CZ_DACHU_SECRET',
+    appid: 'wxb60097797ddc5e75',
+    appsecret: '3df9cb4146ac96f1377100cd18b78aa1',
+    rawId: '',
+  },
+}
+
+/**
  * 检测当前函数的出口公网 IP（与后续微信 API 调用使用同一连接）
  */
 async function detectEgressIP() {
@@ -181,9 +206,21 @@ export async function onRequestPost(context) {
 
   try {
     const body = await context.request.json()
-    const { appid, appsecret, title, content, summary, cover_image, author } = body
+    const { account, appid, appsecret, title, content, summary, cover_image, author } = body
 
-    if (!appid || !appsecret) {
+    // 解析目标公众号：优先用预设 account 标识，否则用调用方直接传来的 appid/appsecret（兼容旧用法）
+    let useAppId = appid
+    let useAppSecret = appsecret
+    let accountName = ''
+    if (account && WECHAT_ACCOUNTS[account]) {
+      const preset = WECHAT_ACCOUNTS[account]
+      const env = context.env || {}
+      useAppId = env[preset.appidEnv] || preset.appid
+      useAppSecret = env[preset.secretEnv] || preset.appsecret
+      accountName = preset.name
+    }
+
+    if (!useAppId || !useAppSecret) {
       return jsonResp({ success: false, error: '缺少 AppID 或 AppSecret', egress_ip: egressIP }, 400)
     }
     if (!title || !content) {
@@ -194,7 +231,7 @@ export async function onRequestPost(context) {
     const htmlContent = markdownToWechatHtml(content)
 
     // 2. 获取 access_token
-    const token = await getAccessToken(appid, appsecret)
+    const token = await getAccessToken(useAppId, useAppSecret)
 
     // 3. 创建草稿
     const mediaId = await createDraft(token, title, htmlContent, summary, cover_image, author)
@@ -204,9 +241,11 @@ export async function onRequestPost(context) {
 
     return jsonResp({
       success: true,
+      account: account || 'custom',
+      account_name: accountName || '自定义公众号',
       publish_result: publishResult,
       media_id: mediaId,
-      message: `已成功推送到公众号（publish_id: ${publishResult.publish_id}）`,
+      message: `已成功推送到${accountName || '公众号'}（publish_id: ${publishResult.publish_id}）`,
       egress_ip: egressIP,
     })
 

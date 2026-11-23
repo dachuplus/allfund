@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-19</td>
+              <td><code>54e298a7</code></td>
+              <td><span class="version-history">历史版本（小托福不规则动词表）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-19</td>
               <td><code>d0c99a73</code></td>
               <td><span class="version-history">历史版本</span></td>
             </tr>

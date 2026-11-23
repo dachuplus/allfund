@@ -146,21 +146,40 @@
             <span class="ed-label">同步发布到微信公众号</span>
           </label>
           <template v-if="wechatEnabled">
+            <div class="ed-wx-accounts">
+              <span class="ed-label">发布到</span>
+              <div class="ed-wx-account-opts">
+                <label class="ed-wx-account">
+                  <input type="radio" name="wechat-account" value="changzhou-xiaochu" v-model="wechatAccount" />
+                  <span>常州小厨</span>
+                </label>
+                <label class="ed-wx-account">
+                  <input type="radio" name="wechat-account" value="changzhou-dachu" v-model="wechatAccount" />
+                  <span>常州大厨</span>
+                </label>
+                <label class="ed-wx-account">
+                  <input type="radio" name="wechat-account" value="custom" v-model="wechatAccount" />
+                  <span>自定义</span>
+                </label>
+              </div>
+            </div>
             <div class="ed-ip-box">
               <span class="ed-label">服务器出口 IP（请加入公众号 IP 白名单）</span>
               <span v-if="detectingIp" class="ed-ip-value ed-ip-loading">检测中…</span>
               <span v-else-if="detectedIp" class="ed-ip-value">{{ detectedIp }} <button type="button" class="ed-ip-copy" @click="copyIp">复制</button></span>
               <span v-else class="ed-ip-value ed-ip-err">检测失败，请刷新重试</span>
             </div>
-            <label class="ed-field">
-              <span class="ed-label">公众号 AppID *</span>
-              <input v-model="wechatAppId" class="ed-input" placeholder="wx 开头的 AppID" />
-            </label>
-            <label class="ed-field">
-              <span class="ed-label">公众号 AppSecret *</span>
-              <input v-model="wechatAppSecret" type="password" class="ed-input" placeholder="AppSecret（仅本次使用，不存储）" />
-            </label>
-            <p class="ed-hint">发布时服务器会自动检测出口 IP。如果提示 IP 白名单错误，请将显示的 IP 加入公众号后台「IP 白名单」后重试。</p>
+            <template v-if="wechatAccount === 'custom'">
+              <label class="ed-field">
+                <span class="ed-label">公众号 AppID *</span>
+                <input v-model="wechatAppId" class="ed-input" placeholder="wx 开头的 AppID" />
+              </label>
+              <label class="ed-field">
+                <span class="ed-label">公众号 AppSecret *</span>
+                <input v-model="wechatAppSecret" type="password" class="ed-input" placeholder="AppSecret（仅本次使用，不存储）" />
+              </label>
+            </template>
+            <p class="ed-hint">常州小厨 / 常州大厨为预设公众号，凭据仅在服务端使用、不写入网页；选「自定义」可临时填其他公众号。若提示 IP 白名单错误，请将上方 IP 加入公众号后台「IP 白名单」后重试。</p>
           </template>
         </div>
 
@@ -224,6 +243,7 @@ const scheduledAt = ref('')    // datetime-local 字符串（本地时间）
 
 // 公众号同步发布
 const wechatEnabled = ref(false)
+const wechatAccount = ref('changzhou-xiaochu') // changzhou-xiaochu | changzhou-dachu | custom
 const wechatAppId = ref('')
 const wechatAppSecret = ref('')
 const wechatResult = ref(null)  // { success, message/error } | null
@@ -623,7 +643,10 @@ async function onSave(targetStatus) {
     toast(result && result.scheduled ? '已设置定时发布' : (targetStatus === 'published' ? '已发布' : '已保存草稿'), 'success')
 
     // 公众号同步发布（仅在「已发布」状态且用户开启了微信同步时触发）
-    if (targetStatus === 'published' && wechatEnabled.value && wechatAppId.value.trim() && wechatAppSecret.value.trim()) {
+    // 预设公众号无需手填凭据；自定义公众号需填全 AppID/AppSecret
+    const wxReady = wechatAccount.value !== 'custom'
+      || (wechatAppId.value.trim() && wechatAppSecret.value.trim())
+    if (targetStatus === 'published' && wechatEnabled.value && wxReady) {
       await pushToWechat()
     }
 
@@ -698,8 +721,10 @@ async function pushToWechat() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        appid: wechatAppId.value.trim(),
-        appsecret: wechatAppSecret.value.trim(),
+        // 预设公众号只传标识，凭据在服务端；自定义公众号才传明文
+        account: wechatAccount.value,
+        appid: wechatAccount.value === 'custom' ? wechatAppId.value.trim() : '',
+        appsecret: wechatAccount.value === 'custom' ? wechatAppSecret.value.trim() : '',
         title: form.value.title.trim(),
         content: form.value.content,
         summary: form.value.summary.trim(),
@@ -713,7 +738,7 @@ async function pushToWechat() {
 
     if (data.success) {
       wechatResult.value = { success: true, message: data.message }
-      toast('已同步推送到公众号', 'success')
+      toast('已同步推送到' + (data.account_name || '公众号'), 'success')
     } else {
       let errMsg = data.error || '公众号发布失败'
       // IP 错误时确保界面上的 IP 是精确值
@@ -921,6 +946,10 @@ onMounted(load)
 .ed-wechat { display: flex; flex-direction: column; gap: 10px; border: 1px solid #b1b4b6; padding: 12px; background: #f3f2f1; }
 .ed-wechat__toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .ed-wechat__toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1d70b8; cursor: pointer; }
+.ed-wx-accounts { display: flex; flex-direction: column; gap: 6px; }
+.ed-wx-account-opts { display: flex; flex-wrap: wrap; gap: 16px; }
+.ed-wx-account { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--text-primary); cursor: pointer; }
+.ed-wx-account input[type="radio"] { width: 16px; height: 16px; accent-color: #1d70b8; cursor: pointer; }
 
 /* 微信发布结果 */
 .ed-wechat-result {
