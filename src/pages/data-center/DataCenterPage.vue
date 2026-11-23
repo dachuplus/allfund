@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-23</td>
+              <td><code>068673c2</code></td>
+              <td><span class="version-history">历史版本（主动ETF PCF组合观察：沪深18只盘前申赎清单，静态JSON+独立pcf-data分支CDN，不落库）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-23</td>
               <td><code>f403240d</code></td>
               <td><span class="version-history">历史版本（正文默认排版17px/1.6/段后24/两端对齐，公众号草稿同步）</span></td>
             </tr>
