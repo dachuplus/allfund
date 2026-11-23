@@ -60,11 +60,11 @@ echo "==> 2/4 拷贝边缘函数 functions/ 到 dist/"
 rm -rf dist/functions
 # _deepseek_key.js 含服务端密钥回退，沙箱 broker 会拦截直接 cp，
 # 改用 rsync 排除后写入空占位符；生产环境优先读取 EdgeOne 环境变量 DEEPSEEK_API_KEY。
-rsync -a --exclude='_deepseek_key.js' --exclude='_supabase_service.js' functions/ dist/functions/
+rsync -a --exclude='_deepseek_key.js' functions/ dist/functions/
 echo 'export const DEEPSEEK_API_KEY = ""' > dist/functions/api/_deepseek_key.js
-# service_role 凭证不进公开产物：写空占位，生产靠 EdgeOne 环境变量 SUPABASE_SERVICE_ROLE_KEY。
-# 本地 gitignore 文件含真实值，仅用于本地调试；公开 GitHub / dist 均无明文。
-echo 'export const SUPABASE_SERVICE_ROLE_KEY = ""' > dist/functions/api/_supabase_service.js
+# _supabase_service.js 随 functions 进入函数运行时（EdgeOne Pages Functions 将 functions/ 编译为
+# serverless 函数，不作为静态资源公开），供 loadCredential 读密钥表。该文件已被 .gitignore 忽略，
+# 绝不进入公开 GitHub 仓库；EdgeOne env SUPABASE_SERVICE_ROLE_KEY 若配置则优先覆盖文件值。
 
 echo "==> 3/4 写入 dist/package.json（激活 Pages Functions 必需）"
 cat > dist/package.json <<'JSON'
