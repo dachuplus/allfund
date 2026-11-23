@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-23</td>
+              <td><code>f642c509</code></td>
+              <td><span class="version-history">历史版本（公众号无发布权限降级草稿箱）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-23</td>
               <td><code>4f2f57b2</code></td>
               <td><span class="version-history">历史版本（公众号发布 40007 修复）</span></td>
             </tr>
