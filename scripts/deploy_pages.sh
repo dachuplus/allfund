@@ -62,9 +62,9 @@ rm -rf dist/functions
 # 改用 rsync 排除后写入空占位符；生产环境优先读取 EdgeOne 环境变量 DEEPSEEK_API_KEY。
 rsync -a --exclude='_deepseek_key.js' --exclude='_supabase_service.js' functions/ dist/functions/
 echo 'export const DEEPSEEK_API_KEY = ""' > dist/functions/api/_deepseek_key.js
-# service_role 凭证同样不进公开产物；生产靠 EdgeOne 环境变量 SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL。
-echo 'export const SUPABASE_URL = ""' > dist/functions/api/_supabase_service.js
-echo 'export const SUPABASE_SERVICE_ROLE_KEY = ""' >> dist/functions/api/_supabase_service.js
+# service_role 凭证不进公开产物：写空占位，生产靠 EdgeOne 环境变量 SUPABASE_SERVICE_ROLE_KEY。
+# 本地 gitignore 文件含真实值，仅用于本地调试；公开 GitHub / dist 均无明文。
+echo 'export const SUPABASE_SERVICE_ROLE_KEY = ""' > dist/functions/api/_supabase_service.js
 
 echo "==> 3/4 写入 dist/package.json（激活 Pages Functions 必需）"
 cat > dist/package.json <<'JSON'
