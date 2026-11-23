@@ -241,6 +241,18 @@
             </tr>
             <tr>
               <td>v4.0.57</td>
+              <td>2026-11-23</td>
+              <td><code>4f2f57b2</code></td>
+              <td><span class="version-history">历史版本（公众号发布 40007 修复）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-23</td>
+              <td><code>a8544a32</code></td>
+              <td><span class="version-history">历史版本（公众号预设账号选项）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
               <td>2026-11-19</td>
               <td><code>54e298a7</code></td>
               <td><span class="version-history">历史版本（小托福不规则动词表）</span></td>
