@@ -117,7 +117,6 @@
           <div class="ed-editor-wrap">
             <textarea v-show="!previewMode" ref="textarea" v-model="form.content" class="ed-textarea"
               placeholder="支持 Markdown：# 标题、**粗体**、*斜体*、行内 `代码`、代码块用 ``` 包裹、> 引用、- 列表、[链接](url)、![图片](url)。粘贴多行代码会自动识别为代码块；悬停图标查看功能。"
-              @input="resizeTextarea"
               @mousedown="onTextareaMouseDown"
               @mouseup="onTextareaResizeEnd"
               @touchend="onTextareaResizeEnd"
@@ -265,8 +264,11 @@ function resizeTextarea() {
   if (!ta || previewMode.value) return
   const mirror = ensureEditorMirror()
   const cs = getComputedStyle(ta)
-  mirror.style.width = ta.offsetWidth + 'px'
-  mirror.style.boxSizing = cs.boxSizing
+  const paddingX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+  const borderY = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)
+  const contentWidth = Math.max(ta.clientWidth - paddingX, 1)
+  mirror.style.boxSizing = 'content-box'
+  mirror.style.width = contentWidth + 'px'
   mirror.style.fontFamily = cs.fontFamily
   mirror.style.fontSize = cs.fontSize
   mirror.style.fontWeight = cs.fontWeight
@@ -275,22 +277,26 @@ function resizeTextarea() {
   mirror.style.letterSpacing = cs.letterSpacing
   mirror.style.tabSize = cs.tabSize
   mirror.style.padding = cs.padding
-  mirror.style.border = cs.border
+  mirror.style.border = 'none'
   mirror.style.whiteSpace = 'pre-wrap'
   mirror.style.wordWrap = 'break-word'
   mirror.value = ta.value || ''
-  const needed = Math.max(mirror.scrollHeight, 320)
-  if (manualEditorHeight.value) {
-    const current = ta.offsetHeight
-    if (needed > current) {
-      ta.style.height = needed + 'px'
-      manualEditorHeight.value = needed + 'px'
-    } else {
-      ta.style.height = manualEditorHeight.value
-    }
-  } else {
-    ta.style.height = needed + 'px'
+  const needed = Math.max(mirror.scrollHeight + borderY, 320)
+  const current = ta.offsetHeight
+
+  if (manualEditorHeight.value && needed <= current) {
+    if (ta.style.height !== manualEditorHeight.value) ta.style.height = manualEditorHeight.value
+    return
   }
+  if (Math.abs(needed - current) < 2) return
+
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const scrollTop = ta.scrollTop
+  ta.style.height = needed + 'px'
+  ta.scrollTop = scrollTop
+  if (start != null && end != null) ta.setSelectionRange(start, end)
+  if (manualEditorHeight.value) manualEditorHeight.value = needed + 'px'
 }
 
 function onTextareaMouseDown() {
