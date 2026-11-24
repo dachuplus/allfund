@@ -373,7 +373,21 @@
     </div>
 
     <!-- 基金列表 - 桌面端：横向表格 -->
-    <div class="fund-table-wrap" v-if="!isMobile && funds.length > 0">
+    <div
+      class="fund-table-top-scroll"
+      v-if="!isMobile && funds.length > 0"
+      ref="tableHeadScrollRef"
+      @scroll="onTableHeadScroll"
+      aria-hidden="true"
+    >
+      <div class="fund-table-top-scroll-inner" :style="{ width: tableScrollWidth + 'px' }"></div>
+    </div>
+    <div
+      class="fund-table-wrap"
+      v-if="!isMobile && funds.length > 0"
+      ref="tableBodyScrollRef"
+      @scroll="onTableBodyScroll"
+    >
       <table class="fund-table">
         <thead>
           <tr>
@@ -796,7 +810,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, onUnmounted, onActivated } from 'vue'
+import { ref, computed, reactive, onMounted, onUnmounted, onActivated, nextTick, watch } from 'vue'
 import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, HOLDING_NO_LIMIT, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY, TAG_UNDISCLOSED } from '../../api/data.js'
 import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
@@ -895,10 +909,39 @@ async function fetchCategories() {
 
 // ========== 响应式断点 ==========
 const isMobile = ref(window.innerWidth < 641)
-function onResize() { isMobile.value = window.innerWidth < 641 }
+const tableHeadScrollRef = ref(null)
+const tableBodyScrollRef = ref(null)
+const tableScrollWidth = ref(0)
+let tableScrollSyncing = false
+
+function syncTableScrollWidth() {
+  nextTick(() => {
+    const el = tableBodyScrollRef.value
+    if (el) tableScrollWidth.value = el.scrollWidth
+  })
+}
+
+function syncScrollLeft(from, to) {
+  if (!from || !to || tableScrollSyncing) return
+  if (Math.abs(from.scrollLeft - to.scrollLeft) < 1) return
+  tableScrollSyncing = true
+  to.scrollLeft = from.scrollLeft
+  requestAnimationFrame(() => { tableScrollSyncing = false })
+}
+
+function onTableHeadScroll() {
+  syncScrollLeft(tableHeadScrollRef.value, tableBodyScrollRef.value)
+}
+
+function onTableBodyScroll() {
+  syncScrollLeft(tableBodyScrollRef.value, tableHeadScrollRef.value)
+}
+
+function onResize() { isMobile.value = window.innerWidth < 641; syncTableScrollWidth() }
 
 // ========== 状态 ==========
 const funds = ref([])
+watch([funds, isMobile, displayPeriods], syncTableScrollWidth)
 const meta = ref({})
 const metaLoading = ref(false)
 // 摘要行展示用的截止时间：优先净值日期 nav_date，截断到「日」（兼容时间戳）
@@ -1713,10 +1756,12 @@ onMounted(() => {
   loadData()
   loadMeta()
   loadTagMeta()
+  syncTableScrollWidth()
 })
 onActivated(() => {
   // keep-alive 缓存激活时：数据已存在（秒开），仅刷新 meta（更新时间）
   loadMeta()
+  syncTableScrollWidth()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
@@ -1909,6 +1954,17 @@ onUnmounted(() => {
 .filter-update-time::before { content: '·'; margin-right: 6px; }
 
 /* 基金列表 - 横向滚动表格 */
+.fund-table-top-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #f3f2f1;
+  height: 10px;
+}
+.fund-table-top-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.fund-table-top-scroll::-webkit-scrollbar-thumb { background: #b1b4b6; border-radius: 4px; }
+.fund-table-top-scroll::-webkit-scrollbar-thumb:hover { background: #808185; }
+.fund-table-top-scroll::-webkit-scrollbar-track { background: #f3f2f1; }
+.fund-table-top-scroll-inner { height: 1px; }
 .fund-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1950,7 +2006,7 @@ onUnmounted(() => {
 /* 悬停高亮：品牌蓝略深，比斑马纹更深以便区分 */
 .fund-row:hover { background: #d4e6fb; }
 
-.col-code { width: 80px; font-weight: 700; color: var(--text-primary); font-family: monospace; font-size: 12px; }
+.col-code { width: 80px; font-weight: 400; color: var(--text-primary); font-family: monospace; font-size: 12px; }
 .col-code a { color: var(--text-primary); text-decoration: none; }
 .col-code a:hover { color: var(--link); text-decoration: underline; }
 /* 固定前四列：基金代码 / 基金简称 / 基金经理 / 二级分类（横向滚动时锁定）
@@ -1979,7 +2035,7 @@ onUnmounted(() => {
 .fund-row:hover td.col-name,
 .fund-row:hover td.col-manager,
 .fund-row:hover td.col-t1 { background: #d4e6fb; }
-.col-name { width: 140px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-name { width: 140px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-name a { color: var(--text-primary); text-decoration: none; }
 .col-name a:hover { color: var(--link); text-decoration: underline; }
 .col-manager { width: 78px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

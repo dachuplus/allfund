@@ -321,7 +321,7 @@ watch([industryKeyword], () => { expandedInd.value = '' })
 </script>
 
 <style scoped>
-.pcf-page { padding: 20px 16px 48px; color: var(--text-primary); }
+.pcf-page { padding: 20px 16px 48px; color: var(--text-primary); background: var(--bg-body, #f3f2f1); }
 .pcf-title { font-size: 24px; margin: 0 0 10px; color: var(--brand); }
 .pcf-intro { font-size: 15px; line-height: 1.6; margin: 0 0 8px; }
 .pcf-notice { font-size: 13px; line-height: 1.6; color: #505a5f; background: #f3f2f1; border-left: 4px solid var(--border); padding: 10px 12px; margin: 0 0 16px; }
@@ -334,13 +334,13 @@ watch([industryKeyword], () => { expandedInd.value = '' })
 .pcf-status--err { color: #d4351c; }
 /* 视图切换 */
 .pcf-views { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
-.pcf-view { font-size: 15px; padding: 8px 16px; border: none; background: #fff; color: var(--brand); cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -2px; }
+.pcf-view { font-size: 15px; padding: 8px 16px; border: none; background: transparent; color: var(--brand); cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -2px; }
 .pcf-view:hover { background: #f3f2f1; }
 .pcf-view--active { font-weight: 700; border-bottom-color: var(--brand); }
 .pcf-picker { margin-bottom: 20px; }
 .pcf-picker-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .pcf-picker-label { font-size: 13px; font-weight: 700; color: #505a5f; min-width: 120px; }
-.pcf-chip { font-size: 13px; padding: 5px 10px; border: 1px solid var(--border); background: #fff; color: var(--brand); cursor: pointer; }
+.pcf-chip { font-size: 13px; padding: 5px 10px; border: 1px solid var(--border); background: transparent; color: var(--brand); cursor: pointer; }
 .pcf-chip:hover { border-color: var(--brand); }
 .pcf-chip--active { background: var(--brand); color: #fff; border-color: var(--brand); }
 .pcf-detail { border-top: 1px solid var(--border); padding-top: 16px; }
@@ -348,7 +348,7 @@ watch([industryKeyword], () => { expandedInd.value = '' })
 .pcf-fund-name { font-size: 19px; margin: 0; }
 .pcf-fund-code { font-size: 13px; color: #505a5f; }
 .pcf-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 20px; }
-.pcf-fact { background: #fff; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.pcf-fact { background: var(--bg-body, #f3f2f1); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
 .pcf-fact-k { font-size: 12px; color: #505a5f; }
 .pcf-fact-v { font-size: 16px; font-weight: 700; }
 .pcf-subtitle { font-size: 16px; margin: 20px 0 10px; }
@@ -358,14 +358,14 @@ watch([industryKeyword], () => { expandedInd.value = '' })
 .pcf-up { color: #d4351c; font-weight: 700; }
 .pcf-down { color: #00703c; font-weight: 700; }
 .pcf-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.pcf-search { font-size: 14px; padding: 6px 10px; border: 1px solid var(--border); min-width: 200px; }
-.pcf-seg-btn { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); background: #fff; color: var(--text-primary); cursor: pointer; }
+.pcf-search { font-size: 14px; padding: 6px 10px; border: 1px solid var(--border); background: var(--bg-body, #f3f2f1); min-width: 200px; }
+.pcf-seg-btn { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); background: transparent; color: var(--text-primary); cursor: pointer; }
 .pcf-seg-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 .pcf-count { font-size: 13px; color: #505a5f; margin-left: auto; }
 .pcf-table-wrap { overflow-x: auto; border: 1px solid var(--border); }
 .pcf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pcf-table th, .pcf-table td { padding: 8px 10px; border-bottom: 1px solid #d8dde0; text-align: left; white-space: nowrap; }
-.pcf-table th { background: #f3f2f1; font-weight: 700; border-bottom: 2px solid var(--border); }
+.pcf-table th { background: var(--bg-body, #f3f2f1); font-weight: 700; border-bottom: 2px solid var(--border); }
 .pcf-table tbody tr:last-child td { border-bottom: none; }
 .pcf-table .num { text-align: right; }
 .pcf-table .code { font-variant-numeric: tabular-nums; color: var(--brand); }
@@ -374,7 +374,7 @@ watch([industryKeyword], () => { expandedInd.value = '' })
 .pcf-summary-sub { font-size: 14px; line-height: 1.6; color: #505a5f; margin: 6px 0 0; }
 .pcf-ind-card { border: 1px solid var(--border); border-top: none; }
 .pcf-ind-card:first-of-type { border-top: 1px solid var(--border); }
-.pcf-ind-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; padding: 10px 12px; border: none; background: #fff; text-align: left; cursor: pointer; font-size: 14px; color: var(--text-primary); }
+.pcf-ind-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; padding: 10px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-size: 14px; color: var(--text-primary); }
 .pcf-ind-head:hover { background: #f3f2f1; }
 .pcf-ind-caret { color: var(--brand); font-size: 14px; width: 12px; }
 .pcf-ind-name { font-weight: 700; font-size: 15px; min-width: 110px; }
