@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
+              <td><code>71f19d4a</code></td>
+              <td><span class="version-history">历史版本（写文章编辑框自动撑高显示全文，编辑框上下显示正文字数）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-24</td>
               <td><code>30547b5f</code></td>
               <td><span class="version-history">历史版本（PCF页面去白底简化；基金评分表表头增加横向滚动条，代码/简称取消粗体）</span></td>
             </tr>
