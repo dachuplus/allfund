@@ -1947,24 +1947,38 @@ onUnmounted(() => {
 .fund-table td:last-child { border-right: none; }
 /* 斑马纹：偶数行白底（去除蓝色条纹，仅保留细分割线） */
 .fund-table tbody tr:nth-child(even) { background: #ffffff; }
-.fund-table tbody tr:nth-child(even) td.col-code { background: #ffffff; }
 /* 悬停高亮：品牌蓝略深，比斑马纹更深以便区分 */
 .fund-row:hover { background: #d4e6fb; }
-.fund-row:hover td.col-code { background: #d4e6fb; }
 
 .col-code { width: 80px; font-weight: 700; color: var(--text-primary); font-family: monospace; font-size: 12px; }
 .col-code a { color: var(--text-primary); text-decoration: none; }
 .col-code a:hover { color: var(--link); text-decoration: underline; }
-/* 固定首列 */
-.fund-table th.col-code {
-  position: sticky; left: 0; z-index: 3;
-}
-.fund-table td.col-code {
-  position: sticky; left: 0; z-index: 1; background: inherit;
-}
-.fund-row:hover td.col-code {
-  background: #d4e6fb;
-}
+/* 固定前四列：基金代码 / 基金简称 / 基金经理 / 二级分类（横向滚动时锁定）
+   列宽 code 80 + name 140 + manager 78 → left 依次 0 / 80px / 220px / 298px */
+.fund-table th.col-code    { position: sticky; left: 0;     z-index: 4; }
+.fund-table th.col-name    { position: sticky; left: 80px;  z-index: 4; }
+.fund-table th.col-manager { position: sticky; left: 220px; z-index: 4; }
+.fund-table th.col-t1      { position: sticky; left: 298px; z-index: 4; }
+.fund-table td.col-code,
+.fund-table td.col-name,
+.fund-table td.col-manager,
+.fund-table td.col-t1 { position: sticky; z-index: 2; background: #ffffff; }
+.fund-table td.col-code    { left: 0; }
+.fund-table td.col-name    { left: 80px; }
+.fund-table td.col-manager { left: 220px; }
+.fund-table td.col-t1      { left: 298px; }
+/* 固定区与滚动区之间的分界线（gov.uk 无阴影，用 2px 边框） */
+.fund-table th.col-t1,
+.fund-table td.col-t1 { border-right: 2px solid var(--border); }
+/* 固定列背景必须不透明：斑马纹/悬停时同步，避免横向滚动透出下层文字 */
+.fund-table tbody tr:nth-child(even) td.col-code,
+.fund-table tbody tr:nth-child(even) td.col-name,
+.fund-table tbody tr:nth-child(even) td.col-manager,
+.fund-table tbody tr:nth-child(even) td.col-t1 { background: #ffffff; }
+.fund-row:hover td.col-code,
+.fund-row:hover td.col-name,
+.fund-row:hover td.col-manager,
+.fund-row:hover td.col-t1 { background: #d4e6fb; }
 .col-name { width: 140px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-name a { color: var(--text-primary); text-decoration: none; }
 .col-name a:hover { color: var(--link); text-decoration: underline; }
