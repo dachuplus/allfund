@@ -1,0 +1,42 @@
+name: 基金规模增长夜间更新
+
+on:
+  schedule:
+    # 北京时间每天 23:30（UTC 15:30），避开 21:30 评分 / 22:30 配置季度流水线
+    - cron: '30 15 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check credentials
+        run: |
+          if [ -z "$SUPABASE_MGMT_TOKEN" ]; then
+            echo "ERROR: SUPABASE_MGMT_TOKEN 未配置"
+            exit 1
+          fi
+          echo "SUPABASE_MGMT_TOKEN 已配置: ${#SUPABASE_MGMT_TOKEN} 字符"
+
+      - name: Step 1 - Fetch into staging table
+        run: |
+          python3 scripts/refresh_fund_scale_growth.py \
+            --to-staging \
+            --workers 8 \
+            --delay 0.12
+
+      - name: Step 2 - Validate and promote to production
+        run: |
+          python3 scripts/refresh_fund_scale_growth.py --promote

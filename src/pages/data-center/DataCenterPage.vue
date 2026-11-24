@@ -1711,6 +1711,17 @@
         </table>
       </div>
 
+      <!-- pingzhongdata 规模 -->
+      <div class="api-item">
+        <h3 class="api-name">4a. pingzhongdata — 基金主体合并规模（新增）</h3>
+        <table class="api-meta-table">
+          <tr><td class="meta-label">URL</td><td><code>https://fund.eastmoney.com/pingzhongdata/{裸基金代码}.js</code></td></tr>
+          <tr><td class="meta-label">方法</td><td>GET</td></tr>
+          <tr><td class="meta-label">返回</td><td>JS（内含 JSON 变量）</td></tr>
+          <tr><td class="meta-label">提取数据</td><td>非货币：<code>Data_assetAllocation.series[净资产]</code>（已是主体合并口径，A/B/C/D/E/F/I/O/R/T/U/Y 等份额不再相加）；货币：<code>Data_fluctuationScale.series[].y</code>（单份额规模，按主体求和）。产出 <code>fund_scale</code>（当季）、<code>fund_scale_prev</code>（上季）、<code>fund_scale_growth</code>（增长%，2 位小数）</td></tr>
+        </table>
+      </div>
+
       <!-- tsdata -->
       <div class="api-item">
         <h3 class="api-name">5. tsdata — 基金特色数据页面（风险指标+风险等级）</h3>

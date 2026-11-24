@@ -39,7 +39,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # fund_scores 全部数据列（不含 id，切换时由生产表自增生成）
 PROMOTE_COLS = (
-    'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_scale,manage_fee,fund_manager,'
+    'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_scale,fund_scale_prev,fund_scale_growth,manage_fee,fund_manager,'
     'share_scale,custody_fee,sale_fee,found_date,ytd,r0w,r1m,r3m,r6m,r1y,r2y,r3y,r5y,'
     'r7y,r10y,return_all,dd1y,dd2y,dd3y,dd5y,sr1y,sr2y,sr3y,sr5y,'
     'k0w,k1m,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,'
@@ -450,7 +450,7 @@ def main():
     _alloc_cols = ['stock_pct', 'bond_pct', 'cash_pct', 'sub_purchase', 'sub_redemption',
                    'net_sub_share', 'total_share_end', 'net_asset_end', 'nav_change_rate',
                    'inst_hold_pct', 'indiv_hold_pct', 'internal_hold_pct',
-                   'fund_manager', 'fund_scale', 'manage_fee', 'company',
+                   'fund_manager', 'fund_scale', 'fund_scale_prev', 'fund_scale_growth', 'manage_fee', 'company',
                    'found_date', 'share_scale', 'custody_fee', 'sale_fee',
                    # 投资风格（2026-11-13）：每周独立流水线写入，不由评分 staging 抓取，
                    # 切换后必须像配置列一样从备份 COALESCE 回填，否则每晚被清成 NULL。

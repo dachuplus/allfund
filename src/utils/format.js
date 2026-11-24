@@ -71,6 +71,14 @@ export function fmtFundScale(v) {
   return n.toFixed(4)
 }
 
+// 规模增长率展示：已按百分比数值存储（如 12.34 表示 12.34%），统一 2 位小数、纯文字
+export function fmtScaleGrowth(v) {
+  if (v == null) return '--'
+  const n = parseFloat(v)
+  if (isNaN(n)) return '--'
+  return n.toFixed(2) + '%'
+}
+
 // 管理费率展示：原始值格式不一（"0.25%" / "0.6" / HTML占位符 / null）
 // "0.25%"→"0.25%"；纯数字"0.6"→"0.60%"；HTML占位或空→"--"
 export function fmtManageFee(v) {

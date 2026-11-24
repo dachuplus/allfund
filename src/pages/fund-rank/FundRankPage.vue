@@ -404,9 +404,11 @@
             <th class="col-style">投资风格</th>
             <th class="col-tags">概念</th>
             <th class="col-tags">行业</th>
+            <th class="col-scale">上季规模（亿）</th>
             <th class="col-scale sortable" @click="toggleColumnSort('fund_scale')">
               规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
+            <th class="col-growth">规模增长%</th>
             <th class="col-fee sortable" @click="toggleColumnSort('manage_fee')">
               费率<span class="th-arrow" v-if="sortField === 'manage_fee'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -459,7 +461,9 @@
               </template>
               <span v-else class="tag-empty">--</span>
             </td>
+            <td class="col-scale">{{ fmtFundScale(fund.fund_scale_prev) }}</td>
             <td class="col-scale">{{ fmtFundScale(fund.fund_scale) }}</td>
+            <td class="col-growth">{{ fmtScaleGrowth(fund.fund_scale_growth) }}</td>
             <td class="col-fee">{{ fmtManageFee(fund.manage_fee) }}</td>
             <td class="col-inst">{{ fmtInstPct(fund.inst_hold_pct) }}</td>
             <td class="col-ret" :style="{ color: retColor(fund.r1y) }">{{ fmtRetPlain(fund.r1y) }}</td>
@@ -523,6 +527,7 @@
           <span class="tag-line" v-if="industryOf(fund).length"><em>行业</em>{{ industryOf(fund).slice(0, 5).join('、') }}<span v-if="industryOf(fund).length > 5"> 等 {{ industryOf(fund).length }} 个</span></span>
         </div>
         <div class="fund-card-scale" v-if="fund.fund_scale != null || fund.inst_hold_pct != null">规模（亿）：{{ fmtFundScale(fund.fund_scale) }} · 费率：{{ fmtManageFee(fund.manage_fee) }} · 机构占比：{{ fmtInstPct(fund.inst_hold_pct) }}</div>
+        <div class="fund-card-scale" v-if="fund.fund_scale_prev != null || fund.fund_scale_growth != null">上季规模（亿）：{{ fmtFundScale(fund.fund_scale_prev) }} · 规模增长：{{ fmtScaleGrowth(fund.fund_scale_growth) }}</div>
         <div class="fund-card-ret">
           <span :style="{ color: retColor(fund.r1y) }">近1年收益 {{ fmtRetPlain(fund.r1y) }}</span>
           <span :style="{ color: retColor(fund.r2y) }">近2年收益 {{ fmtRetPlain(fund.r2y) }}</span>
@@ -812,7 +817,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, onActivated, nextTick, watch } from 'vue'
 import { fetchFundScores, fetchFundScoresCount, fetchFundMeta, fetchFundCategories, fetchFundTags, HOLDING_PERIOD_OPTIONS, HOLDING_NO_LIMIT, INVEST_STYLE_OPTIONS, INVEST_STYLE_UNDISCLOSED, TAG_TYPE_CONCEPT, TAG_TYPE_INDUSTRY, TAG_UNDISCLOSED } from '../../api/data.js'
-import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtManageFee, scoreColor } from '../../utils/format.js'
+import { fmtScore, fmtRet, fmtRetPlain, fmtDD, fmtSR, fmtScale, fmtFundScale, fmtScaleGrowth, fmtManageFee, scoreColor } from '../../utils/format.js'
 import { addFundToPortfolio } from '../../api/user-data'
 import { useAuth } from '../../composables/useAuth.js'
 import { toast } from '../../composables/useToast.js'
@@ -1694,7 +1699,7 @@ function exportCsv() {
     toast('暂无数据可导出', 'error')
     return
   }
-  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '投资风格', '概念', '行业', '基金规模(亿)', '费率', '近1年', '近2年', '近3年', '近5年']
+  const headers = ['基金代码', '基金简称', '基金经理', '二级分类', '投资风格', '概念', '行业', '上季规模(亿)', '基金规模(亿)', '规模增长(%)', '费率', '近1年', '近2年', '近3年', '近5年']
   const periodHeaders = displayPeriods.value.map(p => p.label + '评分')
   const allHeaders = [...headers, ...periodHeaders]
 
@@ -1707,7 +1712,9 @@ function exportCsv() {
       f.invest_style || '',
       conceptOf(f).join('、'),
       industryOf(f).join('、'),
+      f.fund_scale_prev != null ? f.fund_scale_prev : '',
       f.fund_scale != null ? f.fund_scale : '',
+      f.fund_scale_growth != null ? Number(f.fund_scale_growth).toFixed(2) : '',
       f.manage_fee != null ? f.manage_fee : '',
       f.r1y != null ? f.r1y : '',
       f.r2y != null ? f.r2y : '',
@@ -2044,6 +2051,7 @@ onUnmounted(() => {
 .col-scale { width: 74px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .col-scale.sortable { cursor: pointer; user-select: none; }
 .col-scale.sortable:hover { background: #e0e7ef; }
+.col-growth { width: 72px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .col-num { width: 80px; text-align: right; color: var(--text-secondary); }
 .col-pct { width: 60px; text-align: right; color: var(--text-secondary); }
 .col-score { width: 70px; text-align: center; }

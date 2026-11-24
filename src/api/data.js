@@ -26,7 +26,7 @@ export async function fetchTouguProducts(filters = {}) {
 // fund_scores 表实际列（核心视图）：代码/名称/分类/详情/评分
 // 合规：不再向前端下发短周期（<3 个月）评分列 k0w/k1m ——《证券投资基金评价业务管理暂行办法》
 // 第十四条第(七)项禁止发布单一指标排名期间少于 3 个月的结果，页面对应周期已一并下架。
-const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,inst_hold_pct,invest_style,style_period,tags'
+const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,fund_scale_prev,fund_scale_growth,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,inst_hold_pct,invest_style,style_period,tags'
 export function fetchFundScores(params = {}) {
   const key = 'fundScores:' + JSON.stringify(params)
   return withCache(key, 60000, () => fetchFundScoresImpl(params))
