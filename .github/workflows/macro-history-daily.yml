@@ -5,6 +5,11 @@ on:
     # 北京时间每天 10:00（UTC 02:00），避开 00:10 风格因子与 21:30 评分流水线
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      skip_fetch:
+        description: '跳过抓取，仅校验并 promote 已有 staging'
+        type: boolean
+        default: false
 
 jobs:
   refresh:
@@ -37,6 +42,7 @@ jobs:
           echo "SUPABASE_MGMT_TOKEN 已配置: ${#SUPABASE_MGMT_TOKEN} 字符"
 
       - name: Step 1 - Fetch into staging table
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_fetch }}
         run: python3 scripts/refresh_macro_history.py --to-staging
 
       - name: Step 2 - Validate and promote to production

@@ -54,7 +54,13 @@ RANGE = {
     'shibor_on': (-5.0, 30.0, 0.25),
     'sh000001': (1.0, 100000.0, 0.05),
 }
-FRESHNESS_DAYS = 10
+# 日频序列用 7 天；Shibor 来源（金十）本身有约 1–2 周延迟，单独放宽到 21 天。
+FRESHNESS_DAYS = {
+    'cn10y': 7,
+    'us10y': 7,
+    'shibor_on': 21,
+    'sh000001': 7,
+}
 
 
 def load_env():
@@ -266,7 +272,7 @@ def validate_staging(metrics):
         max(s.date) AS last_date,
         count(*) FILTER (
           WHERE s.value IS NULL
-             OR NOT isfinite(s.value::double precision)
+             OR s.value::text IN ('NaN', 'Infinity', '-Infinity')
              OR s.value::double precision < {min(RANGE[m][0] for m in metrics)}
              OR s.value::double precision > {max(RANGE[m][1] for m in metrics)}
         ) AS bad_rows
@@ -309,8 +315,9 @@ def validate_staging(metrics):
                 f'中间表校验失败：{m} 行数 {st["n"]} < 生产 90% ({pt["n"]})'
             )
         latest = str(st['last_date'])[:10]
-        if latest < time.strftime('%Y-%m-%d', time.localtime(time.time() - FRESHNESS_DAYS * 86400)):
-            raise RuntimeError(f'中间表校验失败：{m} 最新日期 {latest} 超过 {FRESHNESS_DAYS} 天未更新')
+        max_days = FRESHNESS_DAYS[m]
+        if latest < time.strftime('%Y-%m-%d', time.localtime(time.time() - max_days * 86400)):
+            raise RuntimeError(f'中间表校验失败：{m} 最新日期 {latest} 超过 {max_days} 天未更新')
         tol = RANGE[m][2]
         diff = omap.get(m, 0.0)
         if diff > tol:
