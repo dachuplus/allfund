@@ -23,6 +23,7 @@
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -63,6 +64,11 @@ SZSE_STATIC = "https://reportdocs.static.szse.cn"
 SZSE_REFERER = "https://www.szse.cn/disclosure/fund/currency/index.html"
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+
+# 行业穿透：从 stock_scores 拉 code→industry（东财二级行业，158 类）。
+# anon key 为 publishable（前端 bundle 已公开），非密钥；CI 可用 env 覆盖。
+SUPABASE_URL = os.environ.get("PCF_SUPABASE_URL", "https://tqhtegazxykkqfcpejky.supabase.co")
+SUPABASE_ANON = os.environ.get("PCF_SUPABASE_ANON", "sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3")
 
 # 申赎模式码（上交所 JS creationRedemptionEscape）
 SSE_MECHANISM = {
@@ -105,6 +111,81 @@ def curl_json(url, headers, retries=3, timeout=60):
             last = e
             time.sleep(1.5 * (i + 1))
     raise last
+
+
+def load_industry_map(retries=3):
+    """从 stock_scores 分页拉 code→industry 映射（裸6位码为键）。
+    失败返回空字典，不阻断 PCF 主流程（行业字段留空，前端显示 --）。"""
+    mp = {}
+    offset, page = 0, 1000
+    hdr = [f"apikey: {SUPABASE_ANON}", f"Authorization: Bearer {SUPABASE_ANON}"]
+    while True:
+        url = (f"{SUPABASE_URL}/rest/v1/stock_scores"
+               f"?select=code,industry&order=code&offset={offset}&limit={page}")
+        rows = None
+        for i in range(retries):
+            try:
+                raw = curl(url, headers=hdr, timeout=45)
+                rows = json.loads(raw)
+                break
+            except Exception:
+                time.sleep(1.5 * (i + 1))
+        if rows is None:
+            print(f"[WARN] 行业映射 offset={offset} 拉取失败，跳过", file=sys.stderr)
+            break
+        for r in rows:
+            code = (r.get("code") or "").split(".")[0]
+            ind = (r.get("industry") or "").strip()
+            if code and ind:
+                mp[code] = ind
+        if len(rows) < page:
+            break
+        offset += page
+        if offset > 30000:  # 防御性上限
+            break
+    print(f"[INFO] 行业映射加载 {len(mp)} 只股票", file=sys.stderr)
+    return mp
+
+
+def build_industry_summary(funds, ind_map):
+    """按行业聚合所有主动ETF成分证券：每个行业被几只ETF持有、涉及几只股票、合计持仓。
+    '穿透行业'：把 18 只主动ETF 的申赎篮子打散，按底层证券行业重新归集。"""
+    # industry -> { stocks: {code:{name,qty,count,etfs}}, etfs:set, total_qty }
+    agg = {}
+    for f in funds:
+        fcode = f["code"]
+        for c in f.get("components", []):
+            ind = (c.get("industry") or "").strip() or "未分类"
+            node = agg.setdefault(ind, {"stocks": {}, "etfs": set(), "total_qty": 0.0})
+            node["etfs"].add(fcode)
+            qty = c.get("quantity") or 0
+            node["total_qty"] += qty
+            s = node["stocks"].setdefault(c["code"], {
+                "code": c["code"], "name": c.get("name") or "",
+                "qty": 0.0, "etfs": set(),
+            })
+            s["qty"] += qty
+            s["etfs"].add(fcode)
+    out = []
+    for ind, node in agg.items():
+        stocks = []
+        for s in node["stocks"].values():
+            stocks.append({
+                "code": s["code"], "name": s["name"],
+                "qty": round(s["qty"], 2),
+                "etf_count": len(s["etfs"]),
+                "etfs": sorted(s["etfs"]),
+            })
+        stocks.sort(key=lambda x: (-x["etf_count"], -x["qty"], x["code"]))
+        out.append({
+            "industry": ind,
+            "etf_count": len(node["etfs"]),
+            "stock_count": len(stocks),
+            "total_qty": round(node["total_qty"], 2),
+            "stocks": stocks,
+        })
+    out.sort(key=lambda x: (-x["stock_count"], -x["etf_count"], x["industry"]))
+    return out
 
 
 def num(s):
@@ -314,12 +395,28 @@ def main():
                 print(f"[FAIL] {etf['code']} {e}", file=sys.stderr)
     funds.sort(key=lambda x: x["code"])
 
+    # 行业穿透：注入行业字段 + 生成行业汇总
+    ind_map = load_industry_map()
+    ind_hit = 0
+    ind_total = 0
+    for f in funds:
+        for c in f.get("components", []):
+            ind_total += 1
+            ind = ind_map.get(c["code"])
+            c["industry"] = ind or ""
+            if ind:
+                ind_hit += 1
+    industry_summary = build_industry_summary(funds, ind_map)
+    print(f"[INFO] 行业命中 {ind_hit}/{ind_total}，行业汇总 {len(industry_summary)} 类", file=sys.stderr)
+
     payload = {
         "date": args.date,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "disclaimer": "PCF(申购赎回清单)是申赎篮子，不等同于基金全部真实持仓；本页仅作基于PCF的组合观察，不构成投资建议。",
         "count": len(funds),
         "funds": funds,
+        "industry_summary": industry_summary,
+        "industry_coverage": {"hit": ind_hit, "total": ind_total},
         "errors": errors,
     }
     with open(args.out, "w", encoding="utf-8") as f:

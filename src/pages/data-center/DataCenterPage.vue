@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
+              <td><code>pending</code></td>
+              <td><span class="version-history">历史版本（主动ETF PCF：成分明细去分页全显示+行业穿透汇总，CI注入行业字段）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-24</td>
               <td><code>59233889</code></td>
               <td><span class="version-history">历史版本（基金评分表横向滚动锁定前四列：基金代码/简称/经理/二级分类）</span></td>
             </tr>
