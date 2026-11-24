@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
+              <td><code>ba074008</code></td>
+              <td><span class="version-history">历史版本（基金评分冻结列背景跟随斑马纹，左侧四列与右侧底色一致）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-24</td>
               <td><code>67893351</code></td>
               <td><span class="version-history">历史版本（基金评分表新增上季规模/规模增长%，当季规模刷新；夜间CI中间表校验后写生产）</span></td>
             </tr>
