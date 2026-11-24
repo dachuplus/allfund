@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
+              <td><code>bcdd237f</code></td>
+              <td><span class="version-history">历史版本（写文章编辑框精确测量高度，修复输入时跳到屏幕底部）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-24</td>
               <td><code>76a387f7</code></td>
               <td><span class="version-history">历史版本（写文章编辑框输入时保持光标位置，恢复右下角拖拽调整高度手柄）</span></td>
             </tr>
