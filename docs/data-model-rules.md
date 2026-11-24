@@ -14,6 +14,15 @@
 - 校验不通过时整批失败，生产保持原样；不得「先写一部分再补」。
 - 例外只限纯粹的一次性只读导出，或由已在本规则内的 promote 步骤执行的生产写入。
 
+### 规则 0.1 —— `macro_history` 日更链路
+
+- `macro_history` 仍被 `SignalPage.vue` 的 FED 股债性价比历史图直接读取：
+  `metric='cn10y'` 与 `metric='sh000001'` 不能停更。
+- 日更入口是 `scripts/refresh_macro_history.py` + `.github/workflows/macro-history-daily.yml`：
+  抓取 → `public.macro_history_staging` → 行数/日期新鲜度/数值范围/重叠差异校验 → `ON CONFLICT (date, metric)` 增量写生产。
+- 旧脚本 `scripts/fetch_macro_history.py` 的 `DELETE + INSERT` 直写生产属于历史实现，禁止再作为日更入口使用。
+- 抓取依赖固定为 `akshare==1.20.1`；新版 akshare 已移除 `bond_zh_us_rate` / `stock_zh_index_daily` / `macro_china_shibor_all` 旧接口。
+
 ### 规则 1 —— 靠谱指数页面数据来自 `fund_scores`
 
 - 网站「靠谱指数」页面（FundRankPage）展示的所有评分、分类、收益、回撤、夏普数据，
