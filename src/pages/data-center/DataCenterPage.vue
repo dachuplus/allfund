@@ -242,7 +242,7 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
-              <td><code>pending</code></td>
+              <td><code>59233889</code></td>
               <td><span class="version-history">历史版本（基金评分表横向滚动锁定前四列：基金代码/简称/经理/二级分类）</span></td>
             </tr>
             <tr>
