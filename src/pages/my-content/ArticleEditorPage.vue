@@ -118,6 +118,9 @@
             <textarea v-show="!previewMode" ref="textarea" v-model="form.content" class="ed-textarea"
               placeholder="支持 Markdown：# 标题、**粗体**、*斜体*、行内 `代码`、代码块用 ``` 包裹、> 引用、- 列表、[链接](url)、![图片](url)。粘贴多行代码会自动识别为代码块；悬停图标查看功能。"
               @input="resizeTextarea"
+              @mousedown="onTextareaMouseDown"
+              @mouseup="onTextareaResizeEnd"
+              @touchend="onTextareaResizeEnd"
               @paste="onPaste"></textarea>
             <div v-show="previewMode" class="ed-preview" v-html="renderedPreview"></div>
           </div>
@@ -235,12 +238,73 @@ const uploadProgress = ref(null) // { done, total } 或 null
 const form = ref({ title: '', summary: '', tagsRaw: '', cover_image: '', content: '', category: 'blog' })
 const contentWordCount = computed(() => (form.value.content || '').replace(/\s/g, '').length)
 
+let editorMirror = null
+let editorHeightBeforeDrag = null
+const manualEditorHeight = ref(null)
+
+function ensureEditorMirror() {
+  if (editorMirror) return editorMirror
+  editorMirror = document.createElement('textarea')
+  editorMirror.setAttribute('readonly', '')
+  editorMirror.setAttribute('aria-hidden', 'true')
+  editorMirror.tabIndex = -1
+  Object.assign(editorMirror.style, {
+    position: 'fixed',
+    left: '-9999px',
+    top: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    overflow: 'hidden',
+  })
+  document.body.appendChild(editorMirror)
+  return editorMirror
+}
+
 function resizeTextarea() {
   const ta = textarea.value
   if (!ta || previewMode.value) return
-  ta.style.height = 'auto'
-  ta.style.height = Math.max(ta.scrollHeight, 320) + 'px'
+  const mirror = ensureEditorMirror()
+  const cs = getComputedStyle(ta)
+  mirror.style.width = ta.offsetWidth + 'px'
+  mirror.style.boxSizing = cs.boxSizing
+  mirror.style.fontFamily = cs.fontFamily
+  mirror.style.fontSize = cs.fontSize
+  mirror.style.fontWeight = cs.fontWeight
+  mirror.style.fontStyle = cs.fontStyle
+  mirror.style.lineHeight = cs.lineHeight
+  mirror.style.letterSpacing = cs.letterSpacing
+  mirror.style.tabSize = cs.tabSize
+  mirror.style.padding = cs.padding
+  mirror.style.border = cs.border
+  mirror.style.whiteSpace = 'pre-wrap'
+  mirror.style.wordWrap = 'break-word'
+  mirror.value = ta.value || ''
+  const needed = Math.max(mirror.scrollHeight, 320)
+  if (manualEditorHeight.value) {
+    const current = ta.offsetHeight
+    if (needed > current) {
+      ta.style.height = needed + 'px'
+      manualEditorHeight.value = needed + 'px'
+    } else {
+      ta.style.height = manualEditorHeight.value
+    }
+  } else {
+    ta.style.height = needed + 'px'
+  }
 }
+
+function onTextareaMouseDown() {
+  editorHeightBeforeDrag = textarea.value ? textarea.value.offsetHeight : null
+}
+
+function onTextareaResizeEnd() {
+  const ta = textarea.value
+  if (!ta || editorHeightBeforeDrag == null) return
+  const current = ta.offsetHeight
+  if (current !== editorHeightBeforeDrag) manualEditorHeight.value = current + 'px'
+  editorHeightBeforeDrag = null
+}
+
 watch(() => form.value.content, () => nextTick(resizeTextarea))
 watch(previewMode, (val) => { if (!val) nextTick(resizeTextarea) })
 
@@ -902,8 +966,8 @@ onMounted(async () => {
   min-height: 360px;
   box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  resize: none;
-  overflow: hidden;
+  resize: vertical;
+  overflow: auto;
 }
 .ed-textarea:focus { outline: 3px solid #ffdd00; border-color: #1d70b8; }
 .ed-preview {
@@ -938,8 +1002,8 @@ onMounted(async () => {
   min-height: 320px;
   box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  resize: none;
-  overflow: hidden;
+  resize: vertical;
+  overflow: auto;
 }
 .ed-textarea:focus { outline: 3px solid #ffdd00; border-color: #1d70b8; }
 .ed-compliance {
