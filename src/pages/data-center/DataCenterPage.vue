@@ -242,6 +242,12 @@
             <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
+              <td><code>67893351</code></td>
+              <td><span class="version-history">历史版本（基金评分表新增上季规模/规模增长%，当季规模刷新；夜间CI中间表校验后写生产）</span></td>
+            </tr>
+            <tr>
+              <td>v4.0.57</td>
+              <td>2026-11-24</td>
               <td><code>bcdd237f</code></td>
               <td><span class="version-history">历史版本（写文章编辑框精确测量高度，修复输入时跳到屏幕底部）</span></td>
             </tr>
