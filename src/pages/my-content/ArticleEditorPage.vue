@@ -113,12 +113,15 @@
             <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="onFileChange" />
           </div>
 
+          <div class="ed-word-count ed-word-count--top">正文：<strong>{{ contentWordCount }}</strong> 字</div>
           <div class="ed-editor-wrap">
             <textarea v-show="!previewMode" ref="textarea" v-model="form.content" class="ed-textarea"
               placeholder="支持 Markdown：# 标题、**粗体**、*斜体*、行内 `代码`、代码块用 ``` 包裹、> 引用、- 列表、[链接](url)、![图片](url)。粘贴多行代码会自动识别为代码块；悬停图标查看功能。"
+              @input="resizeTextarea"
               @paste="onPaste"></textarea>
             <div v-show="previewMode" class="ed-preview" v-html="renderedPreview"></div>
           </div>
+          <div class="ed-word-count ed-word-count--bottom">正文：<strong>{{ contentWordCount }}</strong> 字</div>
           <p class="ed-hint">提示：选中文字后点工具栏图标可快速加粗 / 加链接 / 对齐；两端对齐适用于全文或大段文字。</p>
         </div>
 
@@ -230,6 +233,16 @@ const saving = ref(false)
 const savingAction = ref(null) // 'draft' | 'published' | null
 const uploadProgress = ref(null) // { done, total } 或 null
 const form = ref({ title: '', summary: '', tagsRaw: '', cover_image: '', content: '', category: 'blog' })
+const contentWordCount = computed(() => (form.value.content || '').replace(/\s/g, '').length)
+
+function resizeTextarea() {
+  const ta = textarea.value
+  if (!ta || previewMode.value) return
+  ta.style.height = 'auto'
+  ta.style.height = Math.max(ta.scrollHeight, 320) + 'px'
+}
+watch(() => form.value.content, () => nextTick(resizeTextarea))
+watch(previewMode, (val) => { if (!val) nextTick(resizeTextarea) })
 
 /** 分类选项（与 DB CHECK 约束一致） */
 const categoryOptions = [
@@ -757,7 +770,10 @@ async function pushToWechat() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  nextTick(resizeTextarea)
+})
 </script>
 
 <style scoped>
@@ -886,7 +902,8 @@ onMounted(load)
   min-height: 360px;
   box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 .ed-textarea:focus { outline: 3px solid #ffdd00; border-color: #1d70b8; }
 .ed-preview {
@@ -902,6 +919,10 @@ onMounted(load)
   word-break: break-word;
   background: #fff;
 }
+.ed-word-count { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.ed-word-count strong { color: var(--brand); font-size: 14px; }
+.ed-word-count--top { margin-bottom: 6px; }
+.ed-word-count--bottom { margin: 6px 0 0; }
 .ed-hint { font-size: 12px; color: var(--text-muted); margin: 6px 0 0; }
 .ed-ip-box { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: #fff; border: 2px solid #1d70b8; margin-bottom: 10px; }
 .ed-ip-value { font-size: 14px; font-weight: 700; color: #1d70b8; font-family: monospace; display: flex; align-items: center; gap: 8px; }
@@ -917,7 +938,8 @@ onMounted(load)
   min-height: 320px;
   box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 .ed-textarea:focus { outline: 3px solid #ffdd00; border-color: #1d70b8; }
 .ed-compliance {
