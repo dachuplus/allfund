@@ -2008,7 +2008,8 @@ onUnmounted(() => {
 /* 最右列去掉右边框，避免外缘出现多余竖线 */
 .fund-table th:last-child,
 .fund-table td:last-child { border-right: none; }
-/* 斑马纹：偶数行白底（去除蓝色条纹，仅保留细分割线） */
+/* 斑马纹：奇数行用页面浅灰底，偶数行白底（仅保留细分割线） */
+.fund-table tbody tr:nth-child(odd) { background: var(--bg-body); }
 .fund-table tbody tr:nth-child(even) { background: #ffffff; }
 /* 悬停高亮：品牌蓝略深，比斑马纹更深以便区分 */
 .fund-row:hover { background: #d4e6fb; }
@@ -2025,7 +2026,7 @@ onUnmounted(() => {
 .fund-table td.col-code,
 .fund-table td.col-name,
 .fund-table td.col-manager,
-.fund-table td.col-t1 { position: sticky; z-index: 2; background: #ffffff; }
+.fund-table td.col-t1 { position: sticky; z-index: 2; background: var(--bg-body); }
 .fund-table td.col-code    { left: 0; }
 .fund-table td.col-name    { left: 80px; }
 .fund-table td.col-manager { left: 220px; }
