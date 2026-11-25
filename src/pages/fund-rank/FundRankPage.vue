@@ -60,16 +60,18 @@
         </div>
       </div>
 
-      <!-- 二级分类（多选勾选框，依赖一级，来自 fund_scores.t1_tt） -->
-      <div class="filter-row" v-if="filterT0.length > 0 && t1List.length > 0">
-        <span class="filter-label">二级分类</span>
-        <div class="filter-chips">
-          <div class="filter-chip" :class="{ active: filterT1.length === 0 }" @click="clearT1">全部</div>
-          <div v-for="item in t1List" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value)">
-            <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+      <!-- 二级分类（按一级分类分组展示，组内多选勾选框） -->
+      <template v-if="filterT0.length > 0">
+        <div v-for="t0 in filterT0" :key="'t1grp-' + t0" class="filter-row t1-group-row" v-show="(t1Map[t0] || []).length > 0">
+          <span class="filter-label t1-group-label">{{ t0 }}</span>
+          <div class="filter-chips">
+            <div class="filter-chip" :class="{ active: !hasT1InGroup(t0) }" @click="clearT1Group(t0)">全部</div>
+            <div v-for="item in (t1Map[t0] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value)">
+              <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- 更多筛选（弹窗入口） -->
       <div class="filter-actions-row">
@@ -1487,6 +1489,18 @@ function clearT1() {
   loadData(true)
 }
 
+// 分组「全部」：该一级下是否已有二级勾选 / 清空该一级下的二级勾选
+function hasT1InGroup(t0) {
+  const values = new Set((t1Map.value[t0] || []).map(x => x.value))
+  return filterT1.value.some(v => values.has(v))
+}
+
+function clearT1Group(t0) {
+  const values = new Set((t1Map.value[t0] || []).map(x => x.value))
+  filterT1.value = filterT1.value.filter(v => !values.has(v))
+  loadData(true)
+}
+
 /** 清除所有更多筛选条件（份额回到默认「主代码」） */
 function clearMoreFilters() {
   filterSC.value = ['MAIN']
@@ -1952,6 +1966,12 @@ onUnmounted(() => {
 .check-box.checked::after {
   content: ''; width: 4px; height: 8px; border: solid #fff;
   border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px);
+}
+/* 二级分类按一级分组：组名加蓝色左边框标识层级，行缩进对齐 */
+.t1-group-row { padding-top: 2px; padding-bottom: 2px; }
+.t1-group-label {
+  min-width: 80px; text-align: right; color: var(--text-primary);
+  border-left: 4px solid #1d70b8; padding: 4px 8px 4px 0;
 }
 .more-chip { position: relative; }
 .source-dropdown {
