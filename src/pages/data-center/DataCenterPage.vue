@@ -282,6 +282,12 @@
               <td><span class="version-history">历史版本（PCF历史数据改同源代理优先，修复跨日对比不显示）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>ceafd801</code></td>
+              <td><span class="version-history">历史版本（二级按一级独立勾选，全部显式可取消，勾二级自动勾一级）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
