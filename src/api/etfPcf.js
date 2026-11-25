@@ -5,11 +5,14 @@
 const BRANCH = 'pcf-data'
 const REPO = 'dachuplus/allfund'
 
-// 三级回退：jsDelivr CDN → raw CDN → 本站同源代理（国内个别网络访问 CDN 不稳时兜底）
+// 三级回退：本站同源代理 → jsDelivr CDN → raw CDN。
+// 同源代理优先的原因：跨日对比要顺序取多份历史 JSON，jsDelivr 对 pcf-data 分支
+// 历史文件首次访问常超 12s 触发前端超时回退，导致历史数据加载不出来、跨日对比不显示；
+// 同源代理服务端直连 raw 且有 5 分钟缓存，实测 1~3s 返回，稳定得多。CDN 仅作兜底。
 const SOURCES = [
+  (path, t) => `/api/pcf-data?path=${encodeURIComponent(path)}&t=${t}`,
   (path, t) => `https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/${path}?t=${t}`,
   (path, t) => `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${path}?t=${t}`,
-  (path, t) => `/api/pcf-data?path=${encodeURIComponent(path)}&t=${t}`,
 ]
 
 const cache = new Map() // path -> { at, data }（5 分钟内存缓存）
