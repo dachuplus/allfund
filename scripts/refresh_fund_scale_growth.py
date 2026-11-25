@@ -13,7 +13,9 @@
   - 抓取阶段只写中间表 public.fund_scale_snapshot，严禁直接改生产；
   - 校验阶段核对行数、覆盖率、负值/异常值、两个已知样本；
   - 校验全部通过后才用一条 UPDATE ... FROM snapshot 原子写回 fund_scores；
-  - fund_scores_main 物化视图需要时单独 --rebuild-view。
+  - 写回后立刻 REFRESH fund_scores_main：前端默认读该物化视图，不刷新则页面
+    「上季规模 / 规模增长%」停留在旧快照全部显示 --；
+  - --rebuild-view 只在视图结构（列/规则）变更时用，会 DROP + CREATE。
 
 用法：
   # 只看样本，不写任何表
@@ -488,6 +490,10 @@ def promote_snapshot():
     """
     run_sql(sql, timeout=600)
     print('  ✓ 已原子写入生产表 fund_scores', flush=True)
+    # 前端默认份额读 fund_scores_main 物化视图；只更新 fund_scores 而不刷新
+    # 视图，会让页面「上季规模 / 规模增长%」长期显示旧快照的 --。
+    run_sql('REFRESH MATERIALIZED VIEW public.fund_scores_main', timeout=600)
+    print('  ✓ 已同步刷新 fund_scores_main 物化视图', flush=True)
 
 
 def cmd_fetch(args):
