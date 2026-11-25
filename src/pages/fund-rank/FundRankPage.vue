@@ -53,25 +53,27 @@
       <div class="filter-row">
         <span class="filter-label">一级分类</span>
         <div class="filter-chips">
-          <div class="filter-chip" :class="{ active: filterT0.length === 0 }" @click="clearT0">全部</div>
+          <div class="filter-chip check-chip" :class="{ active: filterT0.length === 0 }" @click="clearT0">
+            <span class="check-box" :class="{ checked: filterT0.length === 0 }"></span>全部
+          </div>
           <div v-for="item in t0List" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT0.includes(item.value) }" @click="toggleT0(item.value)">
             <span class="check-box" :class="{ checked: filterT0.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
 
-      <!-- 二级分类（按一级分类分组展示，组内多选勾选框） -->
-      <template v-if="filterT0.length > 0">
-        <div v-for="t0 in filterT0" :key="'t1grp-' + t0" class="filter-row t1-group-row" v-show="(t1Map[t0] || []).length > 0">
-          <span class="filter-label t1-group-label">{{ t0 }}</span>
-          <div class="filter-chips">
-            <div class="filter-chip" :class="{ active: !hasT1InGroup(t0) }" @click="clearT1Group(t0)">全部</div>
-            <div v-for="item in (t1Map[t0] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value)">
-              <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
-            </div>
+      <!-- 二级分类（默认全部铺开，按一级分组，组内多选勾选框） -->
+      <div v-for="t0 in t0List" :key="'t1grp-' + t0.value" class="filter-row t1-group-row" v-show="(t1Map[t0.value] || []).length > 0">
+        <span class="filter-label t1-group-label">{{ t0.value }}</span>
+        <div class="filter-chips">
+          <div class="filter-chip check-chip" :class="{ active: !hasT1InGroup(t0.value) }" @click="clearT1Group(t0.value)">
+            <span class="check-box" :class="{ checked: !hasT1InGroup(t0.value) }"></span>全部
+          </div>
+          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value, t0.value)">
+            <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
-      </template>
+      </div>
 
       <!-- 更多筛选（弹窗入口） -->
       <div class="filter-actions-row">
@@ -1108,21 +1110,6 @@ const totalCount = ref(null)      // 当前筛选条件下后端总数（来自 
 const detailFund = ref(null)
 const showScoreHelp = ref(false)
 
-// ========== 计算属性：分类联动（数据来自 RPC，已存 t0List / t1Map ref）==========
-const t1List = computed(() => {
-  if (!filterT0.value.length) return []
-  // 多个一级分类时取二级分类并集（去重按计数降序）
-  // 货币型的 t1_tt 是「货币型-普通货币」「货币型-浮动净值」，直接用真实值，无需哨兵。
-  const merged = {}
-  for (const t0 of filterT0.value) {
-    for (const x of (t1Map.value[t0] || [])) {
-      if (!merged[x.value]) merged[x.value] = { ...x }
-      else merged[x.value].cnt += x.cnt
-    }
-  }
-  return Object.values(merged).sort((a, b) => b.cnt - a.cnt)
-})
-
 
 // ========== 点赞 / 吐槽（localStorage 持久化） ==========
 const LS_LIKES_KEY = 'af_fund_likes'
@@ -1464,9 +1451,7 @@ async function refreshData() {
 function toggleT0(val) {
   const arr = filterT0.value
   filterT0.value = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
-  // 一级变化后，剔除二级里已不属于当前一级并集的勾选项，避免组间交集出现空结果
-  const valid = new Set(t1List.value.map(x => x.value))
-  filterT1.value = filterT1.value.filter(v => valid.has(v))
+  // 二级分类已全部铺开、独立于一级勾选，这里不再剔除二级勾选项
   clearMoreFilters()
   loadData(true)
 }
@@ -1478,9 +1463,15 @@ function clearT0() {
   loadData(true)
 }
 
-function toggleT1(val) {
+function toggleT1(val, t0Key) {
   const arr = filterT1.value
-  filterT1.value = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  filterT1.value = next
+  // 二级全部铺开后，勾选某二级时若其所属一级未勾选，自动补勾该一级，
+  // 否则 t0/t1 组间交集会把这个二级过滤掉（结果为空）。取消勾选不动一级。
+  if (next.includes(val) && t0Key && !filterT0.value.includes(t0Key)) {
+    filterT0.value = [...filterT0.value, t0Key]
+  }
   loadData(true)
 }
 
@@ -1948,7 +1939,6 @@ onUnmounted(() => {
 .filter-chip:hover { text-decoration-color: var(--link); }
 .filter-chip.active {
   color: #1d70b8; font-weight: 700; text-decoration: none;
-  border-bottom: 4px solid #1d70b8; padding-bottom: 0;
 }
 .chip-cnt {
   font-size: 12px; font-weight: 400; color: var(--text-secondary);
