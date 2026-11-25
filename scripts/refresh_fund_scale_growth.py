@@ -50,8 +50,9 @@ MGMT_API = f'https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query'
 SNAPSHOT_TABLE = 'public.fund_scale_snapshot'
 
 NEW_COLUMNS = ('fund_scale_prev', 'fund_scale_growth')
-# 上季规模低于 0.01 亿（100 万元）视为无可比基数：增长率会失真，统一置 NULL，前端显示 --
-MIN_PREV_SCALE = 0.01
+# 上季规模低于 0.2 亿（2000 万元）视为无可比基数：多为次新基金/份额变更，
+# 增长率会失真，统一置 NULL，前端显示 --；保留覆盖仍 >90%。
+MIN_PREV_SCALE = 0.2
 
 UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -423,7 +424,7 @@ def validate_snapshot():
           WHERE (fund_scale IS NOT NULL AND fund_scale < 0)
              OR (fund_scale_prev IS NOT NULL AND fund_scale_prev < 0)
              OR (fund_scale_growth IS NOT NULL
-                 AND (fund_scale_growth < -100 OR fund_scale_growth > 1000000))
+                 AND (fund_scale_growth < -100 OR fund_scale_growth > 10000))
              OR (fund_scale_prev IS NOT NULL AND fund_scale_prev > 0
                  AND fund_scale_prev < {MIN_PREV_SCALE})
              OR (fund_scale_prev = 0 AND fund_scale_growth IS NOT NULL)
