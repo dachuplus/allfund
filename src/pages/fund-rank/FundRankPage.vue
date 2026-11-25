@@ -404,11 +404,15 @@
             <th class="col-style">投资风格</th>
             <th class="col-tags">概念</th>
             <th class="col-tags">行业</th>
-            <th class="col-scale">上季规模（亿）</th>
+            <th class="col-scale sortable" @click="toggleColumnSort('fund_scale_prev')">
+              上季规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale_prev'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="col-scale sortable" @click="toggleColumnSort('fund_scale')">
               规模（亿）<span class="th-arrow" v-if="sortField === 'fund_scale'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th class="col-growth">规模增长%</th>
+            <th class="col-growth sortable" @click="toggleColumnSort('fund_scale_growth')">
+              规模增长%<span class="th-arrow" v-if="sortField === 'fund_scale_growth'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="col-fee sortable" @click="toggleColumnSort('manage_fee')">
               费率<span class="th-arrow" v-if="sortField === 'manage_fee'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -2095,6 +2099,8 @@ onUnmounted(() => {
 .col-scale.sortable { cursor: pointer; user-select: none; }
 .col-scale.sortable:hover { background: #e0e7ef; }
 .col-growth { width: 72px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.col-growth.sortable { cursor: pointer; user-select: none; }
+.col-growth.sortable:hover { background: #e0e7ef; }
 .col-num { width: 80px; text-align: right; color: var(--text-secondary); }
 .col-pct { width: 60px; text-align: right; color: var(--text-secondary); }
 .col-score { width: 70px; text-align: center; }
