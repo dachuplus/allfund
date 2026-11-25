@@ -1326,32 +1326,30 @@ async function loadData(reset = true, _retryCount = 0) {
   if (reset) totalCount.value = null
 
   try {
-    // 确定 t0 过滤（FOF 类型筛选用 'FOF'）
-    // 一级分类多选：各归一化项的原始 t0 值合并成一个数组（组内并集）。
-    // 一级分类已归一化（"混合型"+"混合型基金"→"混合型"），查询时按原始 t0 数组匹配，保证计数与展示一致。
-    let t0Filter
+    // 分类多选（2026-11-25 重写）：按一级分组，每组 = 该一级 AND 其名下勾选的二级；
+    // 组间 OR。这样「债券型勾全部（无二级勾选）」= 该组只按一级过滤，包含其下所有二级。
+    // 一级分类已归一化（"混合型"+"混合型基金"→"混合型"），用原始 t0 值匹配保证计数一致。
+    let categoryGroups
     if (filterFOF.value === '1') {
-      t0Filter = ['FOF']
-    } else if (filterFOF.value === '0' && !filterT0.value.length) {
-      t0Filter = undefined
+      // FOF 模式走单独一组，忽略二级勾选
+      categoryGroups = [{ t0: ['FOF'], t1: [] }]
     } else if (filterT0.value.length) {
-      const rawSet = new Set()
+      categoryGroups = []
       for (const key of filterT0.value) {
         const raw = t0RawMap.value[key]
-        if (raw && raw.length) raw.forEach(v => rawSet.add(v))
-        else rawSet.add(key)
+        const t0Arr = raw && raw.length ? [...raw] : [key]
+        // 只取属于该一级名下的二级勾选项（t1Map[key]）
+        const owned = new Set((t1Map.value[key] || []).map(x => x.value))
+        const t1Arr = filterT1.value.filter(v => owned.has(v))
+        categoryGroups.push({ t0: t0Arr, t1: t1Arr })
       }
-      t0Filter = [...rawSet]
-    } else {
-      t0Filter = undefined
+      if (!categoryGroups.length) categoryGroups = undefined
     }
+    // filterT0 为空（一级「全部」）且非 FOF 模式：categoryGroups = undefined，不过滤分类
 
     // 当前筛选条件（同时用于「列表」与「真实总数」两次请求，保证口径一致）
-    // t1 多选：数组原样下发，API 端与 t0 取交集（组间 AND）。
     const queryParams = {
-      t0: t0Filter,
-      // FOF 模式走 t0='FOF'，此时忽略二级分类勾选，避免默认偏股交集为空
-      t1: filterFOF.value === '1' ? undefined : (filterT1.value.length ? [...filterT1.value] : undefined),
+      categoryGroups,
       search: buildSearchText(),
       shareClasses: filterSC.value.length ? filterSC.value : undefined,
       holdingPeriods: filterHolding.value.length ? filterHolding.value : undefined,

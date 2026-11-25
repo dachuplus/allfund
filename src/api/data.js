@@ -379,7 +379,7 @@ function tagGroupExpr(selected, flagCol) {
 }
 
 async function fetchFundScoresImpl(params = {}) {
-  const { t0, t1, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, instMin, instMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, conceptTagFilters, industryTagFilters, allConceptTags, allIndustryTags, countOnly = false } = params
+  const { t0, t1, categoryGroups, search, kKey = 'k1', page = 1, pageSize = 100, sortAsc, etf, lof, dk, sg, zz, dailyLimit, retAnomaly, scaleMin, scaleMax, stockMin, stockMax, bondMin, bondMax, cashMin, cashMax, instMin, instMax, sortField, sortDir, mainCode, holding, shareClasses, holdingPeriods, scaleRanges, investStyles, tagFilters, conceptTagFilters, industryTagFilters, allConceptTags, allIndustryTags, countOnly = false } = params
   if (supabase) {
     // 列表请求不带 count（22000+ 行 × 30 列曾触发 57014）。精确总数改由
     // countOnly 模式复用同一条过滤链，只 select c + head + count=exact（见下方），
@@ -404,25 +404,47 @@ async function fetchFundScoresImpl(params = {}) {
     //    只剩最后一组条件，其余静默失效。这里把每个维度内的并集收集成 orGroups，
     //    末尾合成单个 and=(or(...),or(...))，保证「组内 OR、组间 AND」。
     const orGroups = []
-    // 分类筛选（2026-11-25 多选改造）：一级 t0 / 二级 t1_tt 各自可多选，
-    // 同一维度内取并集（or），两个维度之间取交集（and）。
-    // 二级分类优先的历史行为改为「两级独立叠加」：用户勾选一级+二级时同时生效。
-    if (t0) {
+    // 分类筛选（2026-11-25 重写）：按一级分类分组，每组独立成一条 AND 条件，
+    // 组间取并集（OR）。这样「债券型勾全部（无二级勾选）」= 该组只按一级过滤，
+    // 自然包含债券型下所有二级；「混合型勾偏股」= 混合型 AND 偏股。互不干扰。
+    // categoryGroups: [{ t0: ['债券型','债券型基金'], t1: [] }, ...]
+    if (Array.isArray(categoryGroups) && categoryGroups.length > 0) {
+      const groupFlat = []
+      // 展开成扁平的 and/or 条件列表，交给 orGroups 合成 or=(...)。
+      // 注意 PostgREST 不允许 and(...) 内嵌 or(...)，所以一级多原始值、二级多选
+      // 都在最外层展开：每对 (原始t0 × 二级) 各生成一条 and(...)，无二级则 t0.eq。
+      for (const g of categoryGroups) {
+        const t0Arr = (g.t0 || []).filter(v => v !== undefined && v !== null)
+        const t1Arr = (g.t1 || []).filter(v => v !== undefined && v !== null)
+        if (!t0Arr.length) continue
+        if (t1Arr.length) {
+          for (const t0 of t0Arr) {
+            for (const t1 of t1Arr) {
+              groupFlat.push(`and(t0.eq."${t0}",t1_tt.eq."${t1}")`)
+            }
+          }
+        } else {
+          // 该一级选「全部」：只按一级过滤，覆盖其下所有二级分类
+          for (const t0 of t0Arr) groupFlat.push(`t0.eq."${t0}"`)
+        }
+      }
+      if (groupFlat.length === 1) {
+        orGroups.push(groupFlat[0])
+      } else if (groupFlat.length > 1) {
+        orGroups.push(groupFlat.join(','))
+      }
+    } else if (t0) {
+      // 兼容旧调用（其它页面直接传 t0/t1）
       const t0Arr = Array.isArray(t0) ? t0 : [t0]
       if (t0Arr.length === 1) {
-        // PostgREST 的 in.("") 匹配不到空字符串（实测返回 []），
-        // 「新发基金」这类 t0='' 的分类必须走 eq. 精确匹配（or 表达式里用 eq.""）。
         query = t0Arr[0] === '' ? query.eq('t0', '') : query.eq('t0', t0Arr[0])
       } else if (t0Arr.length > 1) {
         orGroups.push(categoryOrExpr('t0', t0Arr))
       }
-    }
-    if (t1) {
-      const t1Arr = Array.isArray(t1) ? t1 : [t1]
-      if (t1Arr.length === 1) {
-        query = query.eq('t1_tt', t1Arr[0])
-      } else if (t1Arr.length > 1) {
-        orGroups.push(categoryOrExpr('t1_tt', t1Arr))
+      if (t1) {
+        const t1Arr = Array.isArray(t1) ? t1 : [t1]
+        if (t1Arr.length === 1) query = query.eq('t1_tt', t1Arr[0])
+        else if (t1Arr.length > 1) orGroups.push(categoryOrExpr('t1_tt', t1Arr))
       }
     }
     if (search) orGroups.push(`n.ilike.%${search}%,c.ilike.%${search}%`)
