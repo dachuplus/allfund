@@ -252,6 +252,12 @@
               <td><span class="version-history">历史版本（一级/二级分类多选勾选框，默认偏股混合，组内并集组间交集）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>dd05a752</code></td>
+              <td><span class="version-history">历史版本（上季规模、规模增长表头支持点击排序）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
