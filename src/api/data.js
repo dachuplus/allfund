@@ -27,6 +27,12 @@ export async function fetchTouguProducts(filters = {}) {
 // 合规：不再向前端下发短周期（<3 个月）评分列 k0w/k1m ——《证券投资基金评价业务管理暂行办法》
 // 第十四条第(七)项禁止发布单一指标排名期间少于 3 个月的结果，页面对应周期已一并下架。
 const FUND_SCORES_COLS = 'c,n,t0,t1,t1_tt,sg,daily_change,company,fund_manager,fund_scale,fund_scale_prev,fund_scale_growth,share_scale,manage_fee,custody_fee,sale_fee,found_date,k3m,k6m,k1,k2,k3,k5,k_all,score_grade,r1y,r2y,r3y,r5y,ret_anomaly,stock_pct,bond_pct,cash_pct,inst_hold_pct,invest_style,style_period,tags'
+
+// 分类多选：把同维度的多个取值拼成 PostgREST or 表达式（组内并集）。
+// 中文分类值用 eq."..." 包裹，避免 PostgREST 误解析；空串 t0（新发基金）同样可用 eq.""。
+function categoryOrExpr(field, values) {
+  return values.map(v => `${field}.eq."${v}"`).join(',')
+}
 export function fetchFundScores(params = {}) {
   const key = 'fundScores:' + JSON.stringify(params)
   return withCache(key, 60000, () => fetchFundScoresImpl(params))
@@ -398,20 +404,25 @@ async function fetchFundScoresImpl(params = {}) {
     //    只剩最后一组条件，其余静默失效。这里把每个维度内的并集收集成 orGroups，
     //    末尾合成单个 and=(or(...),or(...))，保证「组内 OR、组间 AND」。
     const orGroups = []
-    // 分类筛选：直接采用 fund_scores 的「一级分类 t0」与「二级分类 t1_tt」
-    // （从总表服务端过滤，而非客户端对前 100 条再筛）
-    if (t1) {
-      // 二级分类：按天天分类 t1_tt 精确过滤
-      query = query.eq('t1_tt', t1)
-    } else if (t0) {
-      // 一级分类：按聚源 t0 过滤（货币型 t1_tt 为 NULL，也走此分支）
-      // 支持数组（如归一化后同时匹配 "混合型" 和 "混合型基金"）
-      if (Array.isArray(t0) && t0.length > 0) {
+    // 分类筛选（2026-11-25 多选改造）：一级 t0 / 二级 t1_tt 各自可多选，
+    // 同一维度内取并集（or），两个维度之间取交集（and）。
+    // 二级分类优先的历史行为改为「两级独立叠加」：用户勾选一级+二级时同时生效。
+    if (t0) {
+      const t0Arr = Array.isArray(t0) ? t0 : [t0]
+      if (t0Arr.length === 1) {
         // PostgREST 的 in.("") 匹配不到空字符串（实测返回 []），
-        // 「新发基金」这类 t0='' 的分类必须用 eq. 精确匹配。
-        query = (t0.length === 1 && t0[0] === '') ? query.eq('t0', '') : query.in('t0', t0)
-      } else {
-        query = query.eq('t0', t0)
+        // 「新发基金」这类 t0='' 的分类必须走 eq. 精确匹配（or 表达式里用 eq.""）。
+        query = t0Arr[0] === '' ? query.eq('t0', '') : query.eq('t0', t0Arr[0])
+      } else if (t0Arr.length > 1) {
+        orGroups.push(categoryOrExpr('t0', t0Arr))
+      }
+    }
+    if (t1) {
+      const t1Arr = Array.isArray(t1) ? t1 : [t1]
+      if (t1Arr.length === 1) {
+        query = query.eq('t1_tt', t1Arr[0])
+      } else if (t1Arr.length > 1) {
+        orGroups.push(categoryOrExpr('t1_tt', t1Arr))
       }
     }
     if (search) orGroups.push(`n.ilike.%${search}%,c.ilike.%${search}%`)

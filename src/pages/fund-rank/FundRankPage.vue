@@ -49,24 +49,24 @@
 
     <!-- 筛选区 -->
     <div class="filter-section">
-      <!-- 一级分类（动态，来自 fund_scores.t0） -->
+      <!-- 一级分类（多选勾选框，来自 fund_scores.t0） -->
       <div class="filter-row">
         <span class="filter-label">一级分类</span>
         <div class="filter-chips">
-          <div class="filter-chip" :class="{ active: filterT0 === '' }" @click="setT0('')">全部</div>
-          <div v-for="item in t0List" :key="item.value" class="filter-chip" :class="{ active: filterT0 === item.value }" @click="setT0(item.value)">
-            {{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div class="filter-chip" :class="{ active: filterT0.length === 0 }" @click="clearT0">全部</div>
+          <div v-for="item in t0List" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT0.includes(item.value) }" @click="toggleT0(item.value)">
+            <span class="check-box" :class="{ checked: filterT0.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
 
-      <!-- 二级分类（依赖一级，来自 fund_scores.t1_tt） -->
-      <div class="filter-row" v-if="filterT0 && t1List.length > 0">
+      <!-- 二级分类（多选勾选框，依赖一级，来自 fund_scores.t1_tt） -->
+      <div class="filter-row" v-if="filterT0.length > 0 && t1List.length > 0">
         <span class="filter-label">二级分类</span>
         <div class="filter-chips">
-          <div class="filter-chip" v-if="filterT0 !== '货币型'" :class="{ active: filterT1 === '' }" @click="setT1('')">全部</div>
-          <div v-for="item in t1List" :key="item.value" class="filter-chip" :class="{ active: filterT1 === item.value }" @click="setT1(item.value)">
-            {{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div class="filter-chip" :class="{ active: filterT1.length === 0 }" @click="clearT1">全部</div>
+          <div v-for="item in t1List" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value)">
+            <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
@@ -957,9 +957,11 @@ const summaryDate = computed(() => {
   return s.length > 10 ? s.slice(0, 10) : s
 })
 
-// 分类筛选
-const filterT0 = ref('')
-const filterT1 = ref('')
+// 分类筛选（多选勾选框）：组内并集、一级与二级之间交集。
+// 用户 2026-11-25 指定默认：一级只勾「混合型」，二级只勾「混合型-偏股」（即偏股混合基金）。
+// 一级「全部」= 空数组（不过滤）；二级「全部」= 空数组（在当前一级下不过滤）。
+const filterT0 = ref(['混合型'])
+const filterT1 = ref(['混合型-偏股'])
 
 // 更多筛选
 const showMoreFilter = ref(false)
@@ -1102,13 +1104,17 @@ const showScoreHelp = ref(false)
 
 // ========== 计算属性：分类联动（数据来自 RPC，已存 t0List / t1Map ref）==========
 const t1List = computed(() => {
-  if (!filterT0.value) return []
-  // 货币型无 t1_tt，二级分类用自身「货币基金」表示（点击等同于按 t0='货币型' 过滤）
-  if (filterT0.value === '货币型') {
-    const cnt = (t0List.value.find(x => x.value === '货币型') || {}).cnt || 0
-    return [{ value: '', label: '货币基金', cnt }]
+  if (!filterT0.value.length) return []
+  // 多个一级分类时取二级分类并集（去重按计数降序）
+  // 货币型的 t1_tt 是「货币型-普通货币」「货币型-浮动净值」，直接用真实值，无需哨兵。
+  const merged = {}
+  for (const t0 of filterT0.value) {
+    for (const x of (t1Map.value[t0] || [])) {
+      if (!merged[x.value]) merged[x.value] = { ...x }
+      else merged[x.value].cnt += x.cnt
+    }
   }
-  return t1Map.value[filterT0.value] || []
+  return Object.values(merged).sort((a, b) => b.cnt - a.cnt)
 })
 
 
@@ -1328,23 +1334,31 @@ async function loadData(reset = true, _retryCount = 0) {
 
   try {
     // 确定 t0 过滤（FOF 类型筛选用 'FOF'）
-    // 一级分类已归一化（"混合型"+"混合型基金"→"混合型"），查询时按原始 t0 数组匹配，保证计数与展示一致
+    // 一级分类多选：各归一化项的原始 t0 值合并成一个数组（组内并集）。
+    // 一级分类已归一化（"混合型"+"混合型基金"→"混合型"），查询时按原始 t0 数组匹配，保证计数与展示一致。
     let t0Filter
     if (filterFOF.value === '1') {
-      t0Filter = 'FOF'
-    } else if (filterFOF.value === '0' && !filterT0.value) {
+      t0Filter = ['FOF']
+    } else if (filterFOF.value === '0' && !filterT0.value.length) {
       t0Filter = undefined
-    } else if (filterT0.value) {
-      const raw = t0RawMap.value[filterT0.value]
-      t0Filter = raw && raw.length ? raw : filterT0.value
+    } else if (filterT0.value.length) {
+      const rawSet = new Set()
+      for (const key of filterT0.value) {
+        const raw = t0RawMap.value[key]
+        if (raw && raw.length) raw.forEach(v => rawSet.add(v))
+        else rawSet.add(key)
+      }
+      t0Filter = [...rawSet]
     } else {
       t0Filter = undefined
     }
 
     // 当前筛选条件（同时用于「列表」与「真实总数」两次请求，保证口径一致）
+    // t1 多选：数组原样下发，API 端与 t0 取交集（组间 AND）。
     const queryParams = {
       t0: t0Filter,
-      t1: filterT1.value || undefined,
+      // FOF 模式走 t0='FOF'，此时忽略二级分类勾选，避免默认偏股交集为空
+      t1: filterFOF.value === '1' ? undefined : (filterT1.value.length ? [...filterT1.value] : undefined),
       search: buildSearchText(),
       shareClasses: filterSC.value.length ? filterSC.value : undefined,
       holdingPeriods: filterHolding.value.length ? filterHolding.value : undefined,
@@ -1440,16 +1454,32 @@ async function refreshData() {
   }
 }
 
-// ========== 交互 ==========
-function setT0(val) {
-  filterT0.value = val
-  filterT1.value = ''
+// ========== 交互（分类多选勾选框） ==========
+function toggleT0(val) {
+  const arr = filterT0.value
+  filterT0.value = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  // 一级变化后，剔除二级里已不属于当前一级并集的勾选项，避免组间交集出现空结果
+  const valid = new Set(t1List.value.map(x => x.value))
+  filterT1.value = filterT1.value.filter(v => valid.has(v))
   clearMoreFilters()
   loadData(true)
 }
 
-function setT1(val) {
-  filterT1.value = val
+function clearT0() {
+  filterT0.value = []
+  filterT1.value = []
+  clearMoreFilters()
+  loadData(true)
+}
+
+function toggleT1(val) {
+  const arr = filterT1.value
+  filterT1.value = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  loadData(true)
+}
+
+function clearT1() {
+  filterT1.value = []
   loadData(true)
 }
 
@@ -1494,7 +1524,7 @@ function openMoreFilter() {
   moreFilterSnapshot = {
     sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value, anom: filterAnomaly.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
-    smin: filterScaleMin.value, smax: filterScaleMax.value, t0: filterT0.value, t1: filterT1.value,
+    smin: filterScaleMin.value, smax: filterScaleMax.value, t0: [...filterT0.value], t1: [...filterT1.value],
     sp: [...scalePicks.value], scu: scaleCustom.value,
     psm: filterStockMin.value, psx: filterStockMax.value,
     pbm: filterBondMin.value, pbx: filterBondMax.value,
@@ -1520,8 +1550,8 @@ function cancelMoreFilter() {
     filterSG.value = moreFilterSnapshot.sg
     filterScaleMin.value = moreFilterSnapshot.smin
     filterScaleMax.value = moreFilterSnapshot.smax
-    filterT0.value = moreFilterSnapshot.t0
-    filterT1.value = moreFilterSnapshot.t1
+    filterT0.value = Array.isArray(moreFilterSnapshot.t0) ? [...moreFilterSnapshot.t0] : []
+    filterT1.value = Array.isArray(moreFilterSnapshot.t1) ? [...moreFilterSnapshot.t1] : []
     scalePicks.value = [...moreFilterSnapshot.sp]
     scaleCustom.value = moreFilterSnapshot.scu
     filterStockMin.value = moreFilterSnapshot.psm
@@ -1568,7 +1598,7 @@ function mToggleFlag(type, val) {
   if (!r) return
   const next = r.value === val ? '' : val
   r.value = next
-  if (type === 'FOF' && next === '1') { filterT0.value = ''; filterT1.value = '' }
+  if (type === 'FOF' && next === '1') { filterT0.value = []; filterT1.value = [] }
 }
 
 function pickScalePreset(key) {
@@ -1907,6 +1937,18 @@ onUnmounted(() => {
   margin-left: 4px; font-variant-numeric: tabular-nums;
 }
 .filter-chip.active .chip-cnt { color: #1d70b8; }
+/* 分类多选勾选框：gov.uk 风格方角，无 emoji，选中为蓝底白勾 */
+.check-chip { display: inline-flex; align-items: center; gap: 6px; }
+.check-box {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border: 2px solid #505a5f; background: #fff;
+  flex: 0 0 auto; box-sizing: border-box;
+}
+.check-box.checked { background: #1d70b8; border-color: #1d70b8; }
+.check-box.checked::after {
+  content: ''; width: 4px; height: 8px; border: solid #fff;
+  border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px);
+}
 .more-chip { position: relative; }
 .source-dropdown {
   position: absolute; top: 100%; left: 0; z-index: 100;
