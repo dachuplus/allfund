@@ -258,6 +258,12 @@
               <td><span class="version-history">历史版本（上季规模、规模增长表头支持点击排序）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>5995bb52</code></td>
+              <td><span class="version-history">历史版本（二级分类按一级分类分组展示，层级更清晰）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
