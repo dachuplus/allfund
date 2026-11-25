@@ -66,11 +66,11 @@
       <div v-for="t0 in t0List" :key="'t1grp-' + t0.value" class="filter-row t1-group-row" v-show="(t1Map[t0.value] || []).length > 0">
         <span class="filter-label t1-group-label">{{ t0.value }}</span>
         <div class="filter-chips">
-          <div class="filter-chip check-chip" :class="{ active: !hasT1InGroup(t0.value) }" @click="clearT1Group(t0.value)">
-            <span class="check-box" :class="{ checked: !hasT1InGroup(t0.value) }"></span>全部
+          <div class="filter-chip check-chip" :class="{ active: !!t1All[t0.value] }" @click="toggleT1All(t0.value)">
+            <span class="check-box" :class="{ checked: !!t1All[t0.value] }"></span>全部
           </div>
-          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT1.includes(item.value) }" @click="toggleT1(item.value, t0.value)">
-            <span class="check-box" :class="{ checked: filterT1.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: (t1ByGroup[t0.value] || []).includes(item.value) }" @click="toggleT1(item.value, t0.value)">
+            <span class="check-box" :class="{ checked: (t1ByGroup[t0.value] || []).includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
@@ -967,9 +967,14 @@ const summaryDate = computed(() => {
 
 // 分类筛选（多选勾选框）：组内并集、一级与二级之间交集。
 // 用户 2026-11-25 指定默认：一级只勾「混合型」，二级只勾「混合型-偏股」（即偏股混合基金）。
-// 一级「全部」= 空数组（不过滤）；二级「全部」= 空数组（在当前一级下不过滤）。
+// 一级「全部」= 空数组（不过滤）。
+// 二级按一级分组独立存储（同名二级如「混合型-偏股」在多组都出现，必须按组区分）：
+//   t1ByGroup[t0] = 该组勾选的二级数组
+//   t1All[t0] = true 表示该组勾了「全部」（= 该一级下所有二级，t1 传空）
+//   两者都没勾 = 该组未选（用户允许结果为空）
 const filterT0 = ref(['混合型'])
-const filterT1 = ref(['混合型-偏股'])
+const t1ByGroup = ref({ '混合型': ['混合型-偏股'] })
+const t1All = ref({})
 
 // 更多筛选
 const showMoreFilter = ref(false)
@@ -1338,12 +1343,17 @@ async function loadData(reset = true, _retryCount = 0) {
       for (const key of filterT0.value) {
         const raw = t0RawMap.value[key]
         const t0Arr = raw && raw.length ? [...raw] : [key]
-        // 只取属于该一级名下的二级勾选项（t1Map[key]）
-        const owned = new Set((t1Map.value[key] || []).map(x => x.value))
-        const t1Arr = filterT1.value.filter(v => owned.has(v))
-        categoryGroups.push({ t0: t0Arr, t1: t1Arr })
+        if (t1All.value[key]) {
+          // 该一级勾了「全部」：只按一级过滤，含其下所有二级
+          categoryGroups.push({ t0: t0Arr, t1: [] })
+        } else if ((t1ByGroup.value[key] || []).length) {
+          // 该一级勾了具体二级：组内 AND
+          categoryGroups.push({ t0: t0Arr, t1: [...t1ByGroup.value[key]] })
+        } else {
+          // 一级勾了但二级「全部」和具体二级都没勾 → 该组不匹配任何基金（结果可为空）
+          categoryGroups.push({ t0: ['__NONE__'], t1: [] })
+        }
       }
-      if (!categoryGroups.length) categoryGroups = undefined
     }
     // filterT0 为空（一级「全部」）且非 FOF 模式：categoryGroups = undefined，不过滤分类
 
@@ -1448,45 +1458,51 @@ async function refreshData() {
 // ========== 交互（分类多选勾选框） ==========
 function toggleT0(val) {
   const arr = filterT0.value
-  filterT0.value = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
-  // 二级分类已全部铺开、独立于一级勾选，这里不再剔除二级勾选项
+  const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  filterT0.value = next
+  // 取消一级勾选时，清空该组二级与「全部」，避免留下"二级勾了但一级没勾"的不一致状态
+  if (!next.includes(val)) {
+    const m = { ...t1ByGroup.value }; delete m[val]; t1ByGroup.value = m
+    const a = { ...t1All.value }; delete a[val]; t1All.value = a
+  }
   clearMoreFilters()
   loadData(true)
 }
 
 function clearT0() {
   filterT0.value = []
-  filterT1.value = []
+  t1ByGroup.value = {}
+  t1All.value = {}
   clearMoreFilters()
   loadData(true)
 }
 
+// 勾选某二级：按一级分组独立记录；勾选时自动勾上其一级，并取消该组「全部」
 function toggleT1(val, t0Key) {
-  const arr = filterT1.value
+  const arr = t1ByGroup.value[t0Key] || []
   const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
-  filterT1.value = next
-  // 二级全部铺开后，勾选某二级时若其所属一级未勾选，自动补勾该一级，
-  // 否则 t0/t1 组间交集会把这个二级过滤掉（结果为空）。取消勾选不动一级。
-  if (next.includes(val) && t0Key && !filterT0.value.includes(t0Key)) {
-    filterT0.value = [...filterT0.value, t0Key]
+  t1ByGroup.value = { ...t1ByGroup.value, [t0Key]: next }
+  if (next.includes(val)) {
+    if (t0Key && !filterT0.value.includes(t0Key)) filterT0.value = [...filterT0.value, t0Key]
+    const a = { ...t1All.value }; delete a[t0Key]; t1All.value = a  // 与「全部」互斥
   }
   loadData(true)
 }
 
-function clearT1() {
-  filterT1.value = []
-  loadData(true)
-}
-
-// 分组「全部」：该一级下是否已有二级勾选 / 清空该一级下的二级勾选
-function hasT1InGroup(t0) {
-  const values = new Set((t1Map.value[t0] || []).map(x => x.value))
-  return filterT1.value.some(v => values.has(v))
-}
-
-function clearT1Group(t0) {
-  const values = new Set((t1Map.value[t0] || []).map(x => x.value))
-  filterT1.value = filterT1.value.filter(v => !values.has(v))
+// 勾选该一级的「全部」：t1All[t0]=true，清空该组具体二级，并自动勾上一级
+function toggleT1All(t0) {
+  const on = !t1All.value[t0]
+  const a = { ...t1All.value }
+  const m = { ...t1ByGroup.value }
+  if (on) {
+    a[t0] = true
+    delete m[t0]            // 「全部」与具体二级互斥
+    if (t0 && !filterT0.value.includes(t0)) filterT0.value = [...filterT0.value, t0]
+  } else {
+    delete a[t0]
+  }
+  t1All.value = a
+  t1ByGroup.value = m
   loadData(true)
 }
 
@@ -1531,7 +1547,8 @@ function openMoreFilter() {
   moreFilterSnapshot = {
     sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value, anom: filterAnomaly.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
-    smin: filterScaleMin.value, smax: filterScaleMax.value, t0: [...filterT0.value], t1: [...filterT1.value],
+    smin: filterScaleMin.value, smax: filterScaleMax.value,
+    t0: [...filterT0.value], t1ByGroup: JSON.parse(JSON.stringify(t1ByGroup.value)), t1All: JSON.parse(JSON.stringify(t1All.value)),
     sp: [...scalePicks.value], scu: scaleCustom.value,
     psm: filterStockMin.value, psx: filterStockMax.value,
     pbm: filterBondMin.value, pbx: filterBondMax.value,
@@ -1558,7 +1575,8 @@ function cancelMoreFilter() {
     filterScaleMin.value = moreFilterSnapshot.smin
     filterScaleMax.value = moreFilterSnapshot.smax
     filterT0.value = Array.isArray(moreFilterSnapshot.t0) ? [...moreFilterSnapshot.t0] : []
-    filterT1.value = Array.isArray(moreFilterSnapshot.t1) ? [...moreFilterSnapshot.t1] : []
+    t1ByGroup.value = moreFilterSnapshot.t1ByGroup ? JSON.parse(JSON.stringify(moreFilterSnapshot.t1ByGroup)) : {}
+    t1All.value = moreFilterSnapshot.t1All ? JSON.parse(JSON.stringify(moreFilterSnapshot.t1All)) : {}
     scalePicks.value = [...moreFilterSnapshot.sp]
     scaleCustom.value = moreFilterSnapshot.scu
     filterStockMin.value = moreFilterSnapshot.psm
@@ -1605,7 +1623,7 @@ function mToggleFlag(type, val) {
   if (!r) return
   const next = r.value === val ? '' : val
   r.value = next
-  if (type === 'FOF' && next === '1') { filterT0.value = []; filterT1.value = [] }
+  if (type === 'FOF' && next === '1') { filterT0.value = []; t1ByGroup.value = {}; t1All.value = {} }
 }
 
 function pickScalePreset(key) {
