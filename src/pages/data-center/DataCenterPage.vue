@@ -246,6 +246,12 @@
               <td><span class="version-history">历史版本（基金评分冻结列背景跟随斑马纹，左侧四列与右侧底色一致）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>f477675e</code></td>
+              <td><span class="version-history">历史版本（一级/二级分类多选勾选框，默认偏股混合，组内并集组间交集）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
