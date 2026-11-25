@@ -276,6 +276,12 @@
               <td><span class="version-history">历史版本（分类筛选按一级分组：组内AND组间OR，债券型勾全部含所有二级）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>35044578</code></td>
+              <td><span class="version-history">历史版本（PCF历史数据改同源代理优先，修复跨日对比不显示）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
