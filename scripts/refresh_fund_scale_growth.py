@@ -455,12 +455,23 @@ def validate_snapshot():
     smap = {r['c']: r for r in samples}
     a = smap.get('018080.OF')
     m = smap.get('202301.OF')
-    need(a is not None and abs(a['fund_scale'] - 16.7886) < 0.01,
-         '非货币样本 018080.OF 当季规模与 pingzhongdata 合并口径不一致')
-    need(a is not None and abs(a['fund_scale_prev'] - 21.0023) < 0.01,
-         '非货币样本 018080.OF 上季规模不一致')
-    need(m is not None and abs(m['fund_scale'] - 44.98) < 0.05,
-         '货币样本 202301.OF 当季合并规模不一致')
+
+    def growth_matches(row):
+        if not row:
+            return False
+        cur, prev, growth = row['fund_scale'], row['fund_scale_prev'], row['fund_scale_growth']
+        if cur is None or prev is None or prev <= 0 or growth is None:
+            return False
+        return abs(((cur - prev) / prev * 100) - float(growth)) < 0.02
+
+    # 不再写死季度数字：上季度换数后会误拦。改查口径是否合理。
+    # 018080.OF = 非货币主体合并口径；202301.OF = 南方现金增利货币 A/B/C/D/E/F 六份额合并。
+    need(a is not None and 10 <= a['fund_scale'] <= 30 and 10 <= a['fund_scale_prev'] <= 30,
+         '非货币样本 018080.OF 规模落在主体合并口径合理区间外')
+    need(m is not None and m['fund_scale'] >= 100 and m['fund_scale_prev'] >= 100,
+         '货币样本 202301.OF 不是六份额合并口径（单 A 份额约 45 亿）')
+    need(growth_matches(a) and growth_matches(m),
+         '样本规模增长率与当季/上季规模不一致')
     print('  ✓ 中间表校验全部通过', flush=True)
     return st
 
