@@ -5,6 +5,11 @@ on:
     # 北京时间每天 23:30（UTC 15:30），避开 21:30 评分 / 22:30 配置季度流水线
     - cron: '30 15 * * *'
   workflow_dispatch:
+    inputs:
+      skip_fetch:
+        description: '跳过抓取，仅清洗/校验并 promote 已有 staging'
+        type: boolean
+        default: false
 
 jobs:
   refresh:
@@ -31,6 +36,7 @@ jobs:
           echo "SUPABASE_MGMT_TOKEN 已配置: ${#SUPABASE_MGMT_TOKEN} 字符"
 
       - name: Step 1 - Fetch into staging table
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_fetch }}
         run: |
           python3 scripts/refresh_fund_scale_growth.py \
             --to-staging \

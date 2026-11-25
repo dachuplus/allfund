@@ -50,6 +50,8 @@ MGMT_API = f'https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query'
 SNAPSHOT_TABLE = 'public.fund_scale_snapshot'
 
 NEW_COLUMNS = ('fund_scale_prev', 'fund_scale_growth')
+# 上季规模低于 0.01 亿（100 万元）视为无可比基数：增长率会失真，统一置 NULL，前端显示 --
+MIN_PREV_SCALE = 0.01
 
 UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -290,7 +292,9 @@ def money_latest_prev(js_list):
 
 
 def growth_pct(cur, prev):
-    if cur is None or prev is None or prev == 0:
+    if cur is None or prev is None or prev <= 0:
+        return None
+    if prev < MIN_PREV_SCALE:
         return None
     return round((cur - prev) / prev * 100, 2)
 
@@ -337,9 +341,13 @@ def process_group(item, delay):
         else:
             rep = pick_non_money_rep(codes, g['found'])
             cur, prev = non_money_latest_prev(fetch_js(rep, delay))
+        growth = growth_pct(cur, prev)
+        # 极小上季基数没有可比意义，连上季规模一起置空，避免前端显示 0.0001 亿这类脏值
+        if prev is not None and prev < MIN_PREV_SCALE:
+            prev = None
         return {
             'grp': grp, 'codes': codes, 'money': g['money'],
-            'cur': cur, 'prev': prev, 'growth': growth_pct(cur, prev), 'error': None,
+            'cur': cur, 'prev': prev, 'growth': growth, 'error': None,
         }
     except Exception as exc:
         return {'grp': grp, 'codes': codes, 'error': str(exc), 'cur': None, 'prev': None, 'growth': None}
@@ -391,6 +399,18 @@ def write_snapshot(flat):
     return total
 
 
+def sanitize_snapshot():
+    """把极小上季基数视为无可比样本：上季规模和增长率一起置 NULL。"""
+    sql = f"""
+      UPDATE {SNAPSHOT_TABLE}
+      SET fund_scale_prev = NULL, fund_scale_growth = NULL
+      WHERE fund_scale_prev IS NOT NULL
+        AND (fund_scale_prev <= 0 OR fund_scale_prev < {MIN_PREV_SCALE})
+    """
+    run_sql(sql, timeout=300)
+    print(f'  ✓ 已清洗极小上季基数（< {MIN_PREV_SCALE} 亿）', flush=True)
+
+
 def validate_snapshot():
     sql = f"""
       SELECT
@@ -404,6 +424,8 @@ def validate_snapshot():
              OR (fund_scale_prev IS NOT NULL AND fund_scale_prev < 0)
              OR (fund_scale_growth IS NOT NULL
                  AND (fund_scale_growth < -100 OR fund_scale_growth > 1000000))
+             OR (fund_scale_prev IS NOT NULL AND fund_scale_prev > 0
+                 AND fund_scale_prev < {MIN_PREV_SCALE})
              OR (fund_scale_prev = 0 AND fund_scale_growth IS NOT NULL)
         ) AS bad_rows
       FROM {SNAPSHOT_TABLE}
@@ -498,6 +520,7 @@ def cmd_fetch(args):
             flat.append((c, r['cur'], r['prev'], r['growth']))
     written = write_snapshot(flat)
     print(f'  中间表最终写入 {written} 行', flush=True)
+    sanitize_snapshot()
     save_set(PROGRESS_FILE, done | {r['grp'] for r in results})
     save_set(FAIL_FILE, set(failures))
     print('抓取阶段完成（未写生产）', flush=True)
@@ -506,12 +529,14 @@ def cmd_fetch(args):
 def cmd_promote(args):
     print('[1] 确保 schema...', flush=True)
     ensure_schema()
-    print('[2] 校验中间表...', flush=True)
+    print('[2] 清洗极小上季基数...', flush=True)
+    sanitize_snapshot()
+    print('[3] 校验中间表...', flush=True)
     validate_snapshot()
-    print('[3] 写生产表...', flush=True)
+    print('[4] 写生产表...', flush=True)
     promote_snapshot()
     if args.rebuild_view:
-        print('[4] 重建主份额物化视图...', flush=True)
+        print('[5] 重建主份额物化视图...', flush=True)
         rebuild_main_view()
     print('生产切换完成', flush=True)
 
