@@ -270,6 +270,12 @@
               <td><span class="version-history">历史版本（二级分类默认全部铺开，全部加勾选框，去掉选中粗下划线）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>d2940eb3</code></td>
+              <td><span class="version-history">历史版本（分类筛选按一级分组：组内AND组间OR，债券型勾全部含所有二级）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
