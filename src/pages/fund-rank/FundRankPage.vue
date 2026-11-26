@@ -392,7 +392,7 @@
       ref="tableBodyScrollRef"
       @scroll="onTableBodyScroll"
     >
-      <table class="fund-table">
+      <table class="fund-table" ref="fundTableRef" :style="frozenStyle">
         <thead>
           <tr>
             <th class="col-code sortable" @click="toggleColumnSort('c')">
@@ -963,13 +963,38 @@ async function fetchCategories() {
 const isMobile = ref(window.innerWidth < 641)
 const tableHeadScrollRef = ref(null)
 const tableBodyScrollRef = ref(null)
+const fundTableRef = ref(null)
 const tableScrollWidth = ref(0)
 let tableScrollSyncing = false
+
+// 固定前四列的 sticky left 偏移：必须按真实渲染宽度累加，不能硬编码。
+// table-layout:fixed + width:100% 下浏览器会按比例放大列宽，硬编码 0/80/220/298
+// 与真实宽度有偏差，横向滚动时相邻固定列之间会露出滚动内容的细缝。
+const frozenLefts = ref([0, 80, 220, 298])
+const frozenStyle = computed(() => ({
+  '--fl-code': frozenLefts.value[0] + 'px',
+  '--fl-name': frozenLefts.value[1] + 'px',
+  '--fl-manager': frozenLefts.value[2] + 'px',
+  '--fl-t1': frozenLefts.value[3] + 'px',
+}))
+function measureFrozenLefts() {
+  const table = fundTableRef.value
+  if (!table) return
+  const ths = table.querySelectorAll('thead th')
+  if (ths.length < 4) return
+  const widths = []
+  for (let i = 0; i < 4; i++) widths.push(ths[i].getBoundingClientRect().width)
+  const next = [0]
+  for (let i = 1; i < 4; i++) next.push(next[i - 1] + widths[i - 1])
+  // 差异超过 0.5px 才更新，避免无谓重渲染
+  if (next.some((v, i) => Math.abs(v - frozenLefts.value[i]) > 0.5)) frozenLefts.value = next
+}
 
 function syncTableScrollWidth() {
   nextTick(() => {
     const el = tableBodyScrollRef.value
     if (el) tableScrollWidth.value = el.scrollWidth
+    measureFrozenLefts()
   })
 }
 
@@ -2100,7 +2125,7 @@ onUnmounted(() => {
   background: #f3f2f1;
 }
 .fund-table {
-  width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap;
+  width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; white-space: nowrap;
   min-width: 860px; table-layout: fixed;
 }
 .fund-table thead { background: #f3f2f1; }
@@ -2129,19 +2154,20 @@ onUnmounted(() => {
 .col-code a { color: var(--text-primary); text-decoration: none; }
 .col-code a:hover { color: var(--link); text-decoration: underline; }
 /* 固定前四列：基金代码 / 基金简称 / 基金经理 / 二级分类（横向滚动时锁定）
-   列宽 code 80 + name 140 + manager 78 → left 依次 0 / 80px / 220px / 298px */
-.fund-table th.col-code    { position: sticky; left: 0;     z-index: 4; }
-.fund-table th.col-name    { position: sticky; left: 80px;  z-index: 4; }
-.fund-table th.col-manager { position: sticky; left: 220px; z-index: 4; }
-.fund-table th.col-t1      { position: sticky; left: 298px; z-index: 4; }
+   left 由 measureFrozenLefts() 按真实列宽动态写入 CSS 变量，禁止硬编码——
+   硬编码与真实列宽的偏差会让滚动内容从列缝漏出 */
+.fund-table th.col-code    { position: sticky; left: var(--fl-code, 0px);     z-index: 4; }
+.fund-table th.col-name    { position: sticky; left: var(--fl-name, 80px);    z-index: 4; }
+.fund-table th.col-manager { position: sticky; left: var(--fl-manager, 220px); z-index: 4; }
+.fund-table th.col-t1      { position: sticky; left: var(--fl-t1, 298px);     z-index: 4; }
 .fund-table td.col-code,
 .fund-table td.col-name,
 .fund-table td.col-manager,
 .fund-table td.col-t1 { position: sticky; z-index: 2; background: var(--bg-body); }
-.fund-table td.col-code    { left: 0; }
-.fund-table td.col-name    { left: 80px; }
-.fund-table td.col-manager { left: 220px; }
-.fund-table td.col-t1      { left: 298px; }
+.fund-table td.col-code    { left: var(--fl-code, 0px); }
+.fund-table td.col-name    { left: var(--fl-name, 80px); }
+.fund-table td.col-manager { left: var(--fl-manager, 220px); }
+.fund-table td.col-t1      { left: var(--fl-t1, 298px); }
 /* 固定区与滚动区之间的分界线（gov.uk 无阴影，用 2px 边框） */
 .fund-table th.col-t1,
 .fund-table td.col-t1 { border-right: 2px solid var(--border); }
