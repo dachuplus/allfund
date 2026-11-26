@@ -69,8 +69,8 @@
           <div class="filter-chip check-chip" :class="{ active: selectAllT0 || !!t1All[t0.value] }" @click="toggleT1All(t0.value)">
             <span class="check-box" :class="{ checked: selectAllT0 || !!t1All[t0.value] }"></span>全部
           </div>
-          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: selectAllT0 || (t1ByGroup[t0.value] || []).includes(item.value) }" @click="toggleT1(item.value, t0.value)">
-            <span class="check-box" :class="{ checked: selectAllT0 || (t1ByGroup[t0.value] || []).includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: isT1Checked(item.value, t0.value) }" @click="toggleT1(item.value, t0.value)">
+            <span class="check-box" :class="{ checked: isT1Checked(item.value, t0.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
@@ -1573,10 +1573,16 @@ function clearT0() {
   loadData(true)
 }
 
+// 某二级是否勾选：一级全选 / 该组「全部」/ 该组具体勾选，三者任一成立即勾选
+function isT1Checked(val, t0Key) {
+  return selectAllT0.value || !!t1All.value[t0Key] || (t1ByGroup.value[t0Key] || []).includes(val)
+}
+
 // 勾选某二级：按一级分组独立记录；勾选时自动勾上其一级，并取消该组「全部」
 function toggleT1(val, t0Key) {
+  const wasChecked = isT1Checked(val, t0Key)
   if (selectAllT0.value) {
-    // 全选状态下点某二级：退出全选，只保留该二级（只选单一分类）
+    // 一级全选态下点某二级：退出全选，只保留该二级
     selectAllT0.value = false
     filterT0.value = t0Key ? [t0Key] : []
     t1ByGroup.value = t0Key ? { [t0Key]: [val] } : {}
@@ -1584,12 +1590,20 @@ function toggleT1(val, t0Key) {
     loadData(true)
     return
   }
+  if (t1All.value[t0Key]) {
+    // 该组「全部」勾选态下点某二级：全部展开为具体二级，并去掉被点的这一项
+    // （视觉上所有二级都勾着，点一个 = 取消它，保留其余）
+    const all = (t1Map.value[t0Key] || []).map(x => x.value).filter(v => v !== val)
+    const a = { ...t1All.value }; delete a[t0Key]; t1All.value = a
+    t1ByGroup.value = { ...t1ByGroup.value, [t0Key]: all }
+    loadData(true)
+    return
+  }
   const arr = t1ByGroup.value[t0Key] || []
-  const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+  const next = wasChecked ? arr.filter(v => v !== val) : [...arr, val]
   t1ByGroup.value = { ...t1ByGroup.value, [t0Key]: next }
-  if (next.includes(val)) {
+  if (!wasChecked) {
     if (t0Key && !filterT0.value.includes(t0Key)) filterT0.value = [...filterT0.value, t0Key]
-    const a = { ...t1All.value }; delete a[t0Key]; t1All.value = a  // 与「全部」互斥
   }
   loadData(true)
 }
