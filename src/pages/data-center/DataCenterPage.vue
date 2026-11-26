@@ -306,6 +306,12 @@
               <td><span class="version-history">历史版本（一级「全部」勾选改为真全选，所有一级/二级框同步打钩；取消则空结果）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-26</td>
+              <td><code>b2a1078f</code></td>
+              <td><span class="version-history">历史版本（修复多标签页登录态丢失：关闭自动刷新、storage 手写 session 同步、修登录时间 key 重名）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
