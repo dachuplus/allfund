@@ -861,10 +861,47 @@ const riskPeriods = [
 
 // 分类数据源：动态取自 fund_scores 的 t0（一级分类）与 t1_tt（二级分类）
 // 通过 Supabase RPC get_fund_categories() 聚合，保证筛选项与数据完全一致
+//
+// 静态骨架（2026-11-25）：RPC 慢/失败时页面首屏只剩「全部」，需等很久才看到分类。
+// 这里内置一份生产分类快照，首屏同步展示全部分类；RPC 返回后仅用实时计数覆盖。
+// 结构：[归一化一级, 计数, 原始 t0 列表]，原始 t0 用于「混合型/混合型基金」合并过滤。
+const FALLBACK_T0 = [
+  ['混合型', 9802, ['混合型', '混合型基金']],
+  ['债券型', 7448, ['债券型', '债券型基金']],
+  ['指数型', 5462, ['指数型']],
+  ['股票型', 2296, ['股票型']],
+  ['FOF', 1413, ['FOF']],
+  ['货币型', 977, ['货币型']],
+  ['QDII', 745, ['QDII']],
+  ['新发基金', 227, ['']],
+  ['Reits', 103, ['Reits']],
+  ['其他', 20, ['其他']],
+  ['商品', 2, ['商品']],
+]
+// 二级分类按归一化一级分组，[t1_tt, 计数]，计数为合并后的快照值
+const FALLBACK_T1 = {
+  '混合型': [['混合型-偏股', 5828], ['混合型-灵活', 2387], ['混合型-偏债', 1475], ['混合型-平衡', 74], ['混合型-绝对收益', 38]],
+  '债券型': [['债券型-长债', 2638], ['债券型-混合二级', 1987], ['债券型-中短债', 1340], ['债券型-混合一级', 962], ['债券型-利率债', 323], ['债券型-信用债', 198]],
+  '指数型': [['指数型-股票', 4703], ['指数型-固收', 677], ['指数型-其他', 70], ['混合型-灵活', 7], ['混合型-偏股', 5]],
+  '股票型': [['股票型', 1148], ['指数型-股票', 1148]],
+  'FOF': [['FOF-稳健型', 801], ['FOF-均衡型', 382], ['FOF-进取型', 230]],
+  '货币型': [['货币型-普通货币', 969], ['货币型-浮动净值', 8]],
+  'QDII': [['指数型-海外股票', 367], ['QDII-混合偏股', 131], ['QDII-普通股票', 90], ['QDII-纯债', 57], ['QDII-混合灵活', 29], ['QDII-混合债', 26], ['QDII-商品', 23], ['QDII-FOF', 9], ['QDII-混合平衡', 8], ['QDII-REITs', 5]],
+  '新发基金': [['指数型-股票', 14], ['QDII-混合偏股', 2], ['混合型-偏股', 2]],
+  'Reits': [['Reits', 103]],
+  '其他': [['指数型-股票', 18]],
+  '商品': [['商品', 2]],
+}
+const fallbackT0List = () => FALLBACK_T0.map(([value, cnt]) => ({ value, label: value, cnt }))
+const fallbackT0RawMap = () => Object.fromEntries(FALLBACK_T0.map(([value, , raw]) => [value, [...raw]]))
+const fallbackT1Map = () => Object.fromEntries(
+  Object.entries(FALLBACK_T1).map(([k, list]) => [k, list.map(([value, cnt]) => ({ value, label: value, cnt }))])
+)
+
 const catLoading = ref(false)
-const t0List = ref([])   // [{ value, label, cnt }]
-const t1Map = ref({})    // { [normalizedT0]: [{ value, label, cnt }] }
-const t0RawMap = ref({}) // { [normalizedT0]: [rawT0Values] }，用于归一化后按多个原始 t0 过滤
+const t0List = ref(fallbackT0List())   // [{ value, label, cnt }]
+const t1Map = ref(fallbackT1Map())     // { [normalizedT0]: [{ value, label, cnt }] }
+const t0RawMap = ref(fallbackT0RawMap()) // { [normalizedT0]: [rawT0Values] }，用于归一化后按多个原始 t0 过滤
 
 // 一级分类归一化：数据库里同时存在「混合型」和「混合型基金」，应合并展示为「混合型」
 // 空 t0（新发基金分类尚未回填）归一化为「新发基金」，否则筛选项只剩一个孤零零的数字计数
@@ -878,6 +915,8 @@ async function fetchCategories() {
     const data = await fetchFundCategories()
     const t0Arr = (data && data.t0) || []
     const t1Arr = (data && data.t1) || []
+    // RPC 返回空（DB 慢/异常）时保留静态骨架，避免首屏只剩「全部」
+    if (!t0Arr.length && !t1Arr.length) return
 
     // 一级分类归一化并合并计数（如 "混合型" + "混合型基金" → "混合型"）
     const t0Merged = {}
@@ -1954,7 +1993,7 @@ onUnmounted(() => {
 }
 .filter-chip:hover { text-decoration-color: var(--link); }
 .filter-chip.active {
-  color: #1d70b8; font-weight: 700; text-decoration: none;
+  color: #1d70b8; font-weight: 400; text-decoration: none;
 }
 .chip-cnt {
   font-size: 12px; font-weight: 400; color: var(--text-secondary);
@@ -1965,13 +2004,13 @@ onUnmounted(() => {
 .check-chip { display: inline-flex; align-items: center; gap: 6px; }
 .check-box {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border: 2px solid #505a5f; background: #fff;
+  width: 16px; height: 16px; border: 1px solid #505a5f; background: #fff;
   flex: 0 0 auto; box-sizing: border-box;
 }
 .check-box.checked { background: #1d70b8; border-color: #1d70b8; }
 .check-box.checked::after {
   content: ''; width: 4px; height: 8px; border: solid #fff;
-  border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px);
+  border-width: 0 1px 1px 0; transform: rotate(45deg) translateY(-1px);
 }
 /* 二级分类按一级分组：组名加蓝色左边框标识层级，行缩进对齐 */
 .t1-group-row { padding-top: 2px; padding-bottom: 2px; }
