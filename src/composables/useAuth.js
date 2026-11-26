@@ -20,7 +20,9 @@ import { SUB_FEATURE_PARENTS } from './useFeatureFlags'
 // 会话最长有效期：1 周（用户要求从默认 30 天缩短）
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const LS_LOGIN_AT = 'allfund_auth_login_at'
-const LS_LOGIN_AT_LEGACY = 'allfund_auth_login_at'
+// 旧版曾把 LEGACY 写成与新 key 同名，导致 markLogin() 写完立刻把同一个 key 删掉，
+// 7 天会话计时永远读不到 → 这里改成真正不同的历史 key。
+const LS_LOGIN_AT_LEGACY = 'allfund_auth_login_at_legacy'
 
 // 数据中心（数据下载 / 用户权限管理）唯一授权管理员账户
 export const ADMIN_EMAIL = '57502460@qq.com'
@@ -129,16 +131,21 @@ export function useAuth() {
         const raw = supabase.auth.storage.getItem(supabase.auth.storageKey)
         if (raw) storedSession = JSON.parse(raw)
       } catch (e) { /* ignore */ }
-      _restoring = true
-      const { data } = await supabase.auth.getSession()
-      _restoring = false
-      let u = data?.session?.user || null
-      // 兜底恢复：getSession 未返回会话、但本地存储确有有效会话（刷新失败被清空），
-      // 直接以存储会话恢复登录态，绕过刷新网络。
-      if (!u && storedSession && storedSession.user && storedSession.access_token) {
-        console.info('[auth] getSession 未返回会话，从本地存储恢复登录态（规避刷新链路失败）')
+      let u = null
+      // 优先直接用 storage 中的手写 session 恢复（登录时由 LoginDialog 写入，
+      // 微信登录由 setSession 写入），不依赖 getSession —— 后者在 token 接近过期时
+      // 会触发刷新，多标签页并发刷新同一 refresh_token 会互相清空会话。
+      if (storedSession && storedSession.user && storedSession.access_token) {
         u = storedSession.user
-        try { supabase.auth.storage.setItem(supabase.auth.storageKey, JSON.stringify(storedSession)) } catch (e) {}
+      } else {
+        // storage 无会话时才走 getSession（兼容 supabase-js 自己建立的会话）
+        _restoring = true
+        try {
+          const { data } = await supabase.auth.getSession()
+          u = data?.session?.user || null
+        } finally {
+          _restoring = false
+        }
       }
       user.value = u
       if (u) {
@@ -190,16 +197,22 @@ export function useAuth() {
       }
     })
 
-    // 跨标签页登录态同步：每个浏览器标签页是独立的 JS 模块实例，各自持有
-    // 独立的 user ref。标准的 onAuthStateChange 只在「触发变更的同一标签页」内
-    // 回调，因此 A 标签页登录后 B 标签页读不到。这里监听 storage 事件（其他
-    // 标签页改动了 LS_LOGIN_AT 时本标签页会收到），重新拉取 session 并同步
-    // 登录态，实现「多个网页登录状态统一」。
+    // 跨标签页登录态同步：每个标签页是独立 JS 模块实例、各自持有 user ref，
+    // onAuthStateChange 只在触发变更的同一个标签页内回调，A 登录后 B 读不到。
+    // 这里监听 storage 事件（其他标签页改动 session / 登录时间时本标签页会收到），
+    // 直接从 storage 读手写 session 恢复登录态。
+    // ⚠️ 不能再调用 getSession()：它在 token 接近过期时会触发刷新，多标签页并发刷新
+    //   同一个 refresh_token 会互相清空会话（新标签页掉线且无法再登录的根因）。
+    const SESSION_KEY = supabase.auth.storageKey
     window.addEventListener('storage', async (e) => {
-      if (e.key !== LS_LOGIN_AT) return
+      if (e.key !== LS_LOGIN_AT && e.key !== SESSION_KEY) return
       try {
-        const { data } = await supabase.auth.getSession()
-        const u = data?.session?.user || null
+        let stored = null
+        try {
+          const raw = supabase.auth.storage.getItem(SESSION_KEY)
+          if (raw) stored = JSON.parse(raw)
+        } catch (_) { /* ignore */ }
+        const u = (stored && stored.user) || null
         user.value = u
         if (u) {
           if (!checkSessionExpiry()) {

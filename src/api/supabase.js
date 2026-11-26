@@ -263,6 +263,10 @@ function timeoutFetch(input, init = {}) {
 export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { fetch: timeoutFetch },
+      // 会话由 LoginDialog 手写进 storage（edge function 直接签发 user），不走 supabase-js 刷新。
+      // 若开启 autoRefreshToken，多个标签页会并发刷新同一个 refresh_token：一次成功一次失败，
+      // 失败方 _removeSession() 清空共享 localStorage → 表现为「新开标签页掉线且无法再登录」。
+      auth: { autoRefreshToken: false },
     })
   : null
 
