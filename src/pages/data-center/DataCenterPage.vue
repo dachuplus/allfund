@@ -288,6 +288,12 @@
               <td><span class="version-history">历史版本（二级按一级独立勾选，全部显式可取消，勾二级自动勾一级）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-25</td>
+              <td><code>f139eb80</code></td>
+              <td><span class="version-history">历史版本（分类静态骨架首屏强制展示，勾选框与选中态去掉加粗）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
