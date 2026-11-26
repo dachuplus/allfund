@@ -53,11 +53,11 @@
       <div class="filter-row">
         <span class="filter-label">一级分类</span>
         <div class="filter-chips">
-          <div class="filter-chip check-chip" :class="{ active: filterT0.length === 0 }" @click="clearT0">
-            <span class="check-box" :class="{ checked: filterT0.length === 0 }"></span>全部
+          <div class="filter-chip check-chip" :class="{ active: selectAllT0 }" @click="clearT0">
+            <span class="check-box" :class="{ checked: selectAllT0 }"></span>全部
           </div>
-          <div v-for="item in t0List" :key="item.value" class="filter-chip check-chip" :class="{ active: filterT0.includes(item.value) }" @click="toggleT0(item.value)">
-            <span class="check-box" :class="{ checked: filterT0.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div v-for="item in t0List" :key="item.value" class="filter-chip check-chip" :class="{ active: selectAllT0 || filterT0.includes(item.value) }" @click="toggleT0(item.value)">
+            <span class="check-box" :class="{ checked: selectAllT0 || filterT0.includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
@@ -66,11 +66,11 @@
       <div v-for="t0 in t0List" :key="'t1grp-' + t0.value" class="filter-row t1-group-row" v-show="(t1Map[t0.value] || []).length > 0">
         <span class="filter-label t1-group-label">{{ t0.value }}</span>
         <div class="filter-chips">
-          <div class="filter-chip check-chip" :class="{ active: !!t1All[t0.value] }" @click="toggleT1All(t0.value)">
-            <span class="check-box" :class="{ checked: !!t1All[t0.value] }"></span>全部
+          <div class="filter-chip check-chip" :class="{ active: selectAllT0 || !!t1All[t0.value] }" @click="toggleT1All(t0.value)">
+            <span class="check-box" :class="{ checked: selectAllT0 || !!t1All[t0.value] }"></span>全部
           </div>
-          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: (t1ByGroup[t0.value] || []).includes(item.value) }" @click="toggleT1(item.value, t0.value)">
-            <span class="check-box" :class="{ checked: (t1ByGroup[t0.value] || []).includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
+          <div v-for="item in (t1Map[t0.value] || [])" :key="item.value" class="filter-chip check-chip" :class="{ active: selectAllT0 || (t1ByGroup[t0.value] || []).includes(item.value) }" @click="toggleT1(item.value, t0.value)">
+            <span class="check-box" :class="{ checked: selectAllT0 || (t1ByGroup[t0.value] || []).includes(item.value) }"></span>{{ item.label }}<span class="chip-cnt" v-if="item.cnt">{{ item.cnt }}</span>
           </div>
         </div>
       </div>
@@ -1036,9 +1036,23 @@ const summaryDate = computed(() => {
 //   t1ByGroup[t0] = 该组勾选的二级数组
 //   t1All[t0] = true 表示该组勾了「全部」（= 该一级下所有二级，t1 传空）
 //   两者都没勾 = 该组未选（用户允许结果为空）
+// 一级「全部」勾选 = 真·全选：所有一级/二级框都显示为勾选，筛选不过滤分类。
+// 单独用布尔表示，避免用 filterT0=[] 兼表「全部」和「一个都没勾」两种相反语义。
+const selectAllT0 = ref(false)
 const filterT0 = ref(['混合型'])
 const t1ByGroup = ref({ '混合型': ['混合型-偏股'] })
 const t1All = ref({})
+
+// 从全选状态退出：展开为「所有一级 + 每组全部」，供后续单项取消操作使用
+function leaveSelectAll() {
+  if (!selectAllT0.value) return
+  selectAllT0.value = false
+  filterT0.value = t0List.value.map(x => x.value)
+  const a = {}
+  for (const key of filterT0.value) a[key] = true
+  t1All.value = a
+  t1ByGroup.value = {}
+}
 
 // 更多筛选
 const showMoreFilter = ref(false)
@@ -1402,6 +1416,12 @@ async function loadData(reset = true, _retryCount = 0) {
     if (filterFOF.value === '1') {
       // FOF 模式走单独一组，忽略二级勾选
       categoryGroups = [{ t0: ['FOF'], t1: [] }]
+    } else if (selectAllT0.value) {
+      // 一级「全部」勾选：不过滤分类，返回全部基金
+      categoryGroups = undefined
+    } else if (!selectAllT0.value && !filterT0.value.length) {
+      // 一级「全部」被取消勾选：一个一级都没选 → 空结果（不返回全部基金）
+      categoryGroups = [{ t0: ['__NONE__'], t1: [] }]
     } else if (filterT0.value.length) {
       categoryGroups = []
       for (const key of filterT0.value) {
@@ -1419,7 +1439,7 @@ async function loadData(reset = true, _retryCount = 0) {
         }
       }
     }
-    // filterT0 为空（一级「全部」）且非 FOF 模式：categoryGroups = undefined，不过滤分类
+    // filterT0 为空且非全选/非 FOF：categoryGroups = undefined，不过滤分类
 
     // 当前筛选条件（同时用于「列表」与「真实总数」两次请求，保证口径一致）
     const queryParams = {
@@ -1521,6 +1541,16 @@ async function refreshData() {
 
 // ========== 交互（分类多选勾选框） ==========
 function toggleT0(val) {
+  // 全选状态下点某个一级：退出全选，只保留被点击的这一级（该组视为「全部」）
+  if (selectAllT0.value) {
+    selectAllT0.value = false
+    filterT0.value = [val]
+    t1ByGroup.value = {}
+    t1All.value = { [val]: true }
+    clearMoreFilters()
+    loadData(true)
+    return
+  }
   const arr = filterT0.value
   const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
   filterT0.value = next
@@ -1533,7 +1563,9 @@ function toggleT0(val) {
   loadData(true)
 }
 
+// 一级「全部」勾选/取消：勾选=真全选（所有框都勾、不过滤）；取消=清空到空结果
 function clearT0() {
+  selectAllT0.value = !selectAllT0.value
   filterT0.value = []
   t1ByGroup.value = {}
   t1All.value = {}
@@ -1543,6 +1575,15 @@ function clearT0() {
 
 // 勾选某二级：按一级分组独立记录；勾选时自动勾上其一级，并取消该组「全部」
 function toggleT1(val, t0Key) {
+  if (selectAllT0.value) {
+    // 全选状态下点某二级：退出全选，只保留该二级（只选单一分类）
+    selectAllT0.value = false
+    filterT0.value = t0Key ? [t0Key] : []
+    t1ByGroup.value = t0Key ? { [t0Key]: [val] } : {}
+    t1All.value = {}
+    loadData(true)
+    return
+  }
   const arr = t1ByGroup.value[t0Key] || []
   const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
   t1ByGroup.value = { ...t1ByGroup.value, [t0Key]: next }
@@ -1555,6 +1596,15 @@ function toggleT1(val, t0Key) {
 
 // 勾选该一级的「全部」：t1All[t0]=true，清空该组具体二级，并自动勾上一级
 function toggleT1All(t0) {
+  if (selectAllT0.value) {
+    // 全选状态下点某组「全部」：退出全选，只保留该一级的全部二级
+    selectAllT0.value = false
+    filterT0.value = t0 ? [t0] : []
+    t1ByGroup.value = {}
+    t1All.value = t0 ? { [t0]: true } : {}
+    loadData(true)
+    return
+  }
   const on = !t1All.value[t0]
   const a = { ...t1All.value }
   const m = { ...t1ByGroup.value }
@@ -1612,6 +1662,7 @@ function openMoreFilter() {
     sc: [...filterSC.value], holding: [...filterHolding.value], etf: filterETF.value, lof: filterLOF.value, fof: filterFOF.value, zz: filterZZ.value, anom: filterAnomaly.value,
     cn: filterCN.value, dk: filterDK.value, dl: filterDailyLimit.value, sg: filterSG.value,
     smin: filterScaleMin.value, smax: filterScaleMax.value,
+    allT0: selectAllT0.value,
     t0: [...filterT0.value], t1ByGroup: JSON.parse(JSON.stringify(t1ByGroup.value)), t1All: JSON.parse(JSON.stringify(t1All.value)),
     sp: [...scalePicks.value], scu: scaleCustom.value,
     psm: filterStockMin.value, psx: filterStockMax.value,
@@ -1638,6 +1689,7 @@ function cancelMoreFilter() {
     filterSG.value = moreFilterSnapshot.sg
     filterScaleMin.value = moreFilterSnapshot.smin
     filterScaleMax.value = moreFilterSnapshot.smax
+    selectAllT0.value = !!moreFilterSnapshot.allT0
     filterT0.value = Array.isArray(moreFilterSnapshot.t0) ? [...moreFilterSnapshot.t0] : []
     t1ByGroup.value = moreFilterSnapshot.t1ByGroup ? JSON.parse(JSON.stringify(moreFilterSnapshot.t1ByGroup)) : {}
     t1All.value = moreFilterSnapshot.t1All ? JSON.parse(JSON.stringify(moreFilterSnapshot.t1All)) : {}
@@ -1687,7 +1739,7 @@ function mToggleFlag(type, val) {
   if (!r) return
   const next = r.value === val ? '' : val
   r.value = next
-  if (type === 'FOF' && next === '1') { filterT0.value = []; t1ByGroup.value = {}; t1All.value = {} }
+  if (type === 'FOF' && next === '1') { selectAllT0.value = false; filterT0.value = []; t1ByGroup.value = {}; t1All.value = {} }
 }
 
 function pickScalePreset(key) {
