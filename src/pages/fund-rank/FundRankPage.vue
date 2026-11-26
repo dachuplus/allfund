@@ -2213,8 +2213,7 @@ onUnmounted(() => {
 /* 斑马纹：奇数行用页面浅灰底，偶数行白底（仅保留细分割线） */
 .fund-table tbody tr:nth-child(odd) { background: var(--bg-body); }
 .fund-table tbody tr:nth-child(even) { background: #ffffff; }
-/* 悬停高亮：品牌蓝略深，比斑马纹更深以便区分 */
-.fund-row:hover { background: #d4e6fb; }
+/* 悬停高亮：整行统一浅蓝，规则见下方固定列背景之后（需高于斑马纹与偶数行白底特异性） */
 
 .col-code { width: 80px; font-weight: 400; color: var(--text-primary); font-family: monospace; font-size: 12px; }
 .col-code a { color: var(--text-primary); text-decoration: none; }
@@ -2242,10 +2241,11 @@ onUnmounted(() => {
 .fund-table tbody tr:nth-child(even) td.col-name,
 .fund-table tbody tr:nth-child(even) td.col-manager,
 .fund-table tbody tr:nth-child(even) td.col-t1 { background: #ffffff; }
-.fund-row:hover td.col-code,
-.fund-row:hover td.col-name,
-.fund-row:hover td.col-manager,
-.fund-row:hover td.col-t1 { background: #d4e6fb; }
+/* 悬停整行高亮：tr 与其所有 td 一起着色。
+   特异性必须同时高于斑马纹(0,2,2) 与偶数行固定列白底(0,3,3)，
+   否则只有奇数行左四列变蓝、右侧列不变。 */
+.fund-table tbody tr.fund-row:hover,
+.fund-table tbody tr.fund-row:hover > td { background: #d4e6fb !important; }
 .col-name { width: 140px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-name a { color: var(--text-primary); text-decoration: none; }
 .col-name a:hover { color: var(--link); text-decoration: underline; }
