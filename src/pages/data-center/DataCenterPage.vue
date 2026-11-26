@@ -312,6 +312,12 @@
               <td><span class="version-history">历史版本（修复多标签页登录态丢失：关闭自动刷新、storage 手写 session 同步、修登录时间 key 重名）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-26</td>
+              <td><code>6eeed6c2</code></td>
+              <td><span class="version-history">历史版本（二级「全部」联动勾选该组所有二级；选中行整行浅蓝高亮，修复仅左四列变色）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
