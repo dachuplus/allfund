@@ -300,6 +300,12 @@
               <td><span class="version-history">历史版本（基金评分横向滚动固定列漏缝修复：动态测量列宽计算 sticky 偏移，边框独立渲染）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-26</td>
+              <td><code>6ab9cf2f</code></td>
+              <td><span class="version-history">历史版本（一级「全部」勾选改为真全选，所有一级/二级框同步打钩；取消则空结果）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
