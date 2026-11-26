@@ -294,6 +294,12 @@
               <td><span class="version-history">历史版本（分类静态骨架首屏强制展示，勾选框与选中态去掉加粗）</span></td>
             </tr>
             <tr>
+              <td>v4.0.58</td>
+              <td>2026-11-26</td>
+              <td><code>9eaa2587</code></td>
+              <td><span class="version-history">历史版本（基金评分横向滚动固定列漏缝修复：动态测量列宽计算 sticky 偏移，边框独立渲染）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>67893351</code></td>
