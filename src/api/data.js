@@ -636,7 +636,42 @@ export function fetchFundCategories() {
   return withCache('fundCategories', 86400000, fetchFundCategoriesImpl)
 }
 
+// 减负 B1（2026-11-27）：分类清单改为夜间 CI 静态导出，前端优先读静态 JSON，
+// 避免每次开页面都调用 get_fund_categories() 对 2.8 万行全表聚合
+// （PostgREST 实测 statement timeout 57014，是首屏卡住与打满 DB 的元凶之一）。
+// 数据真源：GitHub 独立分支 category-data/fund-categories.json（CI 每日聚合+校验后推送）。
+// 读取顺序：同源代理 → jsDelivr → raw → 本地 public 基线 → RPC 兜底。
+// 结构校验后才采用，任何一层脏数据都不污染分类列表。
+const CATEGORY_BRANCH = 'category-data'
+const CATEGORY_REPO = 'dachuplus/allfund'
+const CATEGORY_SOURCES = [
+  () => `/api/category-data?t=${Date.now()}`,
+  () => `https://cdn.jsdelivr.net/gh/${CATEGORY_REPO}@${CATEGORY_BRANCH}/fund-categories.json?t=${Date.now()}`,
+  () => `https://raw.githubusercontent.com/${CATEGORY_REPO}/${CATEGORY_BRANCH}/fund-categories.json?t=${Date.now()}`,
+  () => `/fund-categories.json?t=${Date.now()}`, // 随站点部署的本地基线
+]
+function validCategoryData(d) {
+  return !!(d && Array.isArray(d.t0) && d.t0.length >= 5 && Array.isArray(d.t1) && d.t1.length >= 10)
+}
 async function fetchFundCategoriesImpl() {
+  for (const makeUrl of CATEGORY_SOURCES) {
+    try {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 10000)
+      let res
+      try {
+        res = await fetch(makeUrl(), { signal: ctrl.signal, cache: 'no-store' })
+      } finally {
+        clearTimeout(timer)
+      }
+      if (!res.ok) continue
+      const data = await res.json()
+      if (validCategoryData(data)) return data
+    } catch (e) {
+      // 这一层失败，继续尝试下一个源
+    }
+  }
+  // 所有静态源都不可用才回退 RPC（DB 健康时仍可读，DB 卡死时保留前端静态骨架）
   if (supabase) {
     const { data, error } = await supabase.rpc('get_fund_categories')
     if (error) throw error

@@ -1175,7 +1175,7 @@ function applyScoreIndicator() {
 
 // 搜索/周期/分页/排序
 const searchText = ref('')
-const currentPeriod = ref('k1')     // 默认按 1 年评分排序
+const currentPeriod = ref('k3')     // 默认按 3 年评分降序排序（2026-11-27 用户要求）
 const activeTab = ref('score')      // 选品-基金视图：默认显示「评分」，与「热门」并列切换
 const sortAsc = ref(false)        // 靠谱指数排序方向（false=降序，true=升序）
 const sortField = ref('')          // 客户端排序列（非评分列）：'c'|'n'|'equityPct'|'bondPct'

@@ -1,0 +1,54 @@
+name: Supabase DB 健康探活与自动重启（减负 C）
+
+# 免费共享 Postgres 实例会间歇性卡死（控制面/pooler/auth 正常，仅 db 本体无响应）。
+# 本流水线每 15 分钟探活一次；连续 3 次（间隔 60s）db UNHEALTHY 才自动调用
+# Supabase Management API 重启实例，重启后轮询等待恢复。单次抖动不会误重启。
+# 判定与自愈逻辑全在 scripts/supabase_healthcheck.py，凭据走 SUPABASE_MGMT_TOKEN。
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只探活不重启（验证用）'
+        required: false
+        type: boolean
+        default: false
+
+# 防止上一次探活未结束时重复触发（重启后等待最多 15 分钟，故需串行）
+concurrency:
+  group: db-health-autoheal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_MGMT_TOKEN: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 探活（连续3次不健康才重启）
+        run: |
+          set -euo pipefail
+          DRY="${{ github.event.inputs.dry_run }}"
+          if [ "$DRY" = "true" ]; then
+            python3 scripts/supabase_healthcheck.py --dry-run --threshold 1
+          else
+            python3 scripts/supabase_healthcheck.py --threshold 3 --interval 60 --max-wait 900
+          fi
+
+      - name: 自愈结果通知
+        if: ${{ failure() }}
+        run: |
+          echo "⚠️ DB 自愈流水线异常退出，请检查日志（可能是重启请求失败或重启后 15 分钟未恢复）。"
+          echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"

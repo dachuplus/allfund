@@ -547,6 +547,25 @@ jobs:
           python scripts/reconcile_fund_universe.py
           echo "主列表对账完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
+      - name: 步骤5j — 导出分类静态清单（减负 B1，只读聚合+校验）
+        continue-on-error: true
+        run: |
+          echo "============================================"
+          echo "  步骤5j: 导出 public/fund-categories.json"
+          echo "  只读聚合 fund_scores（不写库），校验一级/二级计数后落盘"
+          echo "  供前端优先读静态清单，避免每次开页面调 get_fund_categories() 全表聚合"
+          echo "============================================"
+          python3 scripts/export_fund_categories.py
+          echo "分类清单导出完成: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: 推送分类静态清单到 category-data 分支
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 独立数据分支，不碰 main，避开本地↔GitHub 字节一致对账（与 pcf-data 同款模式）
+          python3 scripts/push_category_data.py --src public/fund-categories.json
+
       - name: 数据更新通知
         if: ${{ failure() || cancelled() }}
         run: |
