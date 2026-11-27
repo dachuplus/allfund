@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.60</td>
+              <td>2026-11-27</td>
+              <td><code>75f5f342</code></td>
+              <td><span class="version-history">历史版本（小托福加油站新增 Week8 阅读指代题 + Week9 听力语用定语从句）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.59</td>
               <td>2026-11-27</td>
               <td><code>c4be9101</code></td>
