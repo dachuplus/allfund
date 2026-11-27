@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.59</td>
+              <td>2026-11-27</td>
+              <td><code>c4be9101</code></td>
+              <td><span class="version-history">历史版本（B+C 减负自愈：分类清单静态化+夜间CI错峰+DB探活自动重启；基金评分默认3年降序）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.57</td>
               <td>2026-11-24</td>
               <td><code>ba074008</code></td>
