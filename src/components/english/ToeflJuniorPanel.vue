@@ -236,6 +236,8 @@ const WEEKS = [
   { key: 'w5', label: 'Week 5' },
   { key: 'w6', label: 'Week 6' },
   { key: 'w7', label: 'Week 7' },
+  { key: 'w8', label: 'Week 8' },
+  { key: 'w9', label: 'Week 9' },
   { key: 'verbs', label: '不规则动词表' },
 ]
 const LOADERS = {
@@ -246,6 +248,8 @@ const LOADERS = {
   w5: () => import('../../data/toeflJuniorW5.js'),
   w6: () => import('../../data/toeflJuniorW6.js'),
   w7: () => import('../../data/toeflJuniorW7.js'),
+  w8: () => import('../../data/toeflJuniorW8.js'),
+  w9: () => import('../../data/toeflJuniorW9.js'),
 }
 
 const weeks = WEEKS
