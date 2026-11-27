@@ -44,7 +44,7 @@ jobs:
           if [ "$DRY" = "true" ]; then
             python3 scripts/supabase_healthcheck.py --dry-run --threshold 1
           else
-            python3 scripts/supabase_healthcheck.py --threshold 3 --interval 60 --max-wait 900
+            python3 scripts/supabase_healthcheck.py --threshold 3 --interval 60 --max-wait 900 --stable-checks 3
           fi
 
       - name: 自愈结果通知
