@@ -26,9 +26,14 @@ name: 每日更新资产配置与季度评分（方案B-B）
 # =====================================================================
 
 on:
-  # 定时触发：北京时间每天 22:30（UTC 14:30），在流水线 A（13:30 UTC）之后。
+  # 定时触发：北京时间每天 03:00（UTC 19:00）—— 减负 B2 错峰（2026-11-27）
+  # 原 22:30 与流水线 A（21:30，实测常跑 49~70 分钟）尾部重叠，且本流水线
+  # allocation-shard(8片)+quarterly-shard(8片) 曾无依赖同时启动，峰值 16 个 job
+  # 并发直写生产库，实测打满免费实例导致整库 PGRST002 / 页面无数据。
+  # 现移到凌晨空闲段，并给两条分片链加 max-parallel:2 + 串行依赖，峰值降到 2。
+  # 数据口径、抓取范围、写入逻辑均不变，仅改调度与并发。
   schedule:
-    - cron: '30 14 * * *'
+    - cron: '0 19 * * *'
   # 手动触发
   workflow_dispatch:
 
@@ -49,6 +54,9 @@ jobs:
     timeout-minutes: 180
     continue-on-error: true
     strategy:
+      # 减负 B2（2026-11-27）：原 8 片同时直写生产库，与 quarterly-shard 叠加峰值 16 并发，
+      # 打满免费实例。max-parallel:2 限制同时最多 2 片（分片数/数据口径不变，只是排队跑）。
+      max-parallel: 2
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
@@ -118,6 +126,8 @@ jobs:
     timeout-minutes: 180
     continue-on-error: true
     strategy:
+      # 减负 B2：限制并发，避免 4 片同时回补写库
+      max-parallel: 2
       matrix:
         shard: [0, 1, 2, 3]
     env:
@@ -180,10 +190,15 @@ jobs:
   # quarterly-shard：matrix 8 片并行刷 fund_quarterly_scores（仅 quarterly_data）
   # ───────────────────────────────────────────────────────────────
   quarterly-shard:
+    # 减负 B2（2026-11-27）：原无 needs，与 allocation-shard 同时启动，两条 8 片链
+    # 合计 16 job 并发直写生产库，是打满免费实例的主因。现改为等 holder-backfill
+    # 完成后再跑，两条分片链串行；max-parallel:2 再限制本链并发。数据口径不变。
+    needs: [holder-backfill]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     continue-on-error: true
     strategy:
+      max-parallel: 2
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
