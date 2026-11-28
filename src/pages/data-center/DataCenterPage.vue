@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.67</td>
+              <td>2026-11-28</td>
+              <td><code>889fe35e</code></td>
+              <td><span class="version-history">历史版本（日期门控单任务模式修复）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.66</td>
               <td>2026-11-28</td>
               <td><code>12c13bc0</code></td>
@@ -1702,6 +1708,7 @@
       </table>
       <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用。任何写生产表的动作只能由调度中心执行：子 workflow 的手动 / 远程触发不会直接写库，而是由 <code>delegate-to-orchestrator</code> 自动转交调度中心（<code>only_task</code>=对应任务），按 needs 优先次序排队执行；调度中心自身还设有 <code>dispatch-queue-gate</code> 排队门，等待更早的调度中心 run 结束后才放行写库链，多个手动请求同时到达也不会并发写库。<code>from_orchestrator</code> 仅用于区分「调度中心回调」与「手动转交」，避免循环转交。</p>
       <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>/api/sb-proxy</code> 对伪装 UA 的「大表深分页（offset≥4000）」按 IP 限流 20 次/分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
+      <p class="api-note"><strong>二次盘点补强（v4.0.68）：</strong>再次挂库的根因是 AhrefsBot 会执行页面 JS，直接对 <code>*.supabase.co</code> 发起 <code>visitor_logs</code> 写入 / <code>feature_flags</code> / <code>get_visitor_count()</code>，这些请求不经过 <code>/api/*</code> 边缘函数，旧防护挡不到。现在前端在请求发出前对已知低价值 bot 短路返回空响应；同时 <code>/api/sb-proxy</code> 的 <code>__count=exact</code>（实测会触发 57014）按 IP 限流 8 次/分钟，<code>/api/fs-count</code> 按 IP 限流 30 次/分钟；<code>csi-pe</code> / <code>dtip-backtest</code> / <code>toujiao</code> / <code>news</code> / <code>wechat-publish</code> 五个直连 Supabase 的边缘函数统一加 bot 拦截、IP 限流、10 秒超时（无界翻页加 20 轮上限）；<code>toujiao</code> 的 company 参数限定为 102 个合法域名白名单，防止枚举绕过 CDN 缓存。所有限流的 Map 只淘汰过期键，不再全清，避免伪造转发头绕过。</p>
       <p class="api-note"><strong>物化视图减负：</strong>已移除 <code>promote_staging.py</code> 冗余中间刷新与 <code>tag_sync_daily.py</code> 的兜底重复刷新（落地函数已在同事务内刷新）；原每晚多次全量重建持强锁阻塞前端查询，现只保留必要刷新，数据口径不变。</p>
       <p class="api-note"><strong>分类兜底减负：</strong>四个静态源全不可用时，不再调用 <code>get_fund_categories()</code> 做 2.8 万行全表 GROUP BY（实测 57014），改为按 <code>c</code> 游标每批 2000 行读取并在前端聚合。</p>
 
