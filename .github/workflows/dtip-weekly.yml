@@ -6,9 +6,9 @@ name: 定投助手每周一定投写入
 # 估值分位经同源边缘函数 /api/csi-pe 代取（规避 GitHub 云 IP 被 csindex WAF 403）。
 
 on:
-  # 定时触发：北京时间每周一 09:00（UTC 周一 01:00）
+  # 定时触发：北京时间每周一 02:05（UTC 周一 18:05）—— 用户要求全部数据更新安排在夜里12点后
   schedule:
-    - cron: '0 1 * * 1'
+    - cron: '5 18 * * 1'
   # 手动触发（Actions 页面 Run workflow）
   workflow_dispatch:
   # 远程触发（无需登录 GitHub 点击）：
