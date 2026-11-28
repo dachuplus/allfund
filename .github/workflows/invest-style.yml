@@ -20,6 +20,10 @@ on:
   #   - cron: '0 19 * * 0'
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       limit:
         description: '只处理前 N 只（0 = 全量），调试用'
         required: false
@@ -85,6 +89,7 @@ permissions:
 
 jobs:
   invest-style:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     # 全量约 2.8 万只页面、并发 8，实测约 50~70 分钟，给足余量
     timeout-minutes: 240

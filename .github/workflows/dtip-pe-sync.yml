@@ -5,6 +5,11 @@ on:
   # schedule:
   #   - cron: '0 18 * * *'   # 原北京 02:00
   workflow_call:
+    inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
   workflow_dispatch:
   repository_dispatch:
     types: [dtip-pe-sync]
@@ -18,6 +23,7 @@ env:
 
 jobs:
   sync:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

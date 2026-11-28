@@ -6,6 +6,11 @@ on:
   # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
   # workflow_call（供编排器复用；抓取→staging→校验→原子切换三段式）
   workflow_call:
+    inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
   # 原：每日北京时间 21:45（UTC 13:45）
   # schedule:
   #   - cron: '45 13 * * *'
@@ -15,6 +20,7 @@ env:
 
 jobs:
   sync-tag-perf:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:

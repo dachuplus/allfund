@@ -6,6 +6,10 @@ on:
   #   - cron: '30 19 * * *'
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       source:
         description: '只爬指定 source_key（默认全部）'
         required: false
@@ -24,6 +28,7 @@ on:
 
 jobs:
   crawl:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -12,6 +12,10 @@ on:
   #   - cron: '5 18 * * 1'
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       skip_run:
         description: '非周一跳过真实写库（调度中心日期门控用）'
         type: boolean
@@ -28,6 +32,7 @@ permissions:
 
 jobs:
   dtip-weekly:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

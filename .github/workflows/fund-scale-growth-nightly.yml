@@ -7,6 +7,10 @@ on:
   #   - cron: '40 18 * * *'
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       skip_fetch:
         description: '跳过抓取，仅清洗/校验并 promote 已有 staging'
         type: boolean
@@ -20,6 +24,7 @@ on:
 
 jobs:
   refresh:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:

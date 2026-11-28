@@ -8,6 +8,11 @@ on:
   # schedule:
   #   - cron: '10 17 * * *'   # 原北京时间每日 01:10
   workflow_call:
+    inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
   # 手动触发
   workflow_dispatch:
   # 远程触发（无需登录 GitHub 点击）：
@@ -20,6 +25,7 @@ env:
 
 jobs:
   ai-pk-returns:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

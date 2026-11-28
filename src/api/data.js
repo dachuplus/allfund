@@ -629,9 +629,10 @@ export async function fetchFundScoresCount(params = {}) {
 }
 
 // ========== 基金分类（动态，来自 fund_scores 的 t0/t1_tt）==========
-// 调用 Supabase RPC get_fund_categories()，返回：
-//   { t0: [{t0, cnt}], t1: [{t0, t1_tt, cnt}] }
+// 返回结构：{ t0: [{t0, cnt}], t1: [{t0, t1_tt, cnt}] }
 // 一级分类用 t0，二级分类用 t1_tt（货币型 t1_tt 为 NULL，前端单独处理）
+// 2026-11-28：兜底不再调用 get_fund_categories() RPC（2.8 万行 GROUP BY 实测 57014），
+// 改为按 c 游标分批读取 2000 行 + 前端聚合，单批查询走索引，不会触发全表聚合超时。
 export function fetchFundCategories() {
   return withCache('fundCategories', 86400000, fetchFundCategoriesImpl)
 }
@@ -640,7 +641,7 @@ export function fetchFundCategories() {
 // 避免每次开页面都调用 get_fund_categories() 对 2.8 万行全表聚合
 // （PostgREST 实测 statement timeout 57014，是首屏卡住与打满 DB 的元凶之一）。
 // 数据真源：GitHub 独立分支 category-data/fund-categories.json（CI 每日聚合+校验后推送）。
-// 读取顺序：同源代理 → jsDelivr → raw → 本地 public 基线 → RPC 兜底。
+// 读取顺序：同源代理 → jsDelivr → raw → 本地 public 基线 → 游标分批读表兜底。
 // 结构校验后才采用，任何一层脏数据都不污染分类列表。
 const CATEGORY_BRANCH = 'category-data'
 const CATEGORY_REPO = 'dachuplus/allfund'
@@ -671,11 +672,36 @@ async function fetchFundCategoriesImpl() {
       // 这一层失败，继续尝试下一个源
     }
   }
-  // 所有静态源都不可用才回退 RPC（DB 健康时仍可读，DB 卡死时保留前端静态骨架）
+  // 所有静态源都不可用才回退：按 c 游标分批读表 + 前端聚合，绝不再做全表 GROUP BY。
   if (supabase) {
-    const { data, error } = await supabase.rpc('get_fund_categories')
-    if (error) throw error
-    return data
+    const BATCH = 2000
+    const t0Map = new Map()
+    const t1Map = new Map()
+    let lastCode = ''
+    for (let guard = 0; guard < 100; guard++) {
+      let q = supabase.from('fund_scores').select('c,t0,t1_tt')
+        .order('c', { ascending: true }).limit(BATCH)
+      if (lastCode) q = q.gt('c', lastCode)
+      const { data, error } = await q
+      if (error) throw error
+      if (!data || !data.length) break
+      for (const r of data) {
+        const t0 = r.t0 || ''
+        const t1 = r.t1_tt || ''
+        t0Map.set(t0, (t0Map.get(t0) || 0) + 1)
+        const key = t0 + '\u0000' + t1
+        const item = t1Map.get(key) || { t0, t1_tt: r.t1_tt || null, cnt: 0 }
+        item.cnt += 1
+        t1Map.set(key, item)
+      }
+      lastCode = data[data.length - 1].c
+      if (data.length < BATCH) break
+    }
+    const out = {
+      t0: Array.from(t0Map, ([t0, cnt]) => ({ t0, cnt })),
+      t1: Array.from(t1Map.values()),
+    }
+    if (validCategoryData(out)) return out
   }
   return { t0: [], t1: [] }
 }

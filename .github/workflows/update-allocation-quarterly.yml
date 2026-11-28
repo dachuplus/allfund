@@ -36,6 +36,11 @@ on:
   # schedule:
   #   - cron: '0 19 * * *'   # 原北京时间 03:00
   workflow_call:
+    inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
   # 手动触发
   workflow_dispatch:
 
@@ -52,6 +57,7 @@ jobs:
   # allocation-shard：matrix 8 片并行抓配置/规模/持有人 → 直写生产 12 列（--to-prod）
   # ───────────────────────────────────────────────────────────────
   allocation-shard:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     continue-on-error: true
@@ -123,6 +129,7 @@ jobs:
   # 只处理当前 9 列存在 NULL 的行；东财瞬时空返回不再被误写成 NULL。
   # ───────────────────────────────────────────────────────────────
   holder-backfill:
+    if: ${{ inputs.from_orchestrator }}
     needs: [allocation-shard]
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -164,7 +171,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────
   refresh-main-view:
     needs: [holder-backfill]
-    if: ${{ always() }}
+    if: ${{ (always()) && inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -192,6 +199,7 @@ jobs:
   # quarterly-shard：matrix 8 片并行刷 fund_quarterly_scores（仅 quarterly_data）
   # ───────────────────────────────────────────────────────────────
   quarterly-shard:
+    if: ${{ inputs.from_orchestrator }}
     # 减负 B2（2026-11-27）：原无 needs，与 allocation-shard 同时启动，两条 8 片链
     # 合计 16 job 并发直写生产库，是打满免费实例的主因。现改为等 holder-backfill
     # 完成后再跑，两条分片链串行；max-parallel:2 再限制本链并发。数据口径不变。
@@ -260,6 +268,7 @@ jobs:
   # quarterly-score：单 job 读全量重算横截面评分（必须全量一次算）
   # ───────────────────────────────────────────────────────────────
   quarterly-score:
+    if: ${{ inputs.from_orchestrator }}
     needs: quarterly-shard
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -318,6 +327,7 @@ jobs:
   # rebuild-combined：基于最新季度评分重建 fund_combined
   # ───────────────────────────────────────────────────────────────
   rebuild-combined:
+    if: ${{ inputs.from_orchestrator }}
     needs: quarterly-score
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -379,7 +389,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────
   notify:
     needs: [allocation-shard, holder-backfill, refresh-main-view, quarterly-shard, quarterly-score, rebuild-combined]
-    if: ${{ failure() || cancelled() }}
+    if: ${{ (failure() || cancelled()) && inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     steps:
       - name: 流水线B异常通知

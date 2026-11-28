@@ -30,6 +30,10 @@ on:
   #   - cron: '40 16 * * *'   # 原北京时间每日 00:40
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       limit:
         description: '调试用：本次最多抓多少只（0=全部 universe）'
         required: false
@@ -58,6 +62,7 @@ env:
 
 jobs:
   update-index-scores:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     # secret 映射：仓库里确定存在的是 SUPABASE_MGMT_TOKEN；

@@ -18,8 +18,11 @@ name: 调度中心 · 夜间数据统一调度
 #     caller 上会触发 startup_failure（0 job）；secrets 用 inherit 透传即可，
 #     写库所需权限由各被调 workflow 自己的 GITHUB_TOKEN 默认权限承担。
 #   - 每个被调 workflow 仍是独立文件、独立脚本，数据口径/抓取范围/校验逻辑完全不变；
-#   - 所有被调 workflow 的独立 schedule 已停用（保留 workflow_dispatch /
-#     repository_dispatch 供手动排障），避免双重触发。
+#   - 所有被调 workflow 的独立 schedule 已停用；其 workflow_dispatch /
+#     repository_dispatch 仍在，但子 workflow 全部以 inputs.from_orchestrator 门控，
+#     手动/远程触发一律跳过写生产，只能经本编排器排队执行；
+#   - 手动入口只保留本 workflow 的 workflow_dispatch(only_task)：默认 all 为整链，
+#     也可只选一个任务，其余 job 按 needs 规则跳过但链不中断，仍严格串行。
 #
 # 遵守抓数铁律：所有覆盖型写入均为「抓取→staging→校验→单事务切换生产」，
 # 校验不过绝不碰生产表。收益/PE/定投记录类是 append-only 历史表（PK +
@@ -44,89 +47,160 @@ on:
   schedule:
     - cron: '10 16 * * *'
   workflow_dispatch:
+    inputs:
+      only_task:
+        description: '手动只跑某个任务（默认 all=按调度中心全链顺序执行）'
+        type: choice
+        default: all
+        options:
+          - all
+          - fund-scores
+          - tag-perf
+          - stock-scores
+          - style-factors
+          - index-scores
+          - ai-pk-returns
+          - stock-pk-returns
+          - dtip-pe-sync
+          - fund-scale-growth
+          - allocation-quarterly
+          - tag-funds
+          - tougu-daily
+          - macro-history
+          - monday-gate
+          - dtip-weekly
+          - stock-pk-weekly
+          - monthly-gate
+          - ai-pk-monthly
+          - quarterly-gate
+          - refresh-fund-scale-quarterly
+          - news-spa-crawl
+          - toujiao-crawl
+          - sunday-gate
+          - invest-style
+          - movie-ratings-weekly
 
 jobs:
   # ① 核心基金评分：产出 fund_scores + 物化视图，是下游多数任务的基线
   fund-scores:
+    if: ${{ !cancelled() && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'fund-scores') }}
     uses: ./.github/workflows/update-scores.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ② 热门标签资金流：抓取→staging→校验→原子切换（三段式改造）
   tag-perf:
+    if: ${{ !cancelled() && needs['fund-scores'].result != 'failure' && needs['fund-scores'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'tag-perf') }}
     needs: [fund-scores]
     uses: ./.github/workflows/sync-tag-perf.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ③ 股票全市场评分：staging→promote
   stock-scores:
+    if: ${{ !cancelled() && needs['tag-perf'].result != 'failure' && needs['tag-perf'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'stock-scores') }}
     needs: [tag-perf]
     uses: ./.github/workflows/update-stock-scores.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ④ 风格因子：抓取→staging→校验→原子切换（三段式改造）
   style-factors:
+    if: ${{ !cancelled() && needs['stock-scores'].result != 'failure' && needs['stock-scores'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'style-factors') }}
     needs: [stock-scores]
     uses: ./.github/workflows/update-style-factors.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑤ 指数评分：raw→staging→promote
   index-scores:
+    if: ${{ !cancelled() && needs['style-factors'].result != 'failure' && needs['style-factors'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'index-scores') }}
     needs: [style-factors]
     uses: ./.github/workflows/update-index-scores.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑥ 基金组合月度收益（append-only 历史记录，幂等）
   ai-pk-returns:
+    if: ${{ !cancelled() && needs['index-scores'].result != 'failure' && needs['index-scores'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'ai-pk-returns') }}
     needs: [index-scores]
     uses: ./.github/workflows/ai-pk-monthly-returns.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑦ 股票组合周度收益（append-only 历史记录，幂等）
   stock-pk-returns:
+    if: ${{ !cancelled() && needs['ai-pk-returns'].result != 'failure' && needs['ai-pk-returns'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'stock-pk-returns') }}
     needs: [ai-pk-returns]
     uses: ./.github/workflows/stock-pk-monthly-returns.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑧ 定投 PE 历史缓存（增量 append，ON CONFLICT DO NOTHING 幂等）
   dtip-pe-sync:
+    if: ${{ !cancelled() && needs['stock-pk-returns'].result != 'failure' && needs['stock-pk-returns'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'dtip-pe-sync') }}
     needs: [stock-pk-returns]
     uses: ./.github/workflows/dtip-pe-sync.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑨ 基金规模增长：staging→校验→promote+刷视图
   fund-scale-growth:
+    if: ${{ !cancelled() && needs['dtip-pe-sync'].result != 'failure' && needs['dtip-pe-sync'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'fund-scale-growth') }}
     needs: [dtip-pe-sync]
     uses: ./.github/workflows/fund-scale-growth-nightly.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑩ 资产配置/季度评分（最重，8+8 分片已限 max-parallel:2）+ 刷视图
   allocation-quarterly:
+    if: ${{ !cancelled() && needs['fund-scale-growth'].result != 'failure' && needs['fund-scale-growth'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'allocation-quarterly') }}
     needs: [fund-scale-growth]
     uses: ./.github/workflows/update-allocation-quarterly.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑪ 标签-基金映射：staging→校验→单事务落地（与 promote 共用 advisory lock）
   tag-funds:
+    if: ${{ !cancelled() && needs['allocation-quarterly'].result != 'failure' && needs['allocation-quarterly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'tag-funds') }}
     needs: [allocation-quarterly]
     uses: ./.github/workflows/tag-funds-daily.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑫ 投顾产品每日更新（原独立 01:17）
   tougu-daily:
+    if: ${{ !cancelled() && needs['tag-funds'].result != 'failure' && needs['tag-funds'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'tougu-daily') }}
     needs: [tag-funds]
     uses: ./.github/workflows/tougu-daily.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑬ 宏观历史日更（原独立 01:40）：staging→校验→promote
   macro-history:
+    if: ${{ !cancelled() && needs['tougu-daily'].result != 'failure' && needs['tougu-daily'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'macro-history') }}
     needs: [tougu-daily]
     uses: ./.github/workflows/macro-history-daily.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ── 日期门控：北京时间周一 ──────────────────────────────────────────
   monday-gate:
     needs: [macro-history]
-    if: ${{ !cancelled() && needs['macro-history'].result == 'success' }}
+    if: ${{ !cancelled() && needs['macro-history'].result != 'failure' && needs['macro-history'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'monday-gate') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -146,25 +220,27 @@ jobs:
   # ⑭ 定投助手周投记录（原独立周一 02:05）：仅周一写库
   dtip-weekly:
     needs: [monday-gate]
-    if: ${{ !cancelled() && needs['monday-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['monday-gate'].result != 'failure' && needs['monday-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'dtip-weekly') }}
     uses: ./.github/workflows/dtip-weekly.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['monday-gate'].outputs.run == 'false' }}
     secrets: inherit
 
   # ⑮ 股票 PK 每周重选（原独立周一 02:30）：仅周一写库
   stock-pk-weekly:
     needs: [dtip-weekly, monday-gate]
-    if: ${{ !cancelled() && needs['dtip-weekly'].result == 'success' && needs['monday-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['dtip-weekly'].result != 'failure' && needs['dtip-weekly'].result != 'cancelled' && needs['monday-gate'].result != 'failure' && needs['monday-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'stock-pk-weekly') }}
     uses: ./.github/workflows/stock-pk-weekly.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['monday-gate'].outputs.run == 'false' }}
     secrets: inherit
 
   # ── 日期门控：北京时间每月 1 号 ─────────────────────────────────────
   monthly-gate:
     needs: [stock-pk-weekly]
-    if: ${{ !cancelled() && needs['stock-pk-weekly'].result == 'success' }}
+    if: ${{ !cancelled() && needs['stock-pk-weekly'].result != 'failure' && needs['stock-pk-weekly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'monthly-gate') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -184,16 +260,17 @@ jobs:
   # ⑯ 基金 AI 大 PK 月度调仓（原独立每月 1 号 02:55）：仅月初写库
   ai-pk-monthly:
     needs: [monthly-gate]
-    if: ${{ !cancelled() && needs['monthly-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['monthly-gate'].result != 'failure' && needs['monthly-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'ai-pk-monthly') }}
     uses: ./.github/workflows/ai-pk-monthly.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['monthly-gate'].outputs.run == 'false' }}
     secrets: inherit
 
   # ── 日期门控：北京时间 2/5/8/11 月 1 号 ─────────────────────────────
   quarterly-gate:
     needs: [ai-pk-monthly]
-    if: ${{ !cancelled() && needs['ai-pk-monthly'].result == 'success' }}
+    if: ${{ !cancelled() && needs['ai-pk-monthly'].result != 'failure' && needs['ai-pk-monthly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'quarterly-gate') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -218,30 +295,35 @@ jobs:
   # ⑰ 基金规模季度回刷（原独立季初 03:20）：仅季初写库
   refresh-fund-scale-quarterly:
     needs: [quarterly-gate]
-    if: ${{ !cancelled() && needs['quarterly-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['quarterly-gate'].result != 'failure' && needs['quarterly-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'refresh-fund-scale-quarterly') }}
     uses: ./.github/workflows/refresh-fund-scale-quarterly.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['quarterly-gate'].outputs.run == 'false' }}
     secrets: inherit
 
   # ⑱ 资讯 SPA 聚合爬虫（原独立 03:30）
   news-spa-crawl:
     needs: [refresh-fund-scale-quarterly]
-    if: ${{ !cancelled() && needs['refresh-fund-scale-quarterly'].result == 'success' }}
+    if: ${{ !cancelled() && needs['refresh-fund-scale-quarterly'].result != 'failure' && needs['refresh-fund-scale-quarterly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'news-spa-crawl') }}
     uses: ./.github/workflows/news-spa-crawl.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ⑲ 投教内容聚合爬虫（原独立 02:00）
   toujiao-crawl:
     needs: [news-spa-crawl]
-    if: ${{ !cancelled() && needs['news-spa-crawl'].result == 'success' }}
+    if: ${{ !cancelled() && needs['news-spa-crawl'].result != 'failure' && needs['news-spa-crawl'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'toujiao-crawl') }}
     uses: ./.github/workflows/toujiao-crawl.yml
+    with:
+      from_orchestrator: true
     secrets: inherit
 
   # ── 日期门控：北京时间周日 ──────────────────────────────────────────
   sunday-gate:
     needs: [toujiao-crawl]
-    if: ${{ !cancelled() && needs['toujiao-crawl'].result == 'success' }}
+    if: ${{ !cancelled() && needs['toujiao-crawl'].result != 'failure' && needs['toujiao-crawl'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'sunday-gate') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -261,17 +343,19 @@ jobs:
   # ⑳ 基金投资风格周更（原独立周日 03:00）：仅周日写库
   invest-style:
     needs: [sunday-gate]
-    if: ${{ !cancelled() && needs['sunday-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['sunday-gate'].result != 'failure' && needs['sunday-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'invest-style') }}
     uses: ./.github/workflows/invest-style.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['sunday-gate'].outputs.run == 'false' }}
     secrets: inherit
 
   # ㉑ 电影评分周更（原独立周日 04:00）：仅周日写库
   movie-ratings-weekly:
     needs: [invest-style, sunday-gate]
-    if: ${{ !cancelled() && needs['invest-style'].result == 'success' && needs['sunday-gate'].result == 'success' }}
+    if: ${{ !cancelled() && needs['invest-style'].result != 'failure' && needs['invest-style'].result != 'cancelled' && needs['sunday-gate'].result != 'failure' && needs['sunday-gate'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'movie-ratings-weekly') }}
     uses: ./.github/workflows/movie-ratings-weekly.yml
     with:
+      from_orchestrator: true
       skip_run: ${{ needs['sunday-gate'].outputs.run == 'false' }}
     secrets: inherit

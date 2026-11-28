@@ -110,14 +110,11 @@ def main():
         restore()
         sys.exit(1)
 
-    # 落地函数内已刷新过物化视图；这里做一次幂等兜底，防止函数版本较旧未刷新。
-    try:
-        refresh_view()
-        print('  ✓ 已刷新物化视图 fund_scores_main', flush=True)
-    except Exception as e:
-        print(f'  [WARN] 兜底刷新物化视图失败（不影响已落地数据）: {e}', flush=True)
-
-    print('✅ 标签数据同步完成', flush=True)
+    # 2026-11-28：apply_fund_tag_funds() 已在同事务内 REFRESH MATERIALIZED VIEW，
+    # 旧版这里再做一次兜底刷新等于同一晚重复全量重建 + 强锁，是免费实例高风险点。
+    # 函数真源 scripts/tag_apply_function.sql 由 sync_tag_funds_full.py 每次幂等创建，
+    # 故不再额外刷新。
+    print('✅ 标签数据同步完成（物化视图已由落地函数在同事务内刷新）', flush=True)
 
 
 if __name__ == '__main__':

@@ -13,6 +13,11 @@ on:
   # schedule:
   #   - cron: '20 15 * * *'   # 原北京时间每日 23:20
   workflow_call:
+    inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
   workflow_dispatch:
 
 env:
@@ -20,6 +25,7 @@ env:
 
 jobs:
   update-stock-scores:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:

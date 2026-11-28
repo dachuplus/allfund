@@ -7,6 +7,10 @@ on:
   #   - cron: '55 18 1 * *'
   workflow_call:
     inputs:
+      from_orchestrator:
+        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        type: boolean
+        default: false
       period:
         description: '期次 YYYY-MM，默认当月'
         required: false
@@ -33,6 +37,7 @@ permissions:
 
 jobs:
   rebalance:
+    if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
