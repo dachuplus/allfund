@@ -440,7 +440,7 @@ def main():
         sys.exit(1)
     try:
         res = mgmt_rows(
-            "SELECT public.apply_fund_tag_funds(true) AS r;",
+            "SELECT public.apply_fund_tag_funds(true, false) AS r;",
             "apply", timeout=1200, retries=2,
         )
         print("  落地函数返回:", json.dumps(res, ensure_ascii=False, default=str))

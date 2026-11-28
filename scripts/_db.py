@@ -73,6 +73,17 @@ def _jsonable(o):
     return str(o)
 
 
+def _server_timeout_sql(timeout):
+    """返回服务端 statement_timeout 设置语句（2026-11-28 减负）。
+
+    客户端超时只是「不再等结果」，PostgreSQL 服务端不一定收到取消信号，查询可能
+    继续跑并占住连接池/IO。这里显式给服务端兜底超时，固定 660s（11min）——与
+    当前 Management API 会话实测的 statement_timeout=11min 对齐：既不放松现有
+    长查询上限，也保证 psycopg2 直连路径同样有服务端硬截止，不依赖会话默认值。
+    """
+    return "SET statement_timeout = '660s'"
+
+
 def _mgmt_query(sql, params=None, timeout=60):
     """回退路径：通过 Management API 执行 SQL（只认 PAT）。返回 list[dict] 或 []。
 
@@ -89,12 +100,13 @@ def _mgmt_query(sql, params=None, timeout=60):
     if not token:
         raise RuntimeError("缺少 SUPABASE_PAT / SUPABASE_MGMT_TOKEN（且未配置 SUPABASE_DB_URL）")
     last = None
+    guarded_sql = f"{_server_timeout_sql(timeout)}; {sql}"
     for attempt in range(3):
         try:
             r = requests.post(
                 MGMT_API,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json={"query": sql},
+                json={"query": guarded_sql},
                 timeout=timeout,
             )
             if r.status_code >= 500:
@@ -178,6 +190,8 @@ def _db_query(sql, params=None, timeout=300):
                     pass
             with psycopg2.connect(**conn_kwargs) as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    # 服务端兜底超时：客户端断开/超时后，服务端查询也会被 PostgreSQL 主动终止。
+                    cur.execute(_server_timeout_sql(timeout))
                     for stmt in statements:
                         cur.execute(stmt, params)
                         if cur.description:

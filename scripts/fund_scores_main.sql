@@ -49,6 +49,9 @@ ORDER BY
   f.c;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_fsm_c ON public.fund_scores_main (c);
+-- 2026-11-28：分类筛选走 t0/t1_tt（前端「主代码」默认路径），原只有 c 索引导致
+-- Seq Scan（EXPLAIN cost 1258.26）。复合索引后实测 Index Scan cost 2.50。
+CREATE INDEX IF NOT EXISTS idx_fsm_t0_t1 ON public.fund_scores_main (t0, t1_tt);
 GRANT SELECT ON public.fund_scores_main TO anon, authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
 

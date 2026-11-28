@@ -16,7 +16,10 @@
  *
  * 2026-11-28 防护：
  *  - 已知 SEO bot UA（AhrefsBot 等）直接在边缘 403，不回源；
- *  - 相同筛选条件的结果缓存 5 分钟，避免爬虫遍历分页时反复全表累加。
+ *  - 相同筛选条件的结果缓存 5 分钟，避免爬虫遍历分页时反复全表累加；
+ *  - 计数算法改为「1 行探针 + 倍增/二分」：原来最多 8×8=64 次 ×1000 行
+ *    （约 6.4 万行传输 + 64 个深分页查询），现在约 32 次 ×1 行。
+ *    EdgeOne 仍禁 Prefer: count=exact / 206，故不能用服务端 HEAD 计数。
  */
 
 import { botGuard, ipRateLimit } from './_bot_guard.js'
@@ -106,34 +109,48 @@ export async function onRequest(context) {
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
-  const PAGE = 1000      // Supabase 单次返回上限
-  const BATCH = 8        // 每轮并发页数，控制耗时
+
+  // 单次探针：只取 1 行，按 c 稳定排序，保证 offset 语义一致。
+  async function probe(offset) {
+    const u = new URL(SUPABASE_BASE + inner)
+    u.searchParams.set('select', 'c')
+    u.searchParams.set('order', 'c.asc')
+    u.searchParams.set('limit', '1')
+    u.searchParams.set('offset', String(offset))
+    const r = await fetch(u.toString(), {
+      method: 'GET', headers, signal: controller.signal, redirect: 'follow',
+    })
+    if (!r.ok) return { error: r.status }
+    const arr = await r.json().catch(() => [])
+    return { has: Array.isArray(arr) && arr.length > 0 }
+  }
+
   try {
-    let total = 0
-    let offset = 0
-    let done = false
-    for (let round = 0; round < 8 && !done; round++) {
-      const offsets = Array.from({ length: BATCH }, (_, i) => offset + i * PAGE)
-      const pages = await Promise.all(offsets.map(async (o) => {
-        const u = new URL(SUPABASE_BASE + inner)
-        u.searchParams.set('limit', String(PAGE))
-        u.searchParams.set('offset', String(o))
-        const r = await fetch(u.toString(), {
-          method: 'GET', headers, signal: controller.signal, redirect: 'follow',
-        })
-        if (!r.ok) return { n: -1, status: r.status }
-        const arr = await r.json().catch(() => [])
-        return { n: Array.isArray(arr) ? arr.length : 0, status: r.status }
-      }))
-      for (const pg of pages) {
-        if (pg.n < 0) return json({ count: null, error: 'upstream ' + pg.status }, 502)
-        total += pg.n
-        if (pg.n < PAGE) { done = true; break }
-      }
-      offset += BATCH * PAGE
+    // 空结果集：offset=0 无行，直接返回 0（1 次请求）。
+    const first = await probe(0)
+    if (first.error) return json({ count: null, error: 'upstream ' + first.error }, 502)
+    if (!first.has) { cacheSet(inner, 0); return json({ count: 0 }) }
+
+    // 倍增找上界：第一个「无行」的 offset 即总数。
+    let lo = 0
+    let hi = 1
+    for (let guard = 0; guard < 20 && hi <= 200000; guard++) {
+      const r = await probe(hi)
+      if (r.error) return json({ count: null, error: 'upstream ' + r.error }, 502)
+      if (!r.has) break
+      lo = hi
+      hi *= 2
     }
-    cacheSet(inner, total)
-    return json({ count: total })
+    // 二分收敛：lo 一定有行、hi 一定无行。
+    for (let guard = 0; guard < 20 && lo + 1 < hi; guard++) {
+      const mid = Math.floor((lo + hi) / 2)
+      const r = await probe(mid)
+      if (r.error) return json({ count: null, error: 'upstream ' + r.error }, 502)
+      if (r.has) lo = mid
+      else hi = mid
+    }
+    cacheSet(inner, hi)
+    return json({ count: hi })
   } catch (e) {
     return json({ count: null, error: String((e && e.message) || e) }, 502)
   } finally {

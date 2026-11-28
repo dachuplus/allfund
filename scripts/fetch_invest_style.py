@@ -223,8 +223,9 @@ def main():
     ap.add_argument('--only-missing', action='store_true', help='只抓 invest_style 为空的基金')
     ap.add_argument('--resume', action='store_true', help='断点续跑：不清空进度表，跳过已抓代码')
     ap.add_argument('--dry-run', action='store_true', help='只抓取统计，不写库 / 不刷新视图')
-    ap.add_argument('--refresh-every', type=int, default=8,
-                    help='每 N 批刷新一次物化视图（默认 8），结束再刷一次')
+    ap.add_argument('--refresh-every', type=int, default=0,
+                    help='每 N 批刷新一次物化视图（默认 0=中途不刷，仅结束刷一次；'
+                         '全量重建持强锁，免费实例上中途刷新会成倍放大风险）')
     ap.add_argument('--min-ok', type=int, default=0,
                     help='成功解析风格的最少行数护栏（0=按样本量自动推断）')
     args = ap.parse_args()
@@ -243,9 +244,7 @@ def main():
     codes = get_codes(args)
     if not codes:
         print('没有需要抓取的基金，退出', flush=True)
-        if not args.dry_run:
-            refresh_view()
-            print('  ✓ 已刷新物化视图 fund_scores_main', flush=True)
+        # 物化视图由调度中心链尾统一刷新，此处不单独刷新。
         return
 
     print('=' * 68, flush=True)
@@ -335,9 +334,9 @@ def main():
         print('dry-run：不写库、不刷新物化视图', flush=True)
         return
 
-    # 最终刷新：无论中途刷新过几次，结束时一定再刷一次，保证视图与库一致
-    refresh_view()
-    print('  ✓ 已刷新物化视图 fund_scores_main', flush=True)
+    # 2026-11-28：物化视图统一由调度中心链尾刷新一次，本脚本不再单独刷新。
+    # --refresh-every 仅供独立排障时显式指定，调度中心调用一律保持默认 0。
+    print('  ✓ 投资风格写回完成（物化视图由调度中心链尾统一刷新）', flush=True)
 
     check = pg("""SELECT count(*) AS n, count(DISTINCT invest_style) AS kinds,
                         max(style_period) AS latest

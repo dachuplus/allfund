@@ -552,19 +552,28 @@ def main():
     # 函数真源 scripts/tag_apply_function.sql，由 sync_tag_funds_full.py 每次运行
     # 幂等创建。若函数尚未部署则回退原分步逻辑，保证评分流水线不被标签侧阻断。
     print('\n[2.5] 重新应用标签到 fund_scores（单事务统一落地）', flush=True)
+    tag_fallback_used = False
     try:
-        _r = pg('SELECT public.apply_fund_tag_funds(false) AS r;', timeout=1200)
+        _r = pg('SELECT public.apply_fund_tag_funds(false, false) AS r;', timeout=1200)
         print(f'  ✓ 统一落地函数返回: {_r}', flush=True)
     except Exception as e:
         print(f'  [WARN] 统一落地函数不可用，回退原有分步重贴: {e}', flush=True)
         try:
             pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS tags text[];", timeout=120)
-            pg("UPDATE fund_scores SET tags = NULL;", timeout=300)
-            pg("""UPDATE fund_scores fs
-                  SET tags = sub.tags
-                  FROM (SELECT fund_code, array_agg(DISTINCT tag_name) AS tags
-                        FROM fund_tag_funds GROUP BY fund_code) sub
-                  WHERE fs.c = sub.fund_code OR fs.c = sub.fund_code || '.OF';""", timeout=600)
+            # 2026-11-28 减负：回退路径原来 3 条无分批全表 UPDATE（2.8 万行/条），
+            # 现按基础代码分小事务执行，口径不变；正常路径仍走统一函数，不会到这里。
+            tag_codes = [r['code'] for r in pg(
+                "SELECT DISTINCT split_part(c,'.',1) AS code FROM fund_scores ORDER BY 1")]
+            for idx, chunk in enumerate(_batches(tag_codes, BATCH), 1):
+                ins = _sql_in(chunk)
+                pg(f"UPDATE fund_scores SET tags = NULL "
+                   f"WHERE split_part(c,'.',1) IN ({ins})", timeout=300)
+                pg(f"""UPDATE fund_scores fs
+                      SET tags = sub.tags
+                      FROM (SELECT fund_code, array_agg(DISTINCT tag_name) AS tags
+                            FROM fund_tag_funds GROUP BY fund_code) sub
+                      WHERE (fs.c = sub.fund_code OR fs.c = sub.fund_code || '.OF')
+                        AND split_part(fs.c,'.',1) IN ({ins})""", timeout=300)
             tagged = pg("SELECT count(*) AS cnt FROM fund_scores WHERE tags IS NOT NULL")[0]['cnt']
             print(f'  ✓ 已为 {tagged} 只基金标记标签', flush=True)
             # 「未分类」按维度判定（2026-11-14）：把「本维度一个标签都没有」固化为布尔列，
@@ -572,28 +581,31 @@ def main():
             # 经同域代理会被 4095 上限拒绝）。tags 刚重新应用完，此处紧接着重算最准确。
             pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_concept boolean;", timeout=120)
             pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS has_industry boolean;", timeout=120)
-            pg("""UPDATE fund_scores fs SET
-                    has_concept = EXISTS (
-                      SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
-                      JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'concept'),
-                    has_industry = EXISTS (
-                      SELECT 1 FROM unnest(COALESCE(fs.tags, '{}'::text[])) x
-                      JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'industry');""", timeout=600)
-            print('  ✓ 已重算 has_concept / has_industry', flush=True)
+            for idx, chunk in enumerate(_batches(tag_codes, BATCH), 1):
+                ins = _sql_in(chunk)
+                pg(f"""UPDATE fund_scores fs SET
+                        has_concept = EXISTS (
+                          SELECT 1 FROM unnest(COALESCE(fs.tags, '{{}}'::text[])) x
+                          JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'concept'),
+                        has_industry = EXISTS (
+                          SELECT 1 FROM unnest(COALESCE(fs.tags, '{{}}'::text[])) x
+                          JOIN fund_tags t ON t.name = x WHERE t.tag_type = 'industry')
+                    WHERE split_part(fs.c,'.',1) IN ({ins})""", timeout=300)
+            print('  ✓ 已重算 has_concept / has_industry（分批）', flush=True)
+            # 回退路径不走统一函数，物化视图未被刷新，[2.6] 必须补刷一次。
+            tag_fallback_used = True
         except Exception as e2:
             print(f'  [WARN] 标签重新应用失败（不影响评分切换）: {e2}', flush=True)
+            # 标签写失败但主切换已完成，[2.6] 仍需刷新以同步配置列/投资风格。
+            tag_fallback_used = True
 
-    # ── 2.6 最终刷新主份额物化视图（2026-11-13）──────────────────────────
-    # [2.2] 那次刷新发生在「配置列 COALESCE 回填」与「[2.5] 重新应用 tags」之前，
-    # 彼时切换进来的新行 invest_style / style_period / tags 都还是 NULL。若只刷一次，
-    # 默认「主代码」列表会丢失投资风格、概念/行业标签
-    # （实测线上 fund_scores_main 15510 行里只有 54 行带 tags，原表有 4481 行）。
-    # 故在所有回填与打标签完成后再刷一次，保证视图与生产表完全同步。
-    try:
-        pg('REFRESH MATERIALIZED VIEW public.fund_scores_main;', timeout=600)
-        print('  ✓ 已刷新物化视图 fund_scores_main（含投资风格与概念/行业标签）', flush=True)
-    except Exception as e:
-        print(f'  [WARN] 最终刷新 fund_scores_main 失败（不阻断切换）: {e}', flush=True)
+    # ── 2.6 物化视图刷新已统一收口到调度中心链尾（2026-11-28）──────────────
+    # 以前每个写库任务都各自刷新一次 fund_scores_main（评分 2 次、规模 1 次、
+    # 配置 1 次、标签 1 次、投资风格 9 次），同一张视图每夜重建 5 次、周日 14 次。
+    # 现在所有写库任务的视图刷新统一由 data-center-orchestrator.yml 最后一个 job
+    # 执行，整链只重建一次；本脚本（含分步回退路径 tag_fallback_used）不再刷新。
+    if tag_fallback_used:
+        print('  ✓ 回退路径完成；物化视图由调度中心链尾统一刷新', flush=True)
 
     # ── 2.9 覆盖率守卫：季度评分刷新完整性 ──────────────────────────────
     print('\n[2.9] 季度评分覆盖率守卫（防 fund_combined 半成品污染）', flush=True)

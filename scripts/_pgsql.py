@@ -20,6 +20,9 @@ MGMT_API = f"https://api.supabase.com/v1/projects/{REF}/database/query"
 
 
 def pg(sql, timeout=600):
+    # 服务端兜底超时：客户端超时只是不再等结果，服务端查询可能继续占住连接池/IO。
+    # 固定 660s（11min），与当前 Management API 会话实测默认值一致，不放宽长查询上限。
+    sql = f"SET statement_timeout = '660s'; {sql}"
     payload = json.dumps({"query": sql})
     r = subprocess.run(
         ["curl", "-s", "--max-time", str(timeout), "-X", "POST", MGMT_API,

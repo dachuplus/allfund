@@ -11,8 +11,11 @@
 --       由本函数在【单个数据库事务】内一次性完成：
 --         ① 正式表 fund_tag_funds 替换（TRUNCATE + INSERT FROM staging）
 --         ② fund_scores.tags / has_concept / has_industry 全量重算
---         ③ REFRESH MATERIALIZED VIEW public.fund_scores_main
+--         ③ 可选刷新物化视图（p_refresh_view=true 时，默认兼容旧调用）
 --       事务提交前，外部会话看到的始终是旧快照，不存在「表已清空、标签还没贴」的中间态。
+--
+-- 2026-11-28 减负：调度中心链尾统一只刷一次 fund_scores_main，夜里的写库任务
+-- 一律传 p_refresh_view=false，避免同一张物化视图被多个任务反复全量重建。
 --
 -- 并发：函数一开始拿 pg_advisory_xact_lock(847261935001)，评分流水线
 --       promote_staging.py [2.5] 也调用同一函数（p_from_staging=false），
@@ -20,11 +23,18 @@
 --       不依赖调度时间、也不依赖 session 连接（Management API 每次请求可能换连接）。
 --
 -- 调用方：
---   scripts/sync_tag_funds_full.py  → SELECT public.apply_fund_tag_funds(true);
---   scripts/promote_staging.py [2.5] → SELECT public.apply_fund_tag_funds(false);
+--   scripts/sync_tag_funds_full.py  → SELECT public.apply_fund_tag_funds(true, false);
+--   scripts/promote_staging.py [2.5] → SELECT public.apply_fund_tag_funds(false, false);
+--   scripts/tag_sync_daily.py       → SELECT public.apply_fund_tag_funds(false, false);
 -- 本文件由 sync_tag_funds_full.py 每次运行幂等执行（CREATE OR REPLACE），是函数真源。
+-- 注意：签名从 1 参变 2 参，必须先 DROP 旧签名，否则会留下两个重载函数。
 
-CREATE OR REPLACE FUNCTION public.apply_fund_tag_funds(p_from_staging boolean DEFAULT false)
+DROP FUNCTION IF EXISTS public.apply_fund_tag_funds(boolean);
+
+CREATE OR REPLACE FUNCTION public.apply_fund_tag_funds(
+  p_from_staging boolean DEFAULT false,
+  p_refresh_view boolean DEFAULT true
+)
 RETURNS jsonb
 LANGUAGE plpgsql
 AS $fn$
@@ -120,8 +130,11 @@ BEGIN
 
   SELECT count(*) INTO v_tagged FROM public.fund_scores WHERE tags IS NOT NULL;
 
-  -- ③ 物化视图是创建时快照，必须在同一事务里刷新，否则主代码列表的 tags 会停在旧快照。
-  EXECUTE 'REFRESH MATERIALIZED VIEW public.fund_scores_main';
+  -- ③ 物化视图是创建时快照；调度中心链路里由链尾统一刷新，这里默认跳过。
+  --    兼容旧调用：p_refresh_view=true 时仍在同事务内刷新。
+  IF p_refresh_view THEN
+    EXECUTE 'REFRESH MATERIALIZED VIEW public.fund_scores_main';
+  END IF;
 
   RETURN jsonb_build_object(
     'from_staging', p_from_staging,

@@ -12,9 +12,10 @@
 写入策略（用户 2026-11-24 要求）：
   - 抓取阶段只写中间表 public.fund_scale_snapshot，严禁直接改生产；
   - 校验阶段核对行数、覆盖率、负值/异常值、两个已知样本；
-  - 校验全部通过后才用一条 UPDATE ... FROM snapshot 原子写回 fund_scores；
-  - 写回后立刻 REFRESH fund_scores_main：前端默认读该物化视图，不刷新则页面
-    「上季规模 / 规模增长%」停留在旧快照全部显示 --；
+  - 校验全部通过后才按基金代码分批（默认 2000/批、小事务）写回 fund_scores；
+    2026-11-28 起不再用一条覆盖 2.8 万行的大 UPDATE，避免长事务/WAL 打挂免费实例；
+  - 2026-11-28 起物化视图统一由调度中心链尾刷新一次，本脚本不再单独 REFRESH，
+    避免同一张视图被多个任务反复全量重建；
   - --rebuild-view 只在视图结构（列/规则）变更时用，会 DROP + CREATE。
 
 用法：
@@ -479,21 +480,33 @@ def validate_snapshot():
     return st
 
 
-def promote_snapshot():
-    sql = f"""
-      UPDATE public.fund_scores f SET
-        fund_scale = s.fund_scale,
-        fund_scale_prev = s.fund_scale_prev,
-        fund_scale_growth = s.fund_scale_growth
-      FROM {SNAPSHOT_TABLE} s
-      WHERE f.c = s.c AND s.fund_scale IS NOT NULL
-    """
-    run_sql(sql, timeout=600)
-    print('  ✓ 已原子写入生产表 fund_scores', flush=True)
-    # 前端默认份额读 fund_scores_main 物化视图；只更新 fund_scores 而不刷新
-    # 视图，会让页面「上季规模 / 规模增长%」长期显示旧快照的 --。
-    run_sql('REFRESH MATERIALIZED VIEW public.fund_scores_main', timeout=600)
-    print('  ✓ 已同步刷新 fund_scores_main 物化视图', flush=True)
+def promote_snapshot(batch_size=2000):
+    """按 c 分批小事务写生产，保持口径与原来的单条 UPDATE ... FROM 完全一致。"""
+    codes = [r['c'] for r in run_sql(
+        f"SELECT c FROM {SNAPSHOT_TABLE} WHERE fund_scale IS NOT NULL ORDER BY c",
+        timeout=300)]
+    if not codes:
+        raise RuntimeError('中间表无可写回的规模数据（fund_scale 全为 NULL）')
+    print(f'  ✓ 规模写回 {len(codes)} 行，分 {(len(codes) + batch_size - 1) // batch_size} 批'
+          f'（每批 {batch_size}）', flush=True)
+
+    for idx, start in enumerate(range(0, len(codes), batch_size), 1):
+        chunk = codes[start:start + batch_size]
+        ins = ','.join("'" + c.replace("'", "''") + "'" for c in chunk)
+        sql = f"""
+          UPDATE public.fund_scores f SET
+            fund_scale = s.fund_scale,
+            fund_scale_prev = s.fund_scale_prev,
+            fund_scale_growth = s.fund_scale_growth
+          FROM {SNAPSHOT_TABLE} s
+          WHERE f.c = s.c AND s.c IN ({ins}) AND s.fund_scale IS NOT NULL
+        """
+        run_sql(sql, timeout=300)
+        if idx % 5 == 0 or idx * batch_size >= len(codes):
+            print(f'    规模写回批次 {idx}/{(len(codes) + batch_size - 1) // batch_size}', flush=True)
+    print('  ✓ 已分批写入生产表 fund_scores', flush=True)
+    # 物化视图由调度中心链尾统一刷新一次；此处不再单独 REFRESH。
+    print('  ✓ 规模写回完成（物化视图由调度中心链尾统一刷新）', flush=True)
 
 
 def cmd_fetch(args):

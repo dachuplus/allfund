@@ -59,8 +59,8 @@ def stats():
 
 
 def reapply_from_prod():
-    """调用同一数据库函数，从正式表重贴 tags/flags 并刷新物化视图。"""
-    r = pg('SELECT public.apply_fund_tag_funds(false) AS r;', timeout=1200)
+    """调用同一数据库函数，从正式表重贴 tags/flags（物化视图由调度中心链尾统一刷新）。"""
+    r = pg('SELECT public.apply_fund_tag_funds(false, false) AS r;', timeout=1200)
     print('  ✓ 统一重贴:', json.dumps(r, ensure_ascii=False, default=str), flush=True)
 
 
@@ -110,11 +110,9 @@ def main():
         restore()
         sys.exit(1)
 
-    # 2026-11-28：apply_fund_tag_funds() 已在同事务内 REFRESH MATERIALIZED VIEW，
-    # 旧版这里再做一次兜底刷新等于同一晚重复全量重建 + 强锁，是免费实例高风险点。
-    # 函数真源 scripts/tag_apply_function.sql 由 sync_tag_funds_full.py 每次幂等创建，
-    # 故不再额外刷新。
-    print('✅ 标签数据同步完成（物化视图已由落地函数在同事务内刷新）', flush=True)
+    # 2026-11-28：物化视图统一由调度中心链尾刷新一次；本脚本与落地函数均不再刷新，
+    # 避免同一晚对同一张视图反复全量重建 + 强锁。函数真源 tag_apply_function.sql。
+    print('✅ 标签数据同步完成（物化视图由调度中心链尾统一刷新）', flush=True)
 
 
 if __name__ == '__main__':

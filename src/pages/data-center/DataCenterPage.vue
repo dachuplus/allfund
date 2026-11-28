@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.68</td>
+              <td>2026-11-28</td>
+              <td><code>4e6b7427</code></td>
+              <td><span class="version-history">历史版本（bot UA 403 + 直连 Supabase 短路 + 昂贵的分类/深分页查询治理）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.67</td>
               <td>2026-11-28</td>
               <td><code>889fe35e</code></td>
@@ -1709,7 +1715,8 @@
       <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用。任何写生产表的动作只能由调度中心执行：子 workflow 的手动 / 远程触发不会直接写库，而是由 <code>delegate-to-orchestrator</code> 自动转交调度中心（<code>only_task</code>=对应任务），按 needs 优先次序排队执行；调度中心自身还设有 <code>dispatch-queue-gate</code> 排队门，等待更早的调度中心 run 结束后才放行写库链，多个手动请求同时到达也不会并发写库。<code>from_orchestrator</code> 仅用于区分「调度中心回调」与「手动转交」，避免循环转交。</p>
       <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>/api/sb-proxy</code> 对伪装 UA 的「大表深分页（offset≥4000）」按 IP 限流 20 次/分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
       <p class="api-note"><strong>二次盘点补强（v4.0.68）：</strong>再次挂库的根因是 AhrefsBot 会执行页面 JS，直接对 <code>*.supabase.co</code> 发起 <code>visitor_logs</code> 写入 / <code>feature_flags</code> / <code>get_visitor_count()</code>，这些请求不经过 <code>/api/*</code> 边缘函数，旧防护挡不到。现在前端在请求发出前对已知低价值 bot 短路返回空响应；同时 <code>/api/sb-proxy</code> 的 <code>__count=exact</code>（实测会触发 57014）按 IP 限流 8 次/分钟，<code>/api/fs-count</code> 按 IP 限流 30 次/分钟；<code>csi-pe</code> / <code>dtip-backtest</code> / <code>toujiao</code> / <code>news</code> / <code>wechat-publish</code> 五个直连 Supabase 的边缘函数统一加 bot 拦截、IP 限流、10 秒超时（无界翻页加 20 轮上限）；<code>toujiao</code> 的 company 参数限定为 102 个合法域名白名单，防止枚举绕过 CDN 缓存。所有限流的 Map 只淘汰过期键，不再全清，避免伪造转发头绕过。</p>
-      <p class="api-note"><strong>物化视图减负：</strong>已移除 <code>promote_staging.py</code> 冗余中间刷新与 <code>tag_sync_daily.py</code> 的兜底重复刷新（落地函数已在同事务内刷新）；原每晚多次全量重建持强锁阻塞前端查询，现只保留必要刷新，数据口径不变。</p>
+      <p class="api-note"><strong>物化视图统一收口（v4.0.69）：</strong><code>fund_scores_main</code> 是全量预计算的物化视图，重建会持强锁。旧实现每个写库任务都「顺手」刷一次（评分 2 次、规模 1 次、季度配置 1 次、标签 1 次、投资风格 9 次），每夜 5 次、周日约 14 次。现在刷新统一放到调度中心 <code>refresh-main-view</code> 链尾任务：全部写库任务完成后只重建一次；<code>apply_fund_tag_funds(p_from_staging, p_refresh_view)</code> 新增开关，夜里的任务一律传 <code>false</code>；规模/配置/投资风格脚本也都不再单独刷新。单任务模式仍会执行链尾刷新，保证主代码列表最终一致。</p>
+      <p class="api-note"><strong>查询减压（v4.0.69）：</strong><code>/api/fs-count</code> 从最多 64 次 ×1000 行分页累加改为「1 行探针 + 倍增/二分」约 32 次 ×1 行，保留 5 分钟缓存、bot 403 与 IP 限流；基金指数页两路全表循环拉取（约 56 次请求 / 5.7 万行）改为服务端 RPC <code>get_fund_category_index(level)</code> 一次聚合（实测 290ms），口径与前端原等权平均一致；物化视图新增 <code>(t0,t1_tt)</code> 复合索引，分类筛选由 Seq Scan 变为 Index Scan。核心写库层统一设置服务端 <code>statement_timeout=660s</code>，客户端断开后服务端查询也会被终止。</p>
       <p class="api-note"><strong>分类兜底减负：</strong>四个静态源全不可用时，不再调用 <code>get_fund_categories()</code> 做 2.8 万行全表 GROUP BY（实测 57014），改为按 <code>c</code> 游标每批 2000 行读取并在前端聚合。</p>
 
       <h2 class="api-group-title">★ 优选数据接口速查（优先选用，状态实时更新）</h2>

@@ -7,8 +7,9 @@ name: 每周更新基金投资风格
 # 2026-11-14 起脚本改为「按批抓取、抓完即写库」：每 400 只立刻
 # UPDATE fund_scores 并写进度表 public.fund_style_fetch，中途取消/超时
 # 也保留已完成批次；用 resume=true 可跳过已抓代码接着跑。
-# 每 8 批及结束时 REFRESH MATERIALIZED VIEW fund_scores_main，
-# 默认「主代码」列表与「筛选结果」总数随之同步。
+# 2026-11-28 减负：中途不再逐批刷新物化视图（--refresh-every 默认 0），
+# 只在全部批次写完后 REFRESH MATERIALIZED VIEW 一次；周日刷新次数从 9 次降到 1 次。
+# 默认「主代码」列表与「筛选结果」总数在结束时同步。
 #
 # 调度：UTC 周日 19:00 = 北京时间周一 03:00（每日评分流水线 21:30 之后）。
 # 每周全量重新核对全部基金，才能抓到新报告期；不带 resume 时会先清空进度表。

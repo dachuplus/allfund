@@ -331,45 +331,31 @@ const displayRows = computed(() => {
   })
 })
 
-// ===== 一级分类指数：按 t0 分组等权聚合 =====
+// ===== 分类指数：服务端一次聚合（2026-11-28 减负）=====
+// 原实现两路 while(true)+range(1000) 把 fund_scores 全表 2.85 万行拉到浏览器再聚合，
+// 共约 56 次请求 / 5.7 万行传输，是免费实例的高成本查询。改调数据库 RPC
+// public.get_fund_category_index(level)，一次请求返回分组结果，口径与原逻辑一致：
+// 空分类归「其他」，count=基金只数，各周期为非空收益的平均值。
+async function loadCategoryIndex(level) {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('get_fund_category_index', { p_level: level })
+  if (error) { console.warn('[FundIndexPanel] category index rpc error', error); return [] }
+  return (data || []).map(r => {
+    const row = { name: r.name, count: Number(r.count) || 0 }
+    AGG_KEYS.forEach(k => {
+      const v = r[k]
+      row[k] = (v == null || v === '' || isNaN(Number(v))) ? null : Number(v)
+    })
+    return row
+  })
+}
+
 async function loadPrimary() {
-  if (!supabase) return
   try {
-    const cols = ['t0', ...AGG_KEYS].join(',')
-    const SIZE = 1000
-    const agg = {}
-    let from = 0
-    while (true) {
-      const { data, error } = await supabase
-        .from('fund_scores')
-        .select(cols)
-        .range(from, from + SIZE - 1)
-      if (error) { console.warn('[FundIndexPanel] primary query error', error); break }
-      if (!data || data.length === 0) break
-      data.forEach(r => {
-        const key = (r.t0 && String(r.t0).trim()) ? String(r.t0).trim() : '其他'
-        if (!agg[key]) {
-          agg[key] = { n: 0, sum: {}, cnt: {} }
-          AGG_KEYS.forEach(k => { agg[key].sum[k] = 0; agg[key].cnt[k] = 0 })
-        }
-        const a = agg[key]
-        a.n++
-        AGG_KEYS.forEach(k => {
-          const v = Number(r[k])
-          if (v != null && !isNaN(v)) { a.sum[k] += v; a.cnt[k]++ }
-        })
-      })
-      if (data.length < SIZE) break
-      from += SIZE
-    }
-    // 排序：按基金数量降序
+    const out = await loadCategoryIndex(1)
+    // 固定分类优先，其余按基金数量降序
     const order = ['股票型','债券型','混合型','指数型','FOF','QDII','货币型']
-    const out = Object.keys(agg).map(k => {
-      const a = agg[k]
-      const row = { name: k, count: a.n }
-      AGG_KEYS.forEach(k2 => { row[k2] = a.cnt[k2] ? a.sum[k2] / a.cnt[k2] : null })
-      return row
-    }).sort((x, y) => {
+    out.sort((x, y) => {
       const ix = order.indexOf(x.name), iy = order.indexOf(y.name)
       if (ix >= 0 && iy >= 0) return ix - iy
       if (ix >= 0) return -1
@@ -382,43 +368,10 @@ async function loadPrimary() {
   }
 }
 
-// ===== 二级分类指数：按 t1_tt 分组等权聚合 =====
 async function loadSecondary() {
-  if (!supabase) return
   try {
-    const cols = ['t1_tt', ...AGG_KEYS].join(',')
-    const SIZE = 1000
-    const agg = {}
-    let from = 0
-    while (true) {
-      const { data, error } = await supabase
-        .from('fund_scores')
-        .select(cols)
-        .range(from, from + SIZE - 1)
-      if (error) { console.warn('[FundIndexPanel] secondary query error', error); break }
-      if (!data || data.length === 0) break
-      data.forEach(r => {
-        const key = (r.t1_tt && String(r.t1_tt).trim()) ? String(r.t1_tt).trim() : '其他'
-        if (!agg[key]) {
-          agg[key] = { n: 0, sum: {}, cnt: {} }
-          AGG_KEYS.forEach(k => { agg[key].sum[k] = 0; agg[key].cnt[k] = 0 })
-        }
-        const a = agg[key]
-        a.n++
-        AGG_KEYS.forEach(k => {
-          const v = Number(r[k])
-          if (v != null && !isNaN(v)) { a.sum[k] += v; a.cnt[k]++ }
-        })
-      })
-      if (data.length < SIZE) break
-      from += SIZE
-    }
-    const out = Object.keys(agg).map(k => {
-      const a = agg[k]
-      const row = { name: k, count: a.n }
-      AGG_KEYS.forEach(k2 => { row[k2] = a.cnt[k2] ? a.sum[k2] / a.cnt[k2] : null })
-      return row
-    }).sort((x, y) => y.count - x.count)
+    const out = await loadCategoryIndex(2)
+    out.sort((x, y) => y.count - x.count)
     secRows.value = out
   } catch (e) {
     console.error('[FundIndexPanel] secondary', e)

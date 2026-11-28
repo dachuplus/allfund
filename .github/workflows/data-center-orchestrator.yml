@@ -397,3 +397,42 @@ jobs:
       from_orchestrator: true
       skip_run: ${{ needs['sunday-gate'].outputs.run == 'false' }}
     secrets: inherit
+
+  # ───────────────────────────────────────────────────────────────
+  # 链尾唯一一次刷新主份额物化视图（2026-11-28 减负）
+  # 所有写库任务的 fund_scores_main 刷新统一收口到这里：整链只做一次全量重建，
+  # 不再由每个任务各自刷新（原来每夜 5 次、周日 14 次，持强锁易打挂免费实例）。
+  # if: !cancelled() 保证任一业务 job 失败时仍刷新已落库的数据，但整条 run 被
+  # 人工取消时不执行；needs 中的 skipped 不算 failure，单任务模式也能正常收尾。
+  # ───────────────────────────────────────────────────────────────
+  refresh-main-view:
+    needs: [dispatch-queue-gate, fund-scores, tag-perf, stock-scores, style-factors,
+            index-scores, ai-pk-returns, stock-pk-returns, dtip-pe-sync,
+            fund-scale-growth, allocation-quarterly, tag-funds, tougu-daily,
+            macro-history, monday-gate, dtip-weekly, stock-pk-weekly, monthly-gate,
+            ai-pk-monthly, quarterly-gate, refresh-fund-scale-quarterly,
+            news-spa-crawl, toujiao-crawl, sunday-gate, invest-style,
+            movie-ratings-weekly]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_PAT: ${{ secrets.SUPABASE_MGMT_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: REFRESH MATERIALIZED VIEW public.fund_scores_main（链尾唯一一次）
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          pat = os.environ['SUPABASE_PAT']
+          ref = os.environ.get('SUPABASE_PROJECT_REF') or 'tqhtegazxykkqfcpejky'
+          url = f'https://api.supabase.com/v1/projects/{ref}/database/query'
+          payload = json.dumps({'query': 'REFRESH MATERIALIZED VIEW public.fund_scores_main'}).encode('utf-8')
+          req = urllib.request.Request(url, data=payload, method='POST', headers={
+              'Authorization': f'Bearer {pat}',
+              'Content-Type': 'application/json',
+              'User-Agent': 'allfund-ci',
+          })
+          with urllib.request.urlopen(req, timeout=600) as r:
+              print(r.read().decode('utf-8') or 'refresh ok')
+          PY
