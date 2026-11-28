@@ -1,7 +1,0 @@
-name: _orch_diag
-on:
-  workflow_dispatch:
-jobs:
-  t:
-    uses: ./.github/workflows/update-scores.yml
-    secrets: inherit
