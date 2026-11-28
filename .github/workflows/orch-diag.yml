@@ -3,5 +3,5 @@ on:
   workflow_dispatch:
 jobs:
   t:
-    uses: ./.github/workflows/sync-tag-perf.yml
+    uses: ./.github/workflows/update-scores.yml
     secrets: inherit

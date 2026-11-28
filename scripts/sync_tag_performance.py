@@ -71,10 +71,11 @@ def fetch_tag_list():
     h = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fund.eastmoney.com/ztjj/'}
     r = requests.get(url, headers=h, timeout=15)
     r.raise_for_status()
-    t = r.text
-    s = t.index('(') + 1
-    e = t.rindex(')')
-    data = json.loads(t[s:e])['Data']
+    t = r.text.strip()
+    # 东财 callback=? 有时返回 JSONP(cb(...))，有时直接返回纯 JSON；两种都兼容
+    if '(' in t and t.rstrip().endswith(')'):
+        t = t[t.index('(') + 1:t.rindex(')')]
+    data = json.loads(t)['Data']
 
     rows = []
     for group in [data.get('hy1', []), data.get('hy2', []), data.get('gn', [])]:
