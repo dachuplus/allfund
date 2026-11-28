@@ -1617,6 +1617,50 @@
       <div class="card-title">数据接口文档</div>
       <p class="section-desc">以下是 本站 使用的所有外部数据接口，所有接口均来源于公开数据平台。</p>
 
+      <!-- 调度中心 · 数据抓取 CI 清单 -->
+      <h2 class="api-group-title">调度中心 · 数据抓取 CI 清单</h2>
+      <p class="section-desc">
+        网站所需的全部后台数据抓取，统一由 <strong>调度中心</strong>（<code>.github/workflows/data-center-orchestrator.yml</code>，北京时间每日 21:10 触发）编排。
+        调度中心把写库任务串成一条 <strong>needs 串行链</strong>，同一时刻只有一个任务写 Supabase，避免并发打满免费实例导致整库不可用。
+        <strong>抓数铁律：所有覆盖型写入均为「抓取 → staging 中间表 → 校验 → 单事务切换生产」，校验不过绝不写生产。</strong>
+      </p>
+
+      <h3 class="api-name">一、调度中心串行链（每日 21:10 起，严格排队执行）</h3>
+      <table class="field-table">
+        <thead><tr><th>#</th><th>数据 / 任务</th><th>数据源接口</th><th>抓取脚本</th><th>落地方式（staging→生产）</th></tr></thead>
+        <tbody>
+          <tr><td>①</td><td>基金核心评分（净值/收益/分类/风险）</td><td>天天基金 rankhandler、FundGuideapi、fundcode_search.js、pingzhongdata、fundf10 jbgk/tsdata、腾讯 gtimg</td><td><code>fetch_and_import_funds.py</code> 等</td><td>fund_scores_staging → 校验 → promote（刷 main 视图）</td></tr>
+          <tr><td>②</td><td>板块涨跌幅 + 资金流</td><td>东财 ZTJJ <code>GetBKListByBKTypeNew</code> / <code>GetBKDetailInfoNew</code>、push2 clist 资金流</td><td><code>sync_tag_performance.py</code></td><td>抓取 → fund_tag_perf_staging → 校验 → 单事务切换</td></tr>
+          <tr><td>③</td><td>股票全市场评分</td><td>东财 datacenter-web / push2his、新浪财经、腾讯 gu.qq.com</td><td><code>fetch_stock_scores.py</code></td><td>stock_scores_staging → 校验 → promote</td></tr>
+          <tr><td>④</td><td>风格因子（股票/债券/大宗）</td><td>新浪财经 K 线、腾讯指数行情、macro_history</td><td><code>build_style_factors.py --to-staging / --promote</code></td><td>抓取 → style_factors_staging → 校验 → 单事务切换</td></tr>
+          <tr><td>⑤</td><td>指数五维评分</td><td>东财 datacenter-web 成分接口、腾讯 gtimg、内部 stock_scores</td><td><code>fetch_index_raw.py</code> → <code>compute_index_scores.py</code></td><td>index_scores_raw → staging → 校验 → promote</td></tr>
+          <tr><td>⑥</td><td>基金组合月度收益记录</td><td>内部 fund_scores（读近1月收益）</td><td><code>record_ai_pk_monthly_returns.py</code></td><td>append 历史表（PK 幂等，不覆盖）</td></tr>
+          <tr><td>⑦</td><td>股票组合周度收益记录</td><td>内部 stock_scores</td><td><code>record_stock_pk_monthly_returns.py</code></td><td>append 历史表（PK 幂等，不覆盖）</td></tr>
+          <tr><td>⑧</td><td>定投 PE 历史缓存</td><td>同源边缘函数 <code>/api/dtip-pe-sync</code>（7 指数全量 PE 日史）</td><td><code>dtip_pe_sync.py</code></td><td>增量 append（ON CONFLICT DO NOTHING）</td></tr>
+          <tr><td>⑨</td><td>基金规模增长（上季/当季/增长%）</td><td>天天基金 pingzhongdata（主体合并口径）</td><td><code>refresh_fund_scale_growth.py</code></td><td>fund_scale_snapshot → 校验 → promote（刷 main 视图）</td></tr>
+          <tr><td>⑩</td><td>资产配置 + 季度评分（最重）</td><td>东财 fundf10 <code>FundArchivesDatas.aspx</code> / gmbd / cyrjg / zcpz</td><td><code>fetch_fund_allocation.py</code> 等（8+8 分片，max-parallel 2）</td><td>fund_scores_staging → test 镜像 → 生产（COALESCE 保护）；刷 main 视图</td></tr>
+          <tr><td>⑪</td><td>热门标签-基金映射</td><td>东财 ZTJJ 板块清单</td><td><code>tag_sync_daily.py</code></td><td>fund_tag_funds_staging → 校验 → 单事务落地（advisory lock）</td></tr>
+        </tbody>
+      </table>
+      <p class="api-note">①②⑤⑨⑪ 为覆盖型写入，全部走 staging → 校验 → 生产三段式；⑥⑦⑧ 为 append-only 历史记录表（主键幂等、不覆盖生产），故无需 staging。所有任务共用 <code>SUPABASE_MGMT_TOKEN</code> 写库，数据口径与抓取范围均未因统一调度改变。</p>
+
+      <h3 class="api-name">二、独立调度任务（低频 / 守护 / 不写主库，不进串行链）</h3>
+      <table class="field-table">
+        <thead><tr><th>任务</th><th>调度时机</th><th>数据源接口</th><th>抓取脚本</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>DB 健康自愈</td><td>每 15 分钟</td><td>Supabase Management API（探活 / 重启）</td><td><code>supabase_healthcheck.py</code></td><td>守护任务，必须独立，连续异常才重启</td></tr>
+          <tr><td>主动 ETF PCF</td><td>交易日 08:30</td><td>上交所 query.sse.com.cn / 深交所报表 API</td><td><code>fetch_etf_pcf.py</code></td><td>写 pcf-data 独立分支，不写 Supabase</td></tr>
+          <tr><td>宏观历史</td><td>每日 10:00</td><td>akshare==1.20.1（bond_zh_us_rate 等）</td><td><code>refresh_macro_history.py</code></td><td>白天低频，staging → 校验 → promote</td></tr>
+          <tr><td>投顾产品</td><td>每日 09:00</td><td>东财 WJLC GSRankList</td><td><code>fetch_tougu_products.py</code></td><td>白天低频</td></tr>
+          <tr><td>投资风格 F10</td><td>每周日 03:00</td><td>东财 fundf10 tsdata 页面</td><td><code>fetch_invest_style.py</code></td><td>周更，分批增量落库</td></tr>
+          <tr><td>电影评分 Top1万</td><td>每周日 04:00</td><td>TMDB Discover API</td><td><code>fetch_tmdb_top_movies.py</code></td><td>staging → 校验 → 切换</td></tr>
+          <tr><td>股票 PK 选股 / 基金 PK 选基</td><td>周一 / 每月 1 号</td><td>东财行情 + 百炼/火山方舟等 LLM</td><td><code>run_stock_pk_monthly.py</code> / <code>ai_pk_real.py</code></td><td>低频，真实 LLM 选基选股</td></tr>
+          <tr><td>定投周投记录</td><td>每周一 09:00</td><td>同源 <code>/api/csi-pe</code>、新浪 K 线</td><td><code>dtip_weekly_commit.py</code></td><td>低频，append 定投流水</td></tr>
+          <tr><td>季度规模回填</td><td>季初 22:00</td><td>天天基金 pingzhongdata</td><td><code>backfill_fund_scale.py</code></td><td>季度低频</td></tr>
+          <tr><td>资讯 / 投教爬虫</td><td>每日凌晨（低频）</td><td>搜狐等公开页面（Playwright）</td><td><code>news_spa_crawler.py</code> / <code>toujiao_crawler.py</code></td><td>内容抓取，低频错峰</td></tr>
+        </tbody>
+      </table>
+
       <h2 class="api-group-title">★ 优选数据接口速查（优先选用，状态实时更新）</h2>
       <p class="section-desc">下列接口为各功能域的<strong>成熟 / 首选</strong>数据源，新功能开发应优先复用，避免重复踩坑。状态含义：✅ 成熟稳定 · ⚠️ 受限需代理 · ❌ 当前不稳定。</p>
       <table class="field-table">
