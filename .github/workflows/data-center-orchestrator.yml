@@ -238,7 +238,7 @@ jobs:
   # ── 日期门控：北京时间周一 ──────────────────────────────────────────
   monday-gate:
     needs: [dispatch-queue-gate, macro-history]
-    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' && needs['macro-history'].result != 'failure' && needs['macro-history'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'monday-gate') }}
+    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -278,7 +278,7 @@ jobs:
   # ── 日期门控：北京时间每月 1 号 ─────────────────────────────────────
   monthly-gate:
     needs: [dispatch-queue-gate, stock-pk-weekly]
-    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' && needs['stock-pk-weekly'].result != 'failure' && needs['stock-pk-weekly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'monthly-gate') }}
+    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -308,7 +308,7 @@ jobs:
   # ── 日期门控：北京时间 2/5/8/11 月 1 号 ─────────────────────────────
   quarterly-gate:
     needs: [dispatch-queue-gate, ai-pk-monthly]
-    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' && needs['ai-pk-monthly'].result != 'failure' && needs['ai-pk-monthly'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'quarterly-gate') }}
+    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -361,7 +361,7 @@ jobs:
   # ── 日期门控：北京时间周日 ──────────────────────────────────────────
   sunday-gate:
     needs: [dispatch-queue-gate, toujiao-crawl]
-    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' && needs['toujiao-crawl'].result != 'failure' && needs['toujiao-crawl'].result != 'cancelled' && (github.event.inputs.only_task == '' || github.event.inputs.only_task == 'all' || github.event.inputs.only_task == 'sunday-gate') }}
+    if: ${{ !cancelled() && needs['dispatch-queue-gate'].result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:

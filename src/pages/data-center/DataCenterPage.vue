@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.66</td>
+              <td>2026-11-28</td>
+              <td><code>12c13bc0</code></td>
+              <td><span class="version-history">历史版本（手动触发自动转交调度中心排队 + 并发排队门）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.65</td>
               <td>2026-11-28</td>
               <td><code>61af9f51</code></td>
