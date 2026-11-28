@@ -1,3 +1,4 @@
+import { botGuard, ipRateLimit } from './_bot_guard.js' // __BOT_GUARD_ADDED__
 /**
  * EdgeOne Pages Function — 定投助手回测引擎（walk-forward 估值分位定投）
  * 路由：GET /api/dtip-backtest?codes=000300,000905&weeks=52
@@ -53,14 +54,22 @@ const DEFAULT_CODES = [
 const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
 const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
 
-/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行） */
+/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行）
+ *  2026-11-28：加 10s 超时（此处曾为 while(true) 无上限翻页 + 无超时，占死连接池风险最高）。 */
 async function sbSelect(path) {
   const url = `${SUPABASE_URL}/rest/v1/${path}&apikey=${ANON_KEY}`
-  const res = await fetch(url, {
-    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
-  })
-  if (!res.ok) throw new Error('sb ' + res.status)
-  return res.json()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  try {
+    const res = await fetch(url, {
+      headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error('sb ' + res.status)
+    return await res.json()
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // 5 档估值区间 → 每周操作（与 DtipPanel.vue ZONES 一致）
@@ -209,7 +218,8 @@ async function fetchPeSeriesCache(code) {
     let offset = 0
     const LIMIT = 1000
     let name = ''
-    while (true) {
+    // 2026-11-28：加最大 20 轮（2 万行）保护，防上游异常时空页不返回导致无限翻页打库
+    for (let round = 0; round < 20; round++) {
       const page = await sbSelect(
         `dtip_pe_history?select=trade_date,pe,name` +
         `&index_code=eq.${code}&order=trade_date.asc&limit=${LIMIT}&offset=${offset}`
@@ -561,6 +571,12 @@ function backtest(peResult, closeResult, weeks) {
 }
 
 export async function onRequest(context) {
+  // 2026-11-28 二次盘点：直连 Supabase 的函数此前无 bot 防护/无限流，
+  // 长时间占用免费实例仅 10 个连接池位。已知 bot 直接 403；其余按 IP 限流。
+  const __blocked = botGuard(context.request)
+  if (__blocked) return __blocked
+  const __limited = ipRateLimit(context.request, 'dtip-backtest', 20, 60 * 1000)
+  if (__limited) return __limited
   const url = new URL(context.request.url)
   const raw = (url.searchParams.get('codes') || '').trim()
   let codes = raw

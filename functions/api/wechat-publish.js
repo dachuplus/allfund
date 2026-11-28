@@ -15,6 +15,7 @@
  */
 
 import { SUPABASE_SERVICE_ROLE_KEY as FILE_SB_KEY } from './_supabase_service.js'
+import { botGuard, ipRateLimit } from './_bot_guard.js' // __BOT_GUARD_ADDED__
 
 const WECHAT_API_BASE = 'https://api.weixin.qq.com'
 // Supabase 项目 URL 是公开信息（前端 VITE_SUPABASE_URL 同源），内联为常量，无需环境变量。
@@ -31,11 +32,15 @@ async function loadCredential(account, env) {
   if (!sbUrl || !sbKey) return null
   const url = `${sbUrl}/rest/v1/wechat_credentials?account_key=eq.${encodeURIComponent(account)}&enabled=eq.true&select=name,appid,appsecret,thumb_media_id,raw_id&limit=1`
   // EdgeOne(海外)→Supabase(新加坡) 跨境链路偶发 502/超时，重试最多 3 次；只接受 2xx 且非空。
-  // 注意：EdgeOne 运行时下 AbortSignal 行为异常（见 sb-proxy.js 注释），此处不用 AbortSignal.timeout。
+  // 2026-11-28：3 次重试此前完全无超时，单次可挂死占住连接池；现每次套 8s 手写 AbortController
+  // （不用 AbortSignal.timeout：EdgeOne 运行时下行为异常，见 sb-proxy.js 注释）。
   for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
     try {
       const res = await fetch(url, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+        signal: controller.signal,
       })
       if (res.ok) {
         const rows = await res.json()
@@ -43,6 +48,8 @@ async function loadCredential(account, env) {
       }
     } catch (_) {
       // 网络抖动，继续重试
+    } finally {
+      clearTimeout(timer)
     }
   }
   return null
@@ -219,6 +226,12 @@ async function publishDraft(accessToken, mediaId) {
 }
 
 export async function onRequestPost(context) {
+  // 2026-11-28 二次盘点：直连 Supabase 的函数此前无 bot 防护/无限流，
+  // 长时间占用免费实例仅 10 个连接池位。已知 bot 直接 403；其余按 IP 限流。
+  const __blocked = botGuard(context.request)
+  if (__blocked) return __blocked
+  const __limited = ipRateLimit(context.request, 'wechat-publish', 10, 60 * 1000)
+  if (__limited) return __limited
   // 先检测出口 IP（在微信调用之前，确保同一连接上下文）
   const egressIP = await detectEgressIP()
 

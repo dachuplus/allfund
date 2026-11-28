@@ -24,6 +24,30 @@ const FETCH_TIMEOUT_MS = 45000
 const baseFetch = (typeof fetch !== 'undefined' ? fetch : (...a) => Promise.reject(new Error('no fetch')))
 
 /**
+ * 2026-11-28 二次盘点：已知 SEO bot（AhrefsBot 等）会执行页面 JS，随后由浏览器
+ * 直接对 supabase.co 发起 visitor_logs 写入 / feature_flags / get_visitor_count，
+ * 这些请求不经过 /api/* 边缘函数，botGuard 挡不到，实测 21:03 把它们全部打 500+57014。
+ * 前端这层在「请求发出前」就返回空响应，bot 拿不到数据、DB 也不再被打。
+ * 与 functions/api/_bot_guard.js 的 UA 列表保持一致；只拦低价值 SEO bot，
+ * Googlebot / Bingbot / Baiduspider 放行，不影响 SEO。
+ */
+const BOT_UA_RE = /ahrefsbot|semrushbot|semrush|mj12bot|dotbot|linkdexbot|majesticbot|blexbot|spbot|screaming frog|petalbot|bytespider/i
+export function isLowValueBot() {
+  if (typeof navigator === 'undefined' || !navigator.userAgent) return false
+  return BOT_UA_RE.test(navigator.userAgent)
+}
+function botEmptyResponse(init) {
+  // 列表/计数类 GET 返回 []（supabase-js 解析为 0 行，UI 显示空但不报错）；
+  // 写请求返回空 200，避免 bot 控制台报错反复重试。
+  const method = ((init && init.method) || 'GET').toUpperCase()
+  const isWrite = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE'
+  return Promise.resolve(new Response(isWrite ? '{}' : '[]', {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  }))
+}
+
+/**
  * 同域代理改写：把对本项目 Supabase 域名（*.supabase.co）的 fetch 重写为同源
  * /api/sb-proxy?path=<原路径+查询>，由 EdgeOne 海外节点函数转发到 Supabase 新加坡，
  * 绕开浏览器跨境直连的不稳定。其余域名（如实时宏观数据 macro-data 函数、第三方源）不改写。
@@ -239,6 +263,8 @@ function raceAuthFetch(input, init, signal) {
 }
 
 function timeoutFetch(input, init = {}) {
+  // bot 的请求在发出前就短路，不经代理也不直连 DB（21:03 打挂库的根因防线）
+  if (isLowValueBot()) return botEmptyResponse(init)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   // 若 supabase 自带 signal，把它和我们的 controller 关联：它取消时我们也取消
@@ -276,6 +302,8 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
  * 浏览器直连新加坡 PostgREST 实测可达，读取端点用直连更稳。
  */
 function directTimeoutFetch(input, init = {}) {
+  // bot 直连客户端同样短路：visitor_logs / feature_flags 等走直连时不打 DB
+  if (isLowValueBot()) return botEmptyResponse(init)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   if (init.signal && typeof init.signal.addEventListener === 'function') {

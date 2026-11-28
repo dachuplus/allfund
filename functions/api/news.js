@@ -1,3 +1,4 @@
+import { botGuard, ipRateLimit } from './_bot_guard.js' // __BOT_GUARD_ADDED__
 /**
  * EdgeOne Pages Function — 资讯聚合（在线拉取，不落地）
  * 路由： GET /api/news?cat=<分类>&src=<站点key>&refresh=1
@@ -194,9 +195,17 @@ async function readNewsSpaCache(sourceKey) {
   const url =
     `${SUPABASE_URL}/rest/v1/news_spa_cache?source_key=eq.${encodeURIComponent(sourceKey)}` +
     `&select=title,url,published_at&order=fetched_at.desc`
-  const res = await fetch(url, {
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  let res
+  try {
+    res = await fetch(url, {
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) throw new Error('sb ' + res.status)
   const rows = await res.json()
   return (rows || []).map((r) => ({
@@ -503,6 +512,12 @@ async function fetchClsTelegraph(url) {
 /* ============ 主入口 ============ */
 
 export async function onRequest(context) {
+  // 2026-11-28 二次盘点：直连 Supabase 的函数此前无 bot 防护/无限流，
+  // 长时间占用免费实例仅 10 个连接池位。已知 bot 直接 403；其余按 IP 限流。
+  const __blocked = botGuard(context.request)
+  if (__blocked) return __blocked
+  const __limited = ipRateLimit(context.request, 'news', 20, 60 * 1000)
+  if (__limited) return __limited
   const url = new URL(context.request.url)
   const cat = (url.searchParams.get('cat') || '').toLowerCase()
   const src = (url.searchParams.get('src') || '').toLowerCase()

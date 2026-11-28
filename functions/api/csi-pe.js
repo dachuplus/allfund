@@ -1,3 +1,4 @@
+import { botGuard, ipRateLimit } from './_bot_guard.js' // __BOT_GUARD_ADDED__
 /**
  * EdgeOne Pages Function — 中证指数官方历史 PE（定投助手估值分位数据源）
  * 路由：GET /api/csi-pe?codes=000300,000905,...（codes 可省略，默认定投助手 7 指数全集）
@@ -34,14 +35,22 @@ const DEFAULT_CODES = [
 const SUPABASE_URL = 'https://tqhtegazxykkqfcpejky.supabase.co'
 const ANON_KEY = 'sb_publishable_iFtMcvav774gqF28gGYQVw_QMmuS-z3'
 
-/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行） */
+/** 经 Supabase anon REST 读取缓存表（SELECT 受 anon_select_dtip_pe 策略放行）
+ *  2026-11-28：加 10s 超时，避免慢查询长时间占用免费实例仅有的 10 个连接池位。 */
 async function sbSelect(path) {
   const url = `${SUPABASE_URL}/rest/v1/${path}&apikey=${ANON_KEY}`
-  const res = await fetch(url, {
-    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
-  })
-  if (!res.ok) throw new Error('sb ' + res.status)
-  return res.json()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  try {
+    const res = await fetch(url, {
+      headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` },
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error('sb ' + res.status)
+    return await res.json()
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** 经 Supabase anon REST 读取缓存表行数。
@@ -162,6 +171,12 @@ async function fetchOne(code) {
 }
 
 export async function onRequest(context) {
+  // 2026-11-28 二次盘点：直连 Supabase 的函数此前无 bot 防护/无限流，
+  // 长时间占用免费实例仅 10 个连接池位。已知 bot 直接 403；其余按 IP 限流。
+  const __blocked = botGuard(context.request)
+  if (__blocked) return __blocked
+  const __limited = ipRateLimit(context.request, 'csi-pe', 20, 60 * 1000)
+  if (__limited) return __limited
   const url = new URL(context.request.url)
   const raw = (url.searchParams.get('codes') || '').trim()
   let codes = raw

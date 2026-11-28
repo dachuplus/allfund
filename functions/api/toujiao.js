@@ -1,3 +1,4 @@
+import { botGuard, ipRateLimit } from './_bot_guard.js' // __BOT_GUARD_ADDED__
 /**
  * 投教内容聚合 — 边缘函数只读接口
  * 路由：GET /api/toujiao?company=<domain>&url=<edu_url>
@@ -80,9 +81,17 @@ async function readCache(company) {
   const url =
     `${SUPABASE_URL}/rest/v1/toujiao_articles?company_key=eq.${encodeURIComponent(company)}` +
     `&select=title,url,category,fetched_at&order=fetched_at.desc`
-  const res = await fetch(url, {
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  let res
+  try {
+    res = await fetch(url, {
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) throw new Error('sb ' + res.status)
   const rows = await res.json()
   return (rows || []).map((r) => ({
@@ -93,7 +102,120 @@ async function readCache(company) {
   }))
 }
 
+// 2026-11-28 二次盘点：company 参数此前完全由调用方提供 → 枚举任意域名可绕过 CDN 缓存、
+// 每个值都触发一次新的 Supabase 查询。限定为 scripts/toujiao_companies.json 的合法域名。
+const ALLOWED_COMPANIES = new Set([
+  '99fund.com',
+  'abc-ca.com',
+  'baoying.com.cn',
+  'bdfund.com',
+  'bocifund.com',
+  'bocim.com',
+  'boscam.com.cn',
+  'bosera.com',
+  'ccbfund.cn',
+  'ccdfund.com.cn',
+  'chfund.com',
+  'chinaamc.com',
+  'cib-fund.com.cn',
+  'ciccfund.com',
+  'cinda.com.cn',
+  'citic-pru.com',
+  'citicfund.com',
+  'cjhxfund.com',
+  'cmfchina.com',
+  'cmsamt.com',
+  'cmsfunds.com.cn',
+  'cnta-zg.com',
+  'cnta.com.cn',
+  'csfund.com.cn',
+  'cxfund.com.cn',
+  'dbfund.com.cn',
+  'dcfund.com.cn',
+  'dfcffund.com',
+  'dfham.com',
+  'ebscn.com',
+  'efunds.com.cn',
+  'essenceasset.com',
+  'fcfrom.com',
+  'ftfund.com',
+  'fullgoal.com.cn',
+  'fund001.com',
+  'fundca.com',
+  'galaxyasset.com',
+  'gefund.com.cn',
+  'gffunds.com.cn',
+  'gjfund.com',
+  'guolian-an.com',
+  'guolian.com.cn',
+  'guoshengan.com',
+  'harvestfund.com.cn',
+  'hffund.com',
+  'hftfund.com',
+  'hongyi.com',
+  'hrfund.com',
+  'hsbcjt.com',
+  'hsfund.com',
+  'hsfund.com.cn',
+  'htcxmc.com',
+  'huaaipb.com',
+  'huaan.com.cn',
+  'hyfund.com',
+  'icbccs.com.cn',
+  'igwfmc.com',
+  'jiutaifunds.com',
+  'jpmorgan.com.cn',
+  'jxfund.com.cn',
+  'jysld.com',
+  'ksfund.com',
+  'manulife.com.cn',
+  'maxwealthfund.com',
+  'msjud.com',
+  'ncfund.com.cn',
+  'noan.com.cn',
+  'nuode.com',
+  'orient-fund.com',
+  'phfund.com.cn',
+  'pinganfund.com',
+  'pyaxa.com',
+  'pyfund.com.cn',
+  'qhkyfund.com.cn',
+  'reyuanfund.com',
+  'rufund.com.cn',
+  'ruida.com',
+  'southernfund.com',
+  'swsmu.com',
+  'szfund.com',
+  'taixin.com',
+  'thfund.com.cn',
+  'tkfunds.com',
+  'ttfund.com',
+  'tzfund.com',
+  'ubssdic.com',
+  'wjasset.com',
+  'wlfunds.com.cn',
+  'xc-fund.com',
+  'xinghua.com',
+  'xqfunds.com',
+  'xyfunds.com.cn',
+  'xzaz.com',
+  'ydfund.com',
+  'yhfund.com.cn',
+  'ymfund.com',
+  'zgfunds.com.cn',
+  'zhfunds.com',
+  'zofund.com',
+  'zque.com',
+  'zrfunds.com.cn',
+])
+
 export async function onRequest(context) {
+  // 2026-11-28 二次盘点：直连 Supabase 的函数此前无 bot 防护/无限流，
+  // 长时间占用免费实例仅 10 个连接池位。已知 bot 直接 403；其余按 IP 限流。
+  const __blocked = botGuard(context.request)
+  if (__blocked) return __blocked
+  const __limited = ipRateLimit(context.request, 'toujiao', 20, 60 * 1000)
+  if (__limited) return __limited
   const { request } = context
   const u = new URL(request.url)
   const company = (u.searchParams.get('company') || '').trim()
@@ -102,6 +224,12 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({ error: 'missing company' }), {
       status: 400,
       headers: { 'content-type': 'application/json; charset=utf-8' },
+    })
+  }
+  if (!ALLOWED_COMPANIES.has(company)) {
+    return new Response(JSON.stringify({ error: 'unknown company' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'X-Robots-Tag': 'noindex, nofollow' },
     })
   }
   try {

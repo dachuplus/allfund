@@ -17,7 +17,7 @@
  * 的 fund_scores_main 大查询，把免费实例打挂。
  */
 
-import { botGuard, deepPaginationGuard } from './_bot_guard.js'
+import { botGuard, deepPaginationGuard, ipRateLimit } from './_bot_guard.js'
 
 const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 // EdgeOne Pages 函数平台上限约 15-17s（实测）。我们必须在被平台强杀前返回自己的 502 JSON，
@@ -165,6 +165,15 @@ export async function onRequest(context) {
   // 伪装 UA 的爬虫仍可能深翻大表：limit=1000 & offset>=4000 按 IP 限流
   const deepLimited = deepPaginationGuard(req, targetPath)
   if (deepLimited) return deepLimited
+
+  // 2026-11-28 二次盘点：__count=exact 是另一个可绕过 UA 拦截的打库入口。
+  // 注释见下方 countMode 分支——该头实测能触发 57014 statement timeout，
+  // 且本函数无任何缓存、deepPaginationGuard 又不匹配无 offset 的 count 请求。
+  // 这里按 IP 单独限流（每 60s 最多 8 次），正常用户筛选翻页远低于此阈值。
+  if (targetPath.includes('__count=exact')) {
+    const countLimited = ipRateLimit(req, 'sb-count-exact', 8, 60 * 1000)
+    if (countLimited) return countLimited
+  }
 
   const method = req.method.toUpperCase()
   const headers = buildUpstreamHeaders(req.headers)

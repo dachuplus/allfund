@@ -19,7 +19,7 @@
  *  - 相同筛选条件的结果缓存 5 分钟，避免爬虫遍历分页时反复全表累加。
  */
 
-import { botGuard } from './_bot_guard.js'
+import { botGuard, ipRateLimit } from './_bot_guard.js'
 
 const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 const UPSTREAM_TIMEOUT_MS = 14000
@@ -56,6 +56,11 @@ export async function onRequest(context) {
   }
   const blocked = botGuard(req)
   if (blocked) return blocked
+  // 2026-11-28 二次盘点：缓存 key 由筛选条件构成，可任意变化（500 key × 64 次分页
+  // = 5min 内约 3.2 万次查询）。UA 可伪造，故再按 IP 限流：每 60s 最多 30 次计数
+  // 请求，正常用户筛选/翻页远低于此值；超阈值直接 429，不回源。
+  const limited = ipRateLimit(req, 'fs-count', 30, 60 * 1000)
+  if (limited) return limited
   const url = new URL(req.url)
   const targetPath = url.searchParams.get('path')
   if (!targetPath) return json({ count: null, error: 'missing path' }, 400)
