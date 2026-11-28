@@ -487,7 +487,8 @@ def main():
     print('== 建表 style_factors（含 staging）==')
     for stmt in [s.strip() for s in DDL.strip().split(';') if s.strip()]:
         pg(stmt)
-    pg(f'CREATE TABLE IF NOT EXISTS {STAGING} (LIKE {PROD} INCLUDING DEFAULTS)')
+    # INCLUDING IDENTITY：让 staging 的 id 也是 GENERATED ALWAYS，插入时无需显式给 id
+    pg(f'CREATE TABLE IF NOT EXISTS {STAGING} (LIKE {PROD} INCLUDING DEFAULTS INCLUDING IDENTITY)')
     print('  表就绪')
 
     if args.promote:
