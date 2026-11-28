@@ -1,0 +1,7 @@
+name: _orch_diag
+on:
+  workflow_dispatch:
+jobs:
+  t:
+    uses: ./.github/workflows/sync-tag-perf.yml
+    secrets: inherit
