@@ -8,9 +8,10 @@ name: 数据中心 · 夜间数据统一调度
 #
 # 本编排器是【唯一夜间数据入口】：
 #   - 单一 cron 触发，按 needs 链【严格串行】跑完 11 个写库任务；
-#   - 不设 concurrency：GitHub 对含 reusable workflow 的 caller 配 concurrency
-#     会导致 startup_failure（实测），故用 needs 串行 + 单一入口保证不并发。
 #   - 同一时刻只有一个任务写库，杜绝并发打满免费实例；
+#   - 不设顶层 permissions / concurrency：实测这两者加在含 reusable workflow 的
+#     caller 上会触发 startup_failure（0 job）；secrets 用 inherit 透传即可，
+#     写库所需权限由各被调 workflow 自己的 GITHUB_TOKEN 默认权限承担。
 #   - 每个被调 workflow 仍是独立文件、独立脚本，数据口径/抓取范围/校验逻辑完全不变；
 #   - 各子 workflow 的独立 schedule 已停用（保留 workflow_dispatch 供手动排障），
 #     避免双重触发。
