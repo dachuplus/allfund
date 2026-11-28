@@ -449,7 +449,10 @@
           >
             <td class="col-code"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.c }}</a></td>
             <td class="col-name"><a :href="eastMoneyUrl(fund.c)" target="_blank" @click.stop>{{ fund.n || '基金' + fund.c }}</a><span v-if="fund.ret_anomaly" class="anom-badge" title="收益数据异常（疑似单点净值毛刺或源数据脏值），筛选「异常-否」可剔除">异常</span></td>
-            <td class="col-manager" :title="fund.fund_manager">{{ fund.fund_manager || '--' }}</td>
+            <td class="col-manager" :title="fund.fund_manager">
+              <router-link v-if="fund.fund_manager" :to="{ name: 'tools-manager', query: { name: fund.fund_manager } }" @click.stop>{{ fund.fund_manager }}</router-link>
+              <span v-else>--</span>
+            </td>
             <td class="col-t1" :title="fund.t1_tt || fund.t1">{{ fund.t1_tt || fund.t1 || '--' }}</td>
             <td class="col-style">
               <span v-if="fund.invest_style" class="style-badge" :title="'投资风格：' + fund.invest_style + '（' + (fund.style_period || '最新报告期') + '）'">{{ fund.invest_style }}</span>
@@ -528,7 +531,9 @@
             </span>
           </span>
         </div>
-        <div class="fund-card-mgr" v-if="fund.fund_manager">{{ fund.fund_manager }}</div>
+        <div class="fund-card-mgr" v-if="fund.fund_manager">
+          <router-link :to="{ name: 'tools-manager', query: { name: fund.fund_manager } }" @click.stop>{{ fund.fund_manager }}</router-link>
+        </div>
         <div class="fund-card-tags">
           <span v-if="fund.invest_style" class="style-badge" :title="'投资风格：' + fund.invest_style + '（' + (fund.style_period || '最新报告期') + '）'">{{ fund.invest_style }}</span>
           <span class="tag-line" v-if="conceptOf(fund).length"><em>概念</em>{{ conceptOf(fund).slice(0, 5).join('、') }}<span v-if="conceptOf(fund).length > 5"> 等 {{ conceptOf(fund).length }} 个</span></span>
@@ -2250,6 +2255,8 @@ onUnmounted(() => {
 .col-name a { color: var(--text-primary); text-decoration: none; }
 .col-name a:hover { color: var(--link); text-decoration: underline; }
 .col-manager { width: 78px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-manager a { color: var(--text-secondary); text-decoration: none; }
+.col-manager a:hover { color: var(--link); text-decoration: underline; }
 .col-manager.sortable { cursor: pointer; user-select: none; }
 .col-manager.sortable:hover { background: #e0e7ef; }
 .col-scale { width: 74px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
@@ -2349,6 +2356,8 @@ onUnmounted(() => {
   font-size: 13px; color: var(--text-secondary);
   margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.fund-card-mgr a { color: var(--text-secondary); text-decoration: none; }
+.fund-card-mgr a:hover { color: var(--link); text-decoration: underline; }
 
 .fund-card-scale {
   font-size: 13px; color: var(--text-secondary);

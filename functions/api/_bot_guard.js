@@ -44,3 +44,36 @@ export function botGuard(req) {
     },
   })
 }
+
+// ── 通用深分页限流（防伪装 UA 的爬虫）──────────────────────────────────────
+// 日志里打挂 DB 的模式是 limit=1000 & offset>=4000 连续翻页。UA 可伪造，
+// 因此对「大表 + 深分页」按 IP 再做一道粗粒度限流：60 秒内超过 20 次即 429。
+const DEEP_HITS = new Map()
+const DEEP_WINDOW_MS = 60 * 1000
+const DEEP_MAX = 20
+
+export function deepPaginationGuard(req, targetPath) {
+  const m = /[?&]offset=(\d+)/.exec(targetPath || '')
+  if (!m || Number(m[1]) < 4000) return null
+  if (!/fund_scores|stock_scores/.test(targetPath)) return null
+
+  const forwarded = (req && req.headers && req.headers.get('x-forwarded-for')) || ''
+  const ip = forwarded.split(',')[0].trim()
+    || ((req && req.headers && req.headers.get('x-real-ip')) || 'unknown')
+  const now = Date.now()
+  let rec = DEEP_HITS.get(ip)
+  if (!rec || now - rec.t > DEEP_WINDOW_MS) rec = { n: 0, t: now }
+  rec.n += 1
+  DEEP_HITS.set(ip, rec)
+  if (DEEP_HITS.size > 2000) DEEP_HITS.clear()
+  if (rec.n <= DEEP_MAX) return null
+  return new Response(JSON.stringify({ error: 'deep pagination rate limited' }), {
+    status: 429,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'Retry-After': '60',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  })
+}

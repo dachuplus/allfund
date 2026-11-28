@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.63</td>
+              <td>2026-11-28</td>
+              <td><code>a0bb688f</code></td>
+              <td><span class="version-history">历史版本（生产写入串行铁律 + fund_scores 分批写生产 + SEO 爬虫防护）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.62</td>
               <td>2026-11-28</td>
               <td><code>bfd6bc66</code></td>
@@ -1677,7 +1683,8 @@
         </tbody>
       </table>
       <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用（仅保留手动触发供排障），不再有时间重叠的可能。</p>
-      <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
+      <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>/api/sb-proxy</code> 对伪装 UA 的「大表深分页（offset≥4000）」按 IP 限流 20 次/分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
+      <p class="api-note"><strong>物化视图减负：</strong>已移除 <code>promote_staging.py</code> 中冗余的中间刷新——原每晚对 <code>fund_scores_main</code> 做 3 次全量重建（持强锁阻塞前端查询），现保留必要的 2 次，数据口径不变。</p>
 
       <h2 class="api-group-title">★ 优选数据接口速查（优先选用，状态实时更新）</h2>
       <p class="section-desc">下列接口为各功能域的<strong>成熟 / 首选</strong>数据源，新功能开发应优先复用，避免重复踩坑。状态含义：✅ 成熟稳定 · ⚠️ 受限需代理 · ❌ 当前不稳定。</p>

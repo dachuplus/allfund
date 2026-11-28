@@ -17,7 +17,7 @@
  * 的 fund_scores_main 大查询，把免费实例打挂。
  */
 
-import { botGuard } from './_bot_guard.js'
+import { botGuard, deepPaginationGuard } from './_bot_guard.js'
 
 const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 // EdgeOne Pages 函数平台上限约 15-17s（实测）。我们必须在被平台强杀前返回自己的 502 JSON，
@@ -161,6 +161,10 @@ export async function onRequest(context) {
   ) {
     return jsonError('absolute or relative traversal url not allowed', 400)
   }
+
+  // 伪装 UA 的爬虫仍可能深翻大表：limit=1000 & offset>=4000 按 IP 限流
+  const deepLimited = deepPaginationGuard(req, targetPath)
+  if (deepLimited) return deepLimited
 
   const method = req.method.toUpperCase()
   const headers = buildUpstreamHeaders(req.headers)

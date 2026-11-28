@@ -179,6 +179,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { toast } from '../../composables/useToast'
 
 const typeTabs = [
@@ -202,6 +203,14 @@ const f = reactive({
   bestFund: '',
   prodType: '',        // 代表产品类型（contains 匹配）
 })
+
+// 从基金评分表点基金经理姓名跳转过来时，自动带入姓名筛选（query.name）
+const route = useRoute()
+if (route.query.name) {
+  f.name = String(route.query.name)
+} else if (route.query.q) {
+  f.search = String(route.query.q)
+}
 
 const rawAll = ref([])        // 当前类型已加载的全部数据
 const loading = ref(false)

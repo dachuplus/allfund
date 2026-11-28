@@ -484,15 +484,11 @@ def main():
     except Exception as e:
         print(f'  [WARN] 代码格式护栏执行失败（不阻断切换）: {e}', flush=True)
 
-    # ── 2.2 刷新主份额物化视图（2026-11-09）────────────────────────────────
-    # fund_scores_main 是物化视图：普通视图做 count=exact / 全量扫描会触发
-    # 57014 statement_timeout（DISTINCT ON + regexp 全表排序），无法给出精确总数。
-    # 生产表切换后必须刷新，否则默认「主代码」列表与「筛选结果」总数会滞后一天。
-    try:
-        pg('REFRESH MATERIALIZED VIEW public.fund_scores_main;', timeout=600)
-        print('  ✓ 已刷新物化视图 fund_scores_main', flush=True)
-    except Exception as e:
-        print(f'  [WARN] 刷新 fund_scores_main 失败（不阻断切换）: {e}', flush=True)
+    # ── 2.2 中间刷新已移除（2026-11-28 减负）──────────────────────────────
+    # 旧实现在这里刷一次 fund_scores_main，[2.5] 的 apply_fund_tag_funds 内部再刷一次，
+    # [2.6] 最终又刷一次 —— 同一晚对 1.5 万行物化视图做 3 次全量重建 + AccessExclusiveLock，
+    # 是免费实例的高风险点。[2.2] 之后到 [2.6] 之间没有任何读取该视图的步骤，
+    # 中间刷新完全冗余；保留 [2.5] 内部刷新与 [2.6] 最终刷新，数据口径不变。
 
     # ── Layer 3：生产表数量校验（基准=数据源全量 U）────────────────────────
     # 允许新发基金使生产超过 U；只卡"显著少于 U"（真实丢失）。
