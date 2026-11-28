@@ -21,9 +21,16 @@ name: 季度刷新基金规模（fund_scale）
 # =====================================================================
 
 on:
-  # 季度定时：北京时间 03:20 的 2/1、5/1、8/1、11/1（UTC 19:20）—— 用户要求全部数据更新安排在夜里12点后
-  schedule:
-    - cron: '20 19 1 2,5,8,11 *'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用，
+  # 季初执行与否由调度中心的 quarterly-gate 判定。
+  # schedule:
+  #   - cron: '20 19 1 2,5,8,11 *'
+  workflow_call:
+    inputs:
+      skip_run:
+        description: '非季初跳过真实写库（调度中心日期门控用）'
+        type: boolean
+        default: false
   # 手动触发（紧急补刷用）
   workflow_dispatch:
 
@@ -54,6 +61,7 @@ jobs:
 
       - name: 季度回刷 fund_scale（全量，支持断点续跑）
         id: backfill
+        if: ${{ !inputs.skip_run }}
         run: |
           echo "============================================"
           echo "  季度回刷 fund_scores.fund_scale"

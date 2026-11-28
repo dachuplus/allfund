@@ -6,9 +6,16 @@ name: 定投助手每周一定投写入
 # 估值分位经同源边缘函数 /api/csi-pe 代取（规避 GitHub 云 IP 被 csindex WAF 403）。
 
 on:
-  # 定时触发：北京时间每周一 02:05（UTC 周一 18:05）—— 用户要求全部数据更新安排在夜里12点后
-  schedule:
-    - cron: '5 18 * * 1'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用，
+  # 周一执行与否由调度中心的 monday-gate 判定。
+  # schedule:
+  #   - cron: '5 18 * * 1'
+  workflow_call:
+    inputs:
+      skip_run:
+        description: '非周一跳过真实写库（调度中心日期门控用）'
+        type: boolean
+        default: false
   # 手动触发（Actions 页面 Run workflow）
   workflow_dispatch:
   # 远程触发（无需登录 GitHub 点击）：
@@ -45,4 +52,5 @@ jobs:
           echo "SUPABASE_PAT 已配置: ${#SUPABASE_PAT} 字符"
 
       - name: 周一定投写入（估值分位 → 收盘 → 落库）
+        if: ${{ !inputs.skip_run }}
         run: python scripts/dtip_weekly_commit.py

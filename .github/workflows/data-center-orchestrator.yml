@@ -3,35 +3,41 @@ name: 调度中心 · 夜间数据统一调度
 # =====================================================================
 # 调度中心（2026-11-28 用户要求，统一命名「调度中心」）
 #
-# 痛点：此前 11 个写库 workflow 各自带 schedule，时间散落在 21:30~05:00，
-# 且部分长流水线尾部重叠，多个 job 同时写 Supabase 免费实例 → PGRST002 / 整库卡死。
+# 痛点：此前各写库 workflow 各自带 schedule，时间散落在凌晨至上午，
+# 任务耗时不可控，长任务尾部与后续任务重叠，多个 job 同时写 Supabase
+# 免费实例 → PGRST002 / 57014 statement timeout / 整库卡死。
 #
 # 本调度中心是【唯一夜间数据入口】：
-#   - 单一 cron 触发，按 needs 链【严格串行】跑完 11 个写库任务；
+#   - 单一 cron 触发（北京时间 00:10），按 needs 链【严格串行】跑完所有写库任务；
+#   - 上一个任务结束后才开始下一个，不依赖 cron 时间点错开；
 #   - 同一时刻只有一个任务写库，杜绝并发打满免费实例；
 #   - 不设顶层 permissions / concurrency：实测这两者加在含 reusable workflow 的
 #     caller 上会触发 startup_failure（0 job）；secrets 用 inherit 透传即可，
 #     写库所需权限由各被调 workflow 自己的 GITHUB_TOKEN 默认权限承担。
 #   - 每个被调 workflow 仍是独立文件、独立脚本，数据口径/抓取范围/校验逻辑完全不变；
-#   - 各子 workflow 的独立 schedule 已停用（保留 workflow_dispatch 供手动排障），
-#     避免双重触发。
+#   - 所有被调 workflow 的独立 schedule 已停用（保留 workflow_dispatch /
+#     repository_dispatch 供手动排障），避免双重触发。
 #
 # 遵守抓数铁律：所有覆盖型写入均为「抓取→staging→校验→单事务切换生产」，
-# 校验不过绝不碰生产表。收益/PE 记录类是 append-only 历史表（PK + ON CONFLICT
-# 幂等、不覆盖生产），不造成服务挂起，纳入串行链但无需 staging。
+# 校验不过绝不碰生产表。收益/PE/定投记录类是 append-only 历史表（PK +
+# ON CONFLICT 幂等、不覆盖生产），不造成服务挂起，纳入串行链但无需 staging。
+#
+# 日期门控（gate job 本身不写库、恒成功，只输出 run=true/false）：
+#   - monday-gate      → dtip-weekly / stock-pk-weekly（仅北京时间周一执行）
+#   - monthly-gate     → ai-pk-monthly（仅每月 1 号执行）
+#   - quarterly-gate   → refresh-fund-scale-quarterly（仅 2/5/8/11 月 1 号执行）
+#   - sunday-gate      → invest-style / movie-ratings-weekly（仅北京时间周日执行）
+# 门控通过 with.skip_run 传给子 workflow：非执行日只跑 checkout/setup，
+# 所有写库 step 被跳过，job 仍 success，串行链不会因 skipped 而中断。
 #
 # 不纳入本链（必须独立）：
 #   - db-health-autoheal.yml：每 15min 探活自愈，守护任务不能排在被保护链里；
-#   - etf-pcf-daily.yml：写 pcf-data 独立分支，不写 Supabase；
-#   - 周/月/季更低频任务（invest-style/movie-ratings/ai-pk-monthly/
-#     stock-pk-weekly/refresh-fund-scale-quarterly/dtip-weekly）+ 白天任务
-#     （macro-history 10:00 / tougu 09:00 / toujiao 02:00 低频）：频率低、时间分散，
-#     不参与每日高峰，保留各自独立调度。
+#   - etf-pcf-daily.yml：写 pcf-data 独立分支，不写 Supabase。
 # =====================================================================
 
 on:
   # 北京时间每天 00:10（UTC 16:10，次日凌晨）—— 用户要求全部安排在夜里 12 点后，
-  # 避开白天/晚高峰，夜间低负载时串行写库，进一步保护免费实例。
+  # 夜间低负载时串行写库，进一步保护免费实例。
   schedule:
     - cron: '10 16 * * *'
   workflow_dispatch:
@@ -42,7 +48,7 @@ jobs:
     uses: ./.github/workflows/update-scores.yml
     secrets: inherit
 
-  # ② 热门标签资金流：抓取→staging→校验→原子切换（本次三段式改造）
+  # ② 热门标签资金流：抓取→staging→校验→原子切换（三段式改造）
   tag-perf:
     needs: [fund-scores]
     uses: ./.github/workflows/sync-tag-perf.yml
@@ -54,7 +60,7 @@ jobs:
     uses: ./.github/workflows/update-stock-scores.yml
     secrets: inherit
 
-  # ④ 风格因子：抓取→staging→校验→原子切换（本次三段式改造）
+  # ④ 风格因子：抓取→staging→校验→原子切换（三段式改造）
   style-factors:
     needs: [stock-scores]
     uses: ./.github/workflows/update-style-factors.yml
@@ -100,4 +106,169 @@ jobs:
   tag-funds:
     needs: [allocation-quarterly]
     uses: ./.github/workflows/tag-funds-daily.yml
+    secrets: inherit
+
+  # ⑫ 投顾产品每日更新（原独立 01:17）
+  tougu-daily:
+    needs: [tag-funds]
+    uses: ./.github/workflows/tougu-daily.yml
+    secrets: inherit
+
+  # ⑬ 宏观历史日更（原独立 01:40）：staging→校验→promote
+  macro-history:
+    needs: [tougu-daily]
+    uses: ./.github/workflows/macro-history-daily.yml
+    secrets: inherit
+
+  # ── 日期门控：北京时间周一 ──────────────────────────────────────────
+  monday-gate:
+    needs: [macro-history]
+    if: ${{ !cancelled() && needs['macro-history'].result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          DOW=$(TZ=Asia/Shanghai date +%u)
+          if [ "$DOW" = "1" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "北京时间周一：执行本周定投/股票PK任务"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "北京时间非周一（dow=$DOW）：跳过本周定投/股票PK任务"
+          fi
+
+  # ⑭ 定投助手周投记录（原独立周一 02:05）：仅周一写库
+  dtip-weekly:
+    needs: [monday-gate]
+    if: ${{ !cancelled() && needs['monday-gate'].result == 'success' }}
+    uses: ./.github/workflows/dtip-weekly.yml
+    with:
+      skip_run: ${{ needs['monday-gate'].outputs.run == 'false' }}
+    secrets: inherit
+
+  # ⑮ 股票 PK 每周重选（原独立周一 02:30）：仅周一写库
+  stock-pk-weekly:
+    needs: [dtip-weekly, monday-gate]
+    if: ${{ !cancelled() && needs['dtip-weekly'].result == 'success' && needs['monday-gate'].result == 'success' }}
+    uses: ./.github/workflows/stock-pk-weekly.yml
+    with:
+      skip_run: ${{ needs['monday-gate'].outputs.run == 'false' }}
+    secrets: inherit
+
+  # ── 日期门控：北京时间每月 1 号 ─────────────────────────────────────
+  monthly-gate:
+    needs: [stock-pk-weekly]
+    if: ${{ !cancelled() && needs['stock-pk-weekly'].result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          DAY=$(TZ=Asia/Shanghai date +%d)
+          if [ "$DAY" = "01" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "北京时间每月 1 号：执行基金 AI 大 PK 月度调仓"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "北京时间非月初（day=$DAY）：跳过基金 AI 大 PK 月度调仓"
+          fi
+
+  # ⑯ 基金 AI 大 PK 月度调仓（原独立每月 1 号 02:55）：仅月初写库
+  ai-pk-monthly:
+    needs: [monthly-gate]
+    if: ${{ !cancelled() && needs['monthly-gate'].result == 'success' }}
+    uses: ./.github/workflows/ai-pk-monthly.yml
+    with:
+      skip_run: ${{ needs['monthly-gate'].outputs.run == 'false' }}
+    secrets: inherit
+
+  # ── 日期门控：北京时间 2/5/8/11 月 1 号 ─────────────────────────────
+  quarterly-gate:
+    needs: [ai-pk-monthly]
+    if: ${{ !cancelled() && needs['ai-pk-monthly'].result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          DAY=$(TZ=Asia/Shanghai date +%d)
+          MON=$(TZ=Asia/Shanghai date +%m)
+          case "$MON" in
+            02|05|08|11) IS_Q=1 ;;
+            *) IS_Q=0 ;;
+          esac
+          if [ "$DAY" = "01" ] && [ "$IS_Q" = "1" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "北京时间季初 ${MON}-${DAY}：执行基金规模季度回刷"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "北京时间非季初（${MON}-${DAY}）：跳过基金规模季度回刷"
+          fi
+
+  # ⑰ 基金规模季度回刷（原独立季初 03:20）：仅季初写库
+  refresh-fund-scale-quarterly:
+    needs: [quarterly-gate]
+    if: ${{ !cancelled() && needs['quarterly-gate'].result == 'success' }}
+    uses: ./.github/workflows/refresh-fund-scale-quarterly.yml
+    with:
+      skip_run: ${{ needs['quarterly-gate'].outputs.run == 'false' }}
+    secrets: inherit
+
+  # ⑱ 资讯 SPA 聚合爬虫（原独立 03:30）
+  news-spa-crawl:
+    needs: [refresh-fund-scale-quarterly]
+    if: ${{ !cancelled() && needs['refresh-fund-scale-quarterly'].result == 'success' }}
+    uses: ./.github/workflows/news-spa-crawl.yml
+    secrets: inherit
+
+  # ⑲ 投教内容聚合爬虫（原独立 02:00）
+  toujiao-crawl:
+    needs: [news-spa-crawl]
+    if: ${{ !cancelled() && needs['news-spa-crawl'].result == 'success' }}
+    uses: ./.github/workflows/toujiao-crawl.yml
+    secrets: inherit
+
+  # ── 日期门控：北京时间周日 ──────────────────────────────────────────
+  sunday-gate:
+    needs: [toujiao-crawl]
+    if: ${{ !cancelled() && needs['toujiao-crawl'].result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          DOW=$(TZ=Asia/Shanghai date +%u)
+          if [ "$DOW" = "7" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "北京时间周日：执行投资风格 / 电影评分周更"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "北京时间非周日（dow=$DOW）：跳过投资风格 / 电影评分周更"
+          fi
+
+  # ⑳ 基金投资风格周更（原独立周日 03:00）：仅周日写库
+  invest-style:
+    needs: [sunday-gate]
+    if: ${{ !cancelled() && needs['sunday-gate'].result == 'success' }}
+    uses: ./.github/workflows/invest-style.yml
+    with:
+      skip_run: ${{ needs['sunday-gate'].outputs.run == 'false' }}
+    secrets: inherit
+
+  # ㉑ 电影评分周更（原独立周日 04:00）：仅周日写库
+  movie-ratings-weekly:
+    needs: [invest-style, sunday-gate]
+    if: ${{ !cancelled() && needs['invest-style'].result == 'success' && needs['sunday-gate'].result == 'success' }}
+    uses: ./.github/workflows/movie-ratings-weekly.yml
+    with:
+      skip_run: ${{ needs['sunday-gate'].outputs.run == 'false' }}
     secrets: inherit

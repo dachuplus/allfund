@@ -10,8 +10,26 @@ name: 每周更新电影评分库
 # 调度：UTC 周日 20:00 = 北京时间周一 04:00（错开投资风格 03:00）。
 
 on:
-  schedule:
-    - cron: '0 20 * * 0'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用，
+  # 周日执行与否由调度中心的 sunday-gate 判定。
+  # schedule:
+  #   - cron: '0 20 * * 0'
+  workflow_call:
+    inputs:
+      limit:
+        description: '抓取条数（0 = 全量 10000，调试用可传 200）'
+        required: false
+        type: string
+        default: '0'
+      dry_run:
+        description: '只抓取不写库（调试用）'
+        required: false
+        type: boolean
+        default: false
+      skip_run:
+        description: '非周日跳过真实写库（调度中心日期门控用）'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       limit:
@@ -61,11 +79,11 @@ jobs:
           fi
 
       - name: 幂等确保表结构存在
-        if: steps.check_key.outputs.configured == 'true'
+        if: ${{ !inputs.skip_run && steps.check_key.outputs.configured == 'true' }}
         run: python scripts/create_movie_ratings_tables.py
 
       - name: 抓取 TMDB Top1万并切换正式表
-        if: steps.check_key.outputs.configured == 'true'
+        if: ${{ !inputs.skip_run && steps.check_key.outputs.configured == 'true' }}
         run: |
           LIMIT="${{ inputs.limit || '0' }}"
           if [ "$LIMIT" = "0" ]; then LIMIT_ARGS=""; else LIMIT_ARGS="--limit $LIMIT"; fi

@@ -14,8 +14,41 @@ name: 每周更新基金投资风格
 # 每周全量重新核对全部基金，才能抓到新报告期；不带 resume 时会先清空进度表。
 
 on:
-  schedule:
-    - cron: '0 19 * * 0'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用，
+  # 周日执行与否由调度中心的 sunday-gate 判定。
+  # schedule:
+  #   - cron: '0 19 * * 0'
+  workflow_call:
+    inputs:
+      limit:
+        description: '只处理前 N 只（0 = 全量），调试用'
+        required: false
+        type: string
+        default: '0'
+      workers:
+        description: '并发数（实测 >8 会被限流，默认 8）'
+        required: false
+        type: string
+        default: '8'
+      chunk:
+        description: '每批只数，抓完立即写库'
+        required: false
+        type: string
+        default: '400'
+      resume:
+        description: '断点续跑：不清空进度表，跳过已抓代码'
+        required: false
+        type: boolean
+        default: false
+      only_missing:
+        description: '只抓尚无风格的基金（轻量补漏用）'
+        required: false
+        type: boolean
+        default: false
+      skip_run:
+        description: '非周日跳过真实写库（调度中心日期门控用）'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       limit:
@@ -74,9 +107,11 @@ jobs:
         run: pip install requests
 
       - name: 幂等准备列与物化视图
+        if: ${{ !inputs.skip_run }}
         run: python scripts/ensure_invest_style_columns.py
 
       - name: 抓取最新报告期投资风格
+        if: ${{ !inputs.skip_run }}
         run: |
           EXTRA=""
           if [ "${{ inputs.resume }}" = "true" ]; then EXTRA="$EXTRA --resume"; fi

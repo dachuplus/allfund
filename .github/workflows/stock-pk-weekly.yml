@@ -1,9 +1,16 @@
 name: 股票PK每周重选
 
 on:
-  # 定时触发：北京时间每周一 02:30（UTC 周一 18:30）—— 用户要求全部数据更新安排在夜里12点后
-  schedule:
-    - cron: '30 18 * * 1'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用，
+  # 周一执行与否由调度中心的 monday-gate 判定。
+  # schedule:
+  #   - cron: '30 18 * * 1'
+  workflow_call:
+    inputs:
+      skip_run:
+        description: '非周一跳过真实写库（调度中心日期门控用）'
+        type: boolean
+        default: false
   # 手动触发
   workflow_dispatch:
   # 远程触发（无需登录 GitHub 点击）：
@@ -59,6 +66,7 @@ jobs:
           fi
 
       - name: 步骤1 — 抓取股票评分（写入 stock_scores staging/test + etl_run_log）
+        if: ${{ !inputs.skip_run }}
         run: |
           echo "============================================"
           echo "  步骤1: 抓取股票评分 fetch_stock_scores"
@@ -69,6 +77,7 @@ jobs:
           echo "股票评分抓取完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: 步骤2 — 校验并切到生产表（stock_scores / stock_pk_models / stock_pk_picks）
+        if: ${{ !inputs.skip_run }}
         run: |
           echo "============================================"
           echo "  步骤2: promote_stock_scores"
@@ -79,6 +88,7 @@ jobs:
           echo "切换完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: 步骤3 — 每周重选（真实LLM选股或规则兜底 + 写 etl_run_log）
+        if: ${{ !inputs.skip_run }}
         run: |
           echo "============================================"
           echo "  步骤3: run_stock_pk_monthly（编排每周重选）"

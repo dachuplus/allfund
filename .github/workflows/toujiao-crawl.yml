@@ -1,9 +1,25 @@
 name: 投教内容聚合爬虫
 
 on:
-  schedule:
-    # 北京 02:00 = UTC 18:00（夜间，避开交易时段，每日全量重抓一次）
-    - cron: '0 18 * * *'
+  # 独立 schedule 已停用（2026-11-28）：统一由调度中心 data-center-orchestrator.yml 串行调用。
+  # schedule:
+  #   - cron: '0 18 * * *'
+  workflow_call:
+    inputs:
+      limit:
+        description: '只爬前 N 家（调试用）'
+        required: false
+        type: string
+        default: ''
+      company:
+        description: '只爬指定 domain（调试用）'
+        required: false
+        type: string
+        default: ''
+      skip_run:
+        description: '调度中心日期门控用（本任务每日执行，恒为 false）'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       limit:
@@ -37,8 +53,9 @@ jobs:
           pip install playwright requests
           python -m playwright install --with-deps chromium
       - name: 运行投教爬虫
+        if: ${{ !inputs.skip_run }}
         run: |
           ARGS=""
-          if [ -n "${{ github.event.inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ github.event.inputs.limit }}"; fi
-          if [ -n "${{ github.event.inputs.company }}" ]; then ARGS="$ARGS --company ${{ github.event.inputs.company }}"; fi
+          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
+          if [ -n "${{ inputs.company }}" ]; then ARGS="$ARGS --company ${{ inputs.company }}"; fi
           python scripts/toujiao_crawler.py $ARGS
