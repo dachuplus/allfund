@@ -12,14 +12,24 @@ promote_staging.py — 校验 fund_scores_staging 并原子切换到生产 fund_
   3. 校验通过后，才把临时表原子切到生产 fund_scores，并重建 fund_combined；
   4. 任何一步失败 → 拒绝切换、保留生产数据、从备份恢复，绝不产生空表。
 
-  切换机制（2026-10-30 修正）：由「TRUNCATE 全表 + 全量 INSERT」改为
-  「DELETE 仅 staging 管理的代码 + INSERT」，保留生产表中由 sync_etfs/reconcile
-  直写、不进 staging 的代码（场内 ETF/LOF 等），天然避免误删，且使 L3 对得上全量。
+  切换机制（2026-11-28 修正）：由「TRUNCATE 全表 + 全量 INSERT」→
+  「DELETE 仅 staging 管理的代码 + INSERT」→【按基础代码分批提交】。
+  单批默认 2000 个基础代码（--batch-size / FUND_PROMOTE_BATCH 可调）：每批用一次
+  独立小事务完成「删旧格式 + 插 staging 行」，批与批之间释放锁，避免 2.8 万行
+  大事务长时间锁表 / 产生海量 WAL 把免费实例打挂；每批失败立即从 _fs_backup
+  按相同批次回滚，生产表绝不会因中途失败留下半成品。
+  保留生产表中由 sync_etfs/reconcile 直写、不进 staging 的代码（场内 ETF/LOF 等），
+  天然避免误删，且使 L3 对得上全量。
+
+  【生产写入串行铁律】调度中心 data-center-orchestrator.yml 用 needs 单链保证：
+  上一个任务完整跑完（抓取 → staging → 校验 → 写生产 → 后置刷新）后，才启动下一个
+  任务的写库。本脚本只负责自身分批，不与其他写库任务并行。
 
 用法：
-  python3 promote_staging.py                 # 校验 + 原子切换
+  python3 promote_staging.py                 # 校验 + 分批切换
   python3 promote_staging.py --dry-run       # 仅跑三层校验与结构化输出，不切换（安全验证用）
   python3 promote_staging.py --skip-combined # 跳过 fund_combined 重建
+  python3 promote_staging.py --batch-size 1000  # 指定每批基础代码数
 （需 SUPABASE_MGMT_TOKEN 环境变量；CI 中自动注入）
 """
 import os
@@ -57,6 +67,29 @@ CANON_CATS = ['股票型', '混合型', '债券型', '指数型', 'FOF', 'QDII',
 def pg(sql, timeout=300):
     from _db import run_sql as _db_run_sql
     return _db_run_sql(sql, timeout=timeout)
+
+
+# ── 分批写生产（2026-11-28）────────────────────────────────────────────────
+def _sql_in(values):
+    """把基础代码列表拼成安全的 SQL IN 字面量（代码均为数字，仍做转义兜底）。"""
+    return ','.join("'" + str(v).replace("'", "''") + "'" for v in values)
+
+
+def _batches(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i + size]
+
+
+def restore_from_backup(codes, batch_size):
+    """按批次从 _fs_backup 回滚生产表里 staging 管理的代码，不 TRUNCATE 整表。"""
+    cols = PROMOTE_COLS
+    for idx, chunk in enumerate(_batches(codes, batch_size), 1):
+        ins = _sql_in(chunk)
+        pg(f"DELETE FROM fund_scores WHERE split_part(c,'.',1) IN ({ins}); "
+           f"INSERT INTO fund_scores ({cols}) SELECT {cols} FROM _fs_backup "
+           f"WHERE split_part(c,'.',1) IN ({ins});", timeout=300)
+        if idx % 10 == 0:
+            print(f'  · 回滚进度 {idx} 批', flush=True)
 
 
 def get_t0_counts(table):
@@ -202,10 +235,16 @@ def main():
                         help='忽略覆盖率守卫，强制重建 fund_combined（手动全量刷新用）')
     parser.add_argument('--dry-run', action='store_true',
                         help='仅跑三层校验与结构化输出，不执行切换（安全验证用）')
+    parser.add_argument('--batch-size', type=int,
+                        default=int(os.environ.get('FUND_PROMOTE_BATCH', '2000')),
+                        help='每批写生产的基础代码数（默认 2000，越大越快但锁越久）')
     args = parser.parse_args()
+    if args.batch_size < 1 or args.batch_size > 10000:
+        sys.exit('--batch-size 必须在 1~10000 之间')
+    BATCH = args.batch_size
 
     print('=' * 64, flush=True)
-    print(' 校验并原子切换 fund_scores_staging → fund_scores', flush=True)
+    print(f' 校验并分批切换 fund_scores_staging → fund_scores（每批 {BATCH} 个基础代码）', flush=True)
     if args.dry_run:
         print('  模式：--dry-run（不切换，仅校验）', flush=True)
     print('=' * 64, flush=True)
@@ -369,7 +408,12 @@ def main():
     print('\n[1] 备份当前生产 fund_scores → _fs_backup', flush=True)
     pg('CREATE TABLE IF NOT EXISTS _fs_backup (LIKE fund_scores INCLUDING ALL)')
     pg('TRUNCATE TABLE _fs_backup')
-    pg('INSERT INTO _fs_backup SELECT * FROM fund_scores')
+    backup_codes = [r['code'] for r in pg(
+        "SELECT DISTINCT split_part(c,'.',1) AS code FROM fund_scores ORDER BY 1")]
+    for idx, chunk in enumerate(_batches(backup_codes, BATCH), 1):
+        ins = _sql_in(chunk)
+        pg(f"INSERT INTO _fs_backup SELECT * FROM fund_scores "
+           f"WHERE split_part(c,'.',1) IN ({ins})", timeout=300)
     backup_n = pg('SELECT count(*) AS cnt FROM _fs_backup')[0]['cnt']
     print(f'  ✓ 备份 {backup_n} 条', flush=True)
 
@@ -380,26 +424,45 @@ def main():
     # 起因：canonical_fund_code() 改版后场内基金（5/15/16 开头）以裸 6 位码写入 staging，
     # 而历史生产表还留着同基金的 .OF 旧行；精确 c 匹配删不掉，导致同名两行、评分不同，
     # 前端出现「重复基金」。按基础码删除可同时清掉旧格式残留，且不会误伤不进 staging 的代码。
-    print('\n[2] 原子切换 fund_scores ← fund_scores_staging（UPSERT 式：仅替换 staging 管理的代码）', flush=True)
-    switch_sql = (
-        f"DELETE FROM fund_scores WHERE split_part(c,'.',1) IN "
-        f"(SELECT split_part(c,'.',1) FROM fund_scores_staging); "
-        f'INSERT INTO fund_scores ({PROMOTE_COLS}) SELECT {PROMOTE_COLS} FROM fund_scores_staging;'
-    )
-    try:
-        pg(switch_sql, timeout=600)
-    except Exception as e:
-        print(f'  [ERR] 切换失败: {e}', flush=True)
-        print('  尝试从备份恢复生产 fund_scores...', flush=True)
-        pg('TRUNCATE TABLE fund_scores; INSERT INTO fund_scores SELECT * FROM _fs_backup;')
+    print('\n[2] 分批切换 fund_scores ← fund_scores_staging（UPSERT 式：仅替换 staging 管理的代码）', flush=True)
+    # 2026-11-28：不再一次 DELETE/INSERT 2.8 万行。按基础代码分批，每批一个小事务；
+    # 批间释放锁与连接，避免长事务 + 海量 WAL 把 Supabase 免费实例打挂。
+    promo_codes = [r['code'] for r in pg(
+        "SELECT DISTINCT split_part(c,'.',1) AS code FROM fund_scores_staging ORDER BY 1")]
+    if not promo_codes:
+        print('  [ERR] staging 基础代码为空，拒绝切换', flush=True)
         sys.exit(1)
+    print(f'  · staging 覆盖 {len(promo_codes)} 个基础代码，分 '
+          f'{(len(promo_codes) + BATCH - 1) // BATCH} 批写入（每批 {BATCH}）', flush=True)
+
+    applied = 0
+    for idx, chunk in enumerate(_batches(promo_codes, BATCH), 1):
+        ins = _sql_in(chunk)
+        batch_sql = (
+            f"DELETE FROM fund_scores WHERE split_part(c,'.',1) IN ({ins}); "
+            f'INSERT INTO fund_scores ({PROMOTE_COLS}) SELECT {PROMOTE_COLS} '
+            f"FROM fund_scores_staging WHERE split_part(c,'.',1) IN ({ins});"
+        )
+        try:
+            pg(batch_sql, timeout=300)
+        except Exception as e:
+            print(f'  [ERR] 第 {idx} 批切换失败: {e}', flush=True)
+            print('  按批次从 _fs_backup 回滚已写入的生产行...', flush=True)
+            try:
+                restore_from_backup(promo_codes, BATCH)
+            except Exception as e2:
+                print(f'  [FATAL] 回滚失败，需人工从 _fs_backup 恢复: {e2}', flush=True)
+            sys.exit(1)
+        applied += len(chunk)
+        if idx % 5 == 0 or idx == (len(promo_codes) + BATCH - 1) // BATCH:
+            print(f'  ✓ 已写 {applied}/{len(promo_codes)} 个基础代码（第 {idx} 批）', flush=True)
 
     # ── 3. 切换后校验 ────────────────────────────────────────────────────
     new_total = pg('SELECT count(*) AS cnt FROM fund_scores')[0]['cnt']
     # 切换后生产应 = (原生产 − staging 管理代码) + staging ≈ 全量，行数应 ≥ staging 总量
     if new_total < staging_total:
         print(f'  [ERR] 切换后数量异常 (生产 {new_total} < staging {staging_total})，从备份恢复', flush=True)
-        pg('TRUNCATE TABLE fund_scores; INSERT INTO fund_scores SELECT * FROM _fs_backup;')
+        restore_from_backup(promo_codes, BATCH)
         sys.exit(1)
     print(f'  ✓ 切换成功，fund_scores 现有 {new_total} 条', flush=True)
 
@@ -438,7 +501,7 @@ def main():
                 f'生产表全量校验: 生产 {new_total} ≥ 95%×主列表 {U} ({U*0.95:.0f})', 'L3')
     if not ok3:
         print('  [ERR] 生产表未覆盖数据源全量，从备份恢复', flush=True)
-        pg('TRUNCATE TABLE fund_scores; INSERT INTO fund_scores SELECT * FROM _fs_backup;')
+        restore_from_backup(promo_codes, BATCH)
         sys.exit(1)
 
     # 货币型评分确认
@@ -457,8 +520,11 @@ def main():
                    'invest_style', 'style_period']
     _set = ', '.join([f'{c} = COALESCE(f.{c}, b.{c})' for c in _alloc_cols])
     try:
-        pg(f'UPDATE fund_scores f SET {_set} FROM _fs_backup b WHERE f.c = b.c', timeout=300)
-        print('  ✓ 配置类列已用备份保护', flush=True)
+        for idx, chunk in enumerate(_batches(promo_codes, BATCH), 1):
+            ins = _sql_in(chunk)
+            pg(f"UPDATE fund_scores f SET {_set} FROM _fs_backup b "
+               f"WHERE f.c = b.c AND split_part(f.c,'.',1) IN ({ins})", timeout=300)
+        print('  ✓ 配置类列已用备份保护（分批）', flush=True)
     except Exception as e:
         print(f'  [WARN] 配置类列备份回填失败（不影响评分切换）: {e}', flush=True)
 
@@ -466,10 +532,16 @@ def main():
     print('\n[2.3] 重算异常收益标注 ret_anomaly', flush=True)
     try:
         pg("ALTER TABLE fund_scores ADD COLUMN IF NOT EXISTS ret_anomaly boolean NOT NULL DEFAULT false", timeout=120)
-        pg("""UPDATE fund_scores SET ret_anomaly = COALESCE(
-                  (r1m > 100) OR (r1m < -60)
-                  OR (t0 = '债券型' AND (r1m > 15 OR r3m > 25 OR r6m > 35 OR r1y > 50))
-                  OR (r1y > 50 AND r1m IS NOT NULL AND (r1y - r1m) < 10), false)""", timeout=300)
+        # 这里覆盖的是生产表全部代码（含 staging 不管理的场内 ETF/LOF），保持原口径
+        prod_codes = [r['code'] for r in pg(
+            "SELECT DISTINCT split_part(c,'.',1) AS code FROM fund_scores ORDER BY 1")]
+        for idx, chunk in enumerate(_batches(prod_codes, BATCH), 1):
+            ins = _sql_in(chunk)
+            pg(f"""UPDATE fund_scores SET ret_anomaly = COALESCE(
+                      (r1m > 100) OR (r1m < -60)
+                      OR (t0 = '债券型' AND (r1m > 15 OR r3m > 25 OR r6m > 35 OR r1y > 50))
+                      OR (r1y > 50 AND r1m IS NOT NULL AND (r1y - r1m) < 10), false)
+                  WHERE split_part(c,'.',1) IN ({ins})""", timeout=300)
         _anom = pg("SELECT count(*) AS cnt FROM fund_scores WHERE ret_anomaly")[0]['cnt']
         print(f'  ✓ 异常收益标注完成，当前 {_anom} 只被标记', flush=True)
     except Exception as e:

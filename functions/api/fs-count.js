@@ -13,10 +13,34 @@
  * 因此「筛选结果」总数与列表口径 100% 一致，且不受 pageSize 限制。
  *
  * 安全：仅允许 /rest/v1/ 相对路径，禁止绝对 URL / 目录穿越；apikey 由前端透传。
+ *
+ * 2026-11-28 防护：
+ *  - 已知 SEO bot UA（AhrefsBot 等）直接在边缘 403，不回源；
+ *  - 相同筛选条件的结果缓存 5 分钟，避免爬虫遍历分页时反复全表累加。
  */
+
+import { botGuard } from './_bot_guard.js'
 
 const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 const UPSTREAM_TIMEOUT_MS = 14000
+const CACHE_TTL_MS = 5 * 60 * 1000
+const CACHE_MAX = 500
+const COUNT_CACHE = new Map()
+
+function cacheGet(key) {
+  const hit = COUNT_CACHE.get(key)
+  if (!hit) return null
+  if (Date.now() - hit.t > CACHE_TTL_MS) { COUNT_CACHE.delete(key); return null }
+  return hit.v
+}
+
+function cacheSet(key, value) {
+  if (COUNT_CACHE.size >= CACHE_MAX) {
+    const oldest = COUNT_CACHE.keys().next().value
+    if (oldest !== undefined) COUNT_CACHE.delete(oldest)
+  }
+  COUNT_CACHE.set(key, { t: Date.now(), v: value })
+}
 
 function json(o, status = 200) {
   return new Response(JSON.stringify(o), {
@@ -30,6 +54,8 @@ export async function onRequest(context) {
   if (req.method.toUpperCase() === 'OPTIONS') {
     return new Response(null, { status: 204 })
   }
+  const blocked = botGuard(req)
+  if (blocked) return blocked
   const url = new URL(req.url)
   const targetPath = url.searchParams.get('path')
   if (!targetPath) return json({ count: null, error: 'missing path' }, 400)
@@ -52,6 +78,9 @@ export async function onRequest(context) {
     usp.delete('limit')
     inner = p + (usp.toString() ? '?' + usp.toString() : '')
   } catch (_) { /* 无 query 时忽略 */ }
+
+  const cached = cacheGet(inner)
+  if (cached !== null) return json({ count: cached, cached: true })
 
   const headers = new Headers()
   for (const k of ['apikey', 'authorization']) {
@@ -90,6 +119,7 @@ export async function onRequest(context) {
       }
       offset += BATCH * PAGE
     }
+    cacheSet(inner, total)
     return json({ count: total })
   } catch (e) {
     return json({ count: null, error: String((e && e.message) || e) }, 502)

@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.62</td>
+              <td>2026-11-28</td>
+              <td><code>bfd6bc66</code></td>
+              <td><span class="version-history">历史版本（全部 21 个写库 CI 纳入调度中心严格 needs 串行 + 4 个日期门控）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.61</td>
               <td>2026-11-28</td>
               <td><code>58eb9330</code></td>
@@ -1627,8 +1633,10 @@
       <h2 class="api-group-title">调度中心 · 数据抓取 CI 清单</h2>
       <p class="section-desc">
         网站所需的全部后台数据抓取，统一由 <strong>调度中心</strong>（<code>.github/workflows/data-center-orchestrator.yml</code>，北京时间每日 00:10 触发）编排。
-        调度中心把 <strong>21 个写库任务</strong>串成一条 <strong>needs 串行链</strong>，并插入 4 个不写库的日期门控：<strong>上一个任务完成后才开始下一个</strong>，不再依赖 cron 时间点错开，同一时刻只有一个任务写 Supabase，避免并发打满免费实例导致整库不可用。
-        <strong>抓数铁律：所有覆盖型写入均为「抓取 → staging 中间表 → 校验 → 单事务切换生产」，校验不过绝不写生产。</strong>
+        调度中心把 <strong>21 个写库任务</strong>串成一条 <strong>needs 串行链</strong>，并插入 4 个不写库的日期门控：<strong>上一个任务完整走完「抓取 → staging → 校验 → 写生产 → 后置刷新」后才开始下一个</strong>，不再依赖 cron 时间点错开，同一时刻只有一个任务写 Supabase，避免并发打满免费实例导致整库不可用。
+        <strong>抓数铁律：所有覆盖型写入均为「抓取 → staging 中间表 → 校验 → 分批写生产」，校验不过绝不写生产。</strong>
+        <strong>生产写入串行铁律：前一个任务的生产表写入（含物化视图/标签等后置刷新）未结束，后一个任务不得开始写生产。</strong>
+        <strong>减负：fund_scores 写生产按每批 2000 个基础代码分批提交（可用 <code>--batch-size</code> 调整），不再一次性 2.8 万行长事务。</strong>
       </p>
 
       <h3 class="api-name">一、调度中心串行链（每日 00:10 起，严格排队执行）</h3>
@@ -1669,6 +1677,7 @@
         </tbody>
       </table>
       <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用（仅保留手动触发供排障），不再有时间重叠的可能。</p>
+      <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
 
       <h2 class="api-group-title">★ 优选数据接口速查（优先选用，状态实时更新）</h2>
       <p class="section-desc">下列接口为各功能域的<strong>成熟 / 首选</strong>数据源，新功能开发应优先复用，避免重复踩坑。状态含义：✅ 成熟稳定 · ⚠️ 受限需代理 · ❌ 当前不稳定。</p>

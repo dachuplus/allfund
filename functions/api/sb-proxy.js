@@ -11,7 +11,13 @@
  *
  * 安全性：不存储任何密钥。前端请求自带的 apikey / Authorization 头原样透传。
  *        仅允许转发到本项目固定 Supabase 域名的相对路径，禁止绝对 URL / 跨域转发。
+ *
+ * 2026-11-28 防护：已知 SEO bot（AhrefsBot 等）在边缘直接 403，不回源。
+ * 根因：AhrefsBot 遍历 /tools/fund 分页，经本代理发起大量 limit=1000&offset=...
+ * 的 fund_scores_main 大查询，把免费实例打挂。
  */
+
+import { botGuard } from './_bot_guard.js'
 
 const SUPABASE_BASE = 'https://tqhtegazxykkqfcpejky.supabase.co'
 // EdgeOne Pages 函数平台上限约 15-17s（实测）。我们必须在被平台强杀前返回自己的 502 JSON，
@@ -137,6 +143,10 @@ export async function onRequest(context) {
   if (req.method.toUpperCase() === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) })
   }
+
+  // 已知 SEO bot 直接拦截，不给回源机会（AhrefsBot 打挂 DB 的防护）
+  const blocked = botGuard(req)
+  if (blocked) return blocked
 
   if (!targetPath) {
     return jsonError('missing path query param', 400)

@@ -326,7 +326,7 @@ jobs:
           echo "        的 rebuild-combined 步骤接管；本步仅切换 fund_scores，"
           echo "        配置列靠 COALESCE 备份回填保护。"
           echo "============================================"
-          python scripts/promote_staging.py --skip-combined 2>&1 | tee "$GITHUB_WORKSPACE/finalize.log"
+          python scripts/promote_staging.py --skip-combined --batch-size 2000 2>&1 | tee "$GITHUB_WORKSPACE/finalize.log"
           echo "切换完成: $(date '+%Y-%m-%d %H:%M:%S')"
 
       - name: 记录更新简报
