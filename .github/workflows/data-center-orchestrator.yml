@@ -34,10 +34,6 @@ on:
     - cron: '10 13 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  actions: write
-
 jobs:
   # ① 核心基金评分：产出 fund_scores + 物化视图，是下游多数任务的基线
   fund-scores:
