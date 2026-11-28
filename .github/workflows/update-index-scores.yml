@@ -25,8 +25,21 @@ name: 指数评分每日更新
 #   所以抓取失败**不会污染线上**，最坏情况是数据停在昨天的版本。
 
 on:
-  schedule:
-    - cron: '40 16 * * *'   # 北京时间每日 00:40
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '40 16 * * *'   # 原北京时间每日 00:40
+  workflow_call:
+    inputs:
+      limit:
+        description: '调试用：本次最多抓多少只（0=全部 universe）'
+        required: false
+        type: string
+        default: '0'
+      interval:
+        description: '每只间隔秒（EastMoney 轻量，0.35 即可；留余量防偶发限流'
+        required: false
+        type: string
+        default: '0.35'
   workflow_dispatch:
     inputs:
       limit:

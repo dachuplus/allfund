@@ -4,8 +4,10 @@ on:
   # 定时触发：北京时间每日 01:10（UTC 17:10）—— 减负 B2 错峰（2026-11-27）
   # 原 23:40 处于 23:20-23:50 密集簇，与股票评分/规模增长/物化视图刷新并发。
   # 需晚于 update-scores（21:30）确保近1月收益已刷新，01:10 满足且避开高峰。
-  schedule:
-    - cron: '10 17 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '10 17 * * *'   # 原北京时间每日 01:10
+  workflow_call:
   # 手动触发
   workflow_dispatch:
   # 远程触发（无需登录 GitHub 点击）：

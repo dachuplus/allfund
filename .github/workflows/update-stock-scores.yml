@@ -9,8 +9,10 @@ name: 股票全市场评分每日更新
 # 任一不通过即拒绝切换，生产表保持不变 —— 抓取失败不会污染线上。
 
 on:
-  schedule:
-    - cron: '20 15 * * *'   # 北京时间每日 23:20
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '20 15 * * *'   # 原北京时间每日 23:20
+  workflow_call:
   workflow_dispatch:
 
 env:

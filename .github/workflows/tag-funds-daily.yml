@@ -14,8 +14,10 @@ name: 热门标签关联基金每日同步
 # 减少锁等待的调度偏好，可随时调整。
 
 on:
-  schedule:
-    - cron: '0 21 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '0 21 * * *'   # 原北京时间 05:00
+  workflow_call:
   workflow_dispatch:
 
 jobs:

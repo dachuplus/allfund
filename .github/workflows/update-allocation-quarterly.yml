@@ -32,8 +32,10 @@ on:
   # 并发直写生产库，实测打满免费实例导致整库 PGRST002 / 页面无数据。
   # 现移到凌晨空闲段，并给两条分片链加 max-parallel:2 + 串行依赖，峰值降到 2。
   # 数据口径、抓取范围、写入逻辑均不变，仅改调度与并发。
-  schedule:
-    - cron: '0 19 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '0 19 * * *'   # 原北京时间 03:00
+  workflow_call:
   # 手动触发
   workflow_dispatch:
 

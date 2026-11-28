@@ -1,13 +1,16 @@
 name: 基金规模增长夜间更新
 
 on:
-  schedule:
-    # 北京时间每天 02:40（UTC 18:40）—— 减负 B2 错峰（2026-11-27）
-    # 原 23:30 与 update-scores（21:30 长流水线，尾部可能拖到 23:30+）并发刷新
-    # 同一物化视图 fund_scores_main，互相阻塞并打满免费实例。移到凌晨空闲段，
-    # 远离 23:20 股票评分 / 23:40-23:50 收益记录簇 / 00:10 风格 / 00:40 指数。
-    # 本任务只需晚于 21:30 评分（提供 fund_scores），02:40 完全满足，数据口径不变。
-    - cron: '40 18 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # 原 02:40 为减负 B2 错峰时段，本任务需晚于核心评分（提供 fund_scores），数据口径不变。
+  # schedule:
+  #   - cron: '40 18 * * *'
+  workflow_call:
+    inputs:
+      skip_fetch:
+        description: '跳过抓取，仅清洗/校验并 promote 已有 staging'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       skip_fetch:

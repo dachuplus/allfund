@@ -7,10 +7,13 @@ sync_tag_performance.py - 拉取天天基金主题板块各周期涨跌幅，写
   字段: D(日涨幅), W(近1周), M(近1月), Q(近3月), Y(近1年), SY(今年来)
        RANKW/RANKM/RANKQ/RANKY/RANKSY(各周期排名), SEC_NAME(标签名)
 
-目标表: fund_tag_perf (TRUNCATE 全量重写，幂等)
+目标表: fund_tag_perf（抓数铁律 2026-11-28 三段式，不得直写生产）
+  Step 3 抓取结果只写 fund_tag_perf_staging 中间表；
+  Step 4 校验中间表行数/非空率/失败批次，任一不过即 sys.exit(2) 保留生产旧数据；
+  Step 5 校验通过后单事务 TRUNCATE 生产 + INSERT...SELECT staging 原子切换，无空窗。
   列: tag_index_code(PK), tag_name, d, w, m, q, y, sy,
-      rank_d, rank_w, rank_m, rank_q, rank_y, rank_sy,
-      updated_at
+      rank_w, rank_m, rank_q, rank_y, rank_sy, total_count,
+      net_inflow, net_inflow_pct, net_inflow_5d, net_inflow_10d, updated_at
 
 用法:
   SUPABASE_PAT=<你的Supabase PAT> \
@@ -449,8 +452,8 @@ def main():
             row['net_inflow_5d'] = None
             row['net_inflow_10d'] = None
 
-    # Step 3: TRUNCATE + 批量写入 fund_tag_perf 表
-    print('\n[STEP 3] 写入 fund_tag_perf 表 ...')
+    # Step 3: 抓取结果先写 staging 中间表（抓数铁律 2026-11-28，绝不直写生产）
+    print('\n[STEP 3] 写入 fund_tag_perf_staging 中间表 ...')
 
     # 确保表存在
     mgmt_query("""
@@ -476,15 +479,19 @@ def main():
             updated_at TIMESTAMPTZ DEFAULT now()
         )
     """)
+    # staging 中间表（结构与生产一致，抓取先落这里；已用 LIKE 建过则跳过）
+    mgmt_query("CREATE TABLE IF NOT EXISTS public.fund_tag_perf_staging "
+               "(LIKE public.fund_tag_perf INCLUDING DEFAULTS)")
 
-    # 兼容已存在的旧表：补齐资金流字段
-    mgmt_query("ALTER TABLE public.fund_tag_perf ADD COLUMN IF NOT EXISTS net_inflow REAL")
-    mgmt_query("ALTER TABLE public.fund_tag_perf ADD COLUMN IF NOT EXISTS net_inflow_pct REAL")
-    mgmt_query("ALTER TABLE public.fund_tag_perf ADD COLUMN IF NOT EXISTS net_inflow_5d REAL")
-    mgmt_query("ALTER TABLE public.fund_tag_perf ADD COLUMN IF NOT EXISTS net_inflow_10d REAL")
+    # 兼容已存在的旧表：补齐资金流字段（生产 + staging 都补，结构对齐）
+    for _t in ('fund_tag_perf', 'fund_tag_perf_staging'):
+        mgmt_query(f"ALTER TABLE public.{_t} ADD COLUMN IF NOT EXISTS net_inflow REAL")
+        mgmt_query(f"ALTER TABLE public.{_t} ADD COLUMN IF NOT EXISTS net_inflow_pct REAL")
+        mgmt_query(f"ALTER TABLE public.{_t} ADD COLUMN IF NOT EXISTS net_inflow_5d REAL")
+        mgmt_query(f"ALTER TABLE public.{_t} ADD COLUMN IF NOT EXISTS net_inflow_10d REAL")
 
-    # 清空旧数据
-    mgmt_query('TRUNCATE TABLE public.fund_tag_perf')
+    # 清空 staging 旧数据（生产表此刻不动）
+    mgmt_query('TRUNCATE TABLE public.fund_tag_perf_staging')
 
     # 批量插入
     def esc(v):
@@ -511,12 +518,12 @@ def main():
             f"{esc(row.get('net_inflow_5d'))}, {esc(row.get('net_inflow_10d'))}, now())"
         )
 
-    # 分批 UPSERT（每批20条，ON CONFLICT 幂等，避免重复键报错；小批量降低 Management API 限流概率）
+    # 分批 UPSERT 写入 staging（每批20条，ON CONFLICT 幂等，避免重复键报错；小批量降低 Management API 限流概率）
     BATCH = 20
     for i in range(0, len(values_parts), BATCH):
         batch = values_parts[i:i + BATCH]
         sql = (
-            f"INSERT INTO public.fund_tag_perf "
+            f"INSERT INTO public.fund_tag_perf_staging "
             f"(tag_index_code, tag_name, d, w, m, q, y, sy, rank_w, rank_m, rank_q, rank_y, rank_sy, total_count, net_inflow, net_inflow_pct, net_inflow_5d, net_inflow_10d, updated_at) "
             f"VALUES {','.join(batch)} "
             f"ON CONFLICT (tag_index_code) DO UPDATE SET "
@@ -540,9 +547,38 @@ def main():
             failed_batches.append((i // BATCH + 1, sql))
         time.sleep(2)  # 降低 Management API 限流风险
 
-    # 验证
-    check = mgmt_query('SELECT count(*) as cnt FROM public.fund_tag_perf')
-    cnt = check['result']['rows'][0]['cnt']
+    # ── Step 4: 校验 staging 中间表（抓数铁律：校验不过绝不碰生产表）──
+    print('\n[STEP 4] 校验 staging 中间表 ...')
+    check = mgmt_query('SELECT count(*) as cnt FROM public.fund_tag_perf_staging')
+    stage_cnt = check['result']['rows'][0]['cnt']
+    cover = mgmt_query(
+        'SELECT count(*)::int AS c FROM public.fund_tag_perf_staging WHERE d IS NOT NULL'
+    )['result']['rows'][0]['c']
+    print(f'  校验统计: staging 行数={stage_cnt}, d非空={cover}, 抓取成功={ok}, 失败批次={len(failed_batches)}')
+
+    problems = []
+    if failed_batches:
+        problems.append(f'{len(failed_batches)} 个批次写入 staging 失败')
+    if stage_cnt < 30:
+        problems.append(f'staging 行数 {stage_cnt} < 30')
+    if stage_cnt < ok * 0.9:
+        problems.append(f'staging 行数 {stage_cnt} < 抓取成功数 {ok} 的 90%')
+    if cover < stage_cnt * 0.9:
+        problems.append(f'd 非空 {cover} < staging 行数 90%')
+    if problems:
+        print('  [ABORT] 中间表校验失败，保留生产表旧数据不切换: ' + '; '.join(problems))
+        sys.exit(2)
+    print('  ✓ 中间表校验全部通过')
+
+    # ── Step 5: 单事务原子切换生产（TRUNCATE + INSERT ... SELECT 同一事务，无空窗）──
+    print('\n[STEP 5] 单事务原子切换生产表 fund_tag_perf ...')
+    cols = ('tag_index_code, tag_name, d, w, m, q, y, sy, rank_w, rank_m, rank_q, rank_y, '
+            'rank_sy, total_count, net_inflow, net_inflow_pct, net_inflow_5d, net_inflow_10d, updated_at')
+    mgmt_query(
+        f'BEGIN; TRUNCATE TABLE public.fund_tag_perf; '
+        f'INSERT INTO public.fund_tag_perf ({cols}) SELECT {cols} FROM public.fund_tag_perf_staging; COMMIT;'
+    )
+    cnt = mgmt_query('SELECT count(*) as cnt FROM public.fund_tag_perf')['result']['rows'][0]['cnt']
 
     # 开放 RLS anon 读权限
     try:
@@ -550,10 +586,7 @@ def main():
     except Exception:
         pass  # 可能已授权
 
-    if failed_batches:
-        print(f'  [WARN] 有 {len(failed_batches)} 个批次写入失败，建议检查上方 DEBUG 输出')
-
-    print(f'[DONE] fund_tag_perf 写入完成: {cnt} 条记录')
+    print(f'[DONE] fund_tag_perf 原子切换完成: {cnt} 条记录')
     print(f'ROWS_AFFECTED={cnt}')
     print(f'       数据来源: 东财 ZTJJ::GetBKDetailInfoNew + 东财板块资金流(push2 clist)')
     print(f'       含字段: d(日涨幅), w(近1周), m(近1月), q(近3月), y(近1年), sy(今年来) + 各周期排名')

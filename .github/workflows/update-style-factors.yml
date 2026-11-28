@@ -8,9 +8,10 @@ name: 每日更新风格因子（股票/债券/大宗商品）
 # 注意：本流水线只更新数据库，前端从 Supabase 实时读取，无需重新部署。
 
 on:
-  # 定时触发：北京时间每天 00:10（UTC 16:10）
-  schedule:
-    - cron: '10 16 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '10 16 * * *'   # 原北京时间每天 00:10
+  workflow_call:
   # 手动触发
   workflow_dispatch:
 
@@ -44,5 +45,8 @@ jobs:
           fi
           echo "SUPABASE_PAT 已配置: ${#SUPABASE_PAT} 字符"
 
-      - name: 重算并写入 style_factors（股票/债券/大宗商品）
-        run: python scripts/build_style_factors.py
+      - name: 步骤1 — 抓取计算并写入中间表 style_factors_staging（不碰生产）
+        run: python scripts/build_style_factors.py --to-staging
+
+      - name: 步骤2 — 校验中间表并单事务原子切换生产 style_factors
+        run: python scripts/build_style_factors.py --promote

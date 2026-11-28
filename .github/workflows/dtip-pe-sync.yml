@@ -1,9 +1,10 @@
 name: 定投助手PE历史夜间同步
 
 on:
-  schedule:
-    # 北京 02:00 = UTC 18:00（夜间，避开交易时段，每天全量补一次增量）
-    - cron: '0 18 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # schedule:
+  #   - cron: '0 18 * * *'   # 原北京 02:00
+  workflow_call:
   workflow_dispatch:
   repository_dispatch:
     types: [dtip-pe-sync]

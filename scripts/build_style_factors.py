@@ -25,10 +25,15 @@ build_style_factors.py — 计算指标信号·风格因子全部三类信号 �
 信号/颜色：V<=30 低估·关注 green；30<V<=70 适中 blue；V>70 高估·谨慎 red。
 （债券三类信号复用 signal 字段表达方向：cheap=利好绿 / neutral=中性蓝 / expensive=谨慎红）
 
-管道：建表(IF NOT EXISTS) → TRUNCATE style_factors → 插入全部三类 → 完成。
+管道（抓数铁律 2026-11-28，三段式）：
+  第一步 --to-staging：抓取计算三类 → 只写 style_factors_staging 中间表；
+  第二步 --promote   ：校验中间表行数/分类覆盖 → 单事务 TRUNCATE 生产并原子切换。
+  抓取失败或校验不过绝不碰生产表，保护免费实例与线上数据。
+  （历史直写模式：不带参数仍为 TRUNCATE 生产后全量写，仅供一次性回填，禁止夜间 CI 使用。）
 
 用法：
-  SUPABASE_PAT=... python3 scripts/build_style_factors.py
+  SUPABASE_PAT=... python3 scripts/build_style_factors.py --to-staging
+  SUPABASE_PAT=... python3 scripts/build_style_factors.py --promote
 （优先 SUPABASE_PAT，回退 SUPABASE_MGMT_TOKEN）
 """
 import os
@@ -410,30 +415,100 @@ COLS = ('category', 'factor_key', 'name', 'sub_style', 'percentile', 'value_scor
         'value_label', 'cost_score', 'cost_label', 'signal', 'signal_label', 'reason', 'color')
 
 
-def main():
-    print('== 建表 style_factors ==')
-    for stmt in [s.strip() for s in DDL.strip().split(';') if s.strip()]:
-        pg(stmt)
-    print('  表就绪')
+STAGING = 'style_factors_staging'
+PROD = 'style_factors'
 
+
+def _insert_rows(table, all_rows):
+    """把计算结果批量写入指定表（先 TRUNCATE 再 INSERT，调用方决定目标是 staging 还是生产）。"""
+    tuples = []
+    for r in all_rows:
+        vals = ', '.join(sql_val(r.get(c)) for c in COLS)
+        tuples.append(f'({vals})')
+    sql = (f'TRUNCATE TABLE {table}; '
+           f"INSERT INTO {table} ({', '.join(COLS)}) VALUES\n" + ',\n'.join(tuples) + ';')
+    pg(sql)
+
+
+def compute_all():
+    """抓取+计算全部三类信号，返回行列表（不写库）。"""
     print('\n== 计算 股票风格（中证指数）==')
     stock = build_stock()
     print('\n== 计算 债券风格（久期/信用/杠杆）==')
     bond = build_bond()
     print('\n== 计算 大宗商品（十几种期货）==')
     commodity = build_commodity()
+    return stock + bond + commodity
 
-    all_rows = stock + bond + commodity
-    print(f'\n== 共 {len(all_rows)} 条信号，写入 style_factors ==')
-    pg('TRUNCATE TABLE style_factors;')
-    tuples = []
-    for r in all_rows:
-        vals = ', '.join(sql_val(r.get(c)) for c in COLS)
-        tuples.append(f'({vals})')
-    sql = f"INSERT INTO style_factors ({', '.join(COLS)}) VALUES\n" + ',\n'.join(tuples) + ';'
+
+def validate_staging():
+    """校验中间表：总行数、三类覆盖、关键字段非空。任一不过抛异常，绝不写生产。"""
+    rows = pg(f'SELECT category, count(*)::int AS c FROM {STAGING} GROUP BY category')
+    by_cat = {r['category']: r['c'] for r in rows}
+    total = sum(by_cat.values())
+    print(f'  中间表校验：总 {total} 条，分类分布 {by_cat}')
+    problems = []
+    if total < 10:
+        problems.append(f'总行数 {total} < 10')
+    for cat, min_n in (('stock', 5), ('bond', 3), ('commodity', 10)):
+        if by_cat.get(cat, 0) < min_n:
+            problems.append(f'分类 {cat} 仅 {by_cat.get(cat, 0)} 条 < {min_n}')
+    nulls = pg(f'SELECT count(*)::int AS c FROM {STAGING} WHERE factor_key IS NULL OR name IS NULL')
+    if nulls and nulls[0]['c'] > 0:
+        problems.append(f'factor_key/name 为空 {nulls[0]["c"]} 条')
+    if problems:
+        raise RuntimeError('中间表校验失败：' + '; '.join(problems))
+    print('  ✓ 中间表校验全部通过')
+    return total
+
+
+def promote():
+    """校验通过后在单事务内原子切换生产：TRUNCATE 生产 + 从 staging 全量写入。"""
+    validate_staging()
+    # 单事务：TRUNCATE + INSERT ... SELECT 必须在同一 transaction，避免中间态空窗。
+    # Management API 的多语句在一个请求里按单事务执行（实测 SELECT 1;SELECT 2 顺序返回）。
+    cols = ', '.join(COLS)
+    sql = (f'BEGIN; TRUNCATE TABLE {PROD}; '
+           f'INSERT INTO {PROD} ({cols}) SELECT {cols} FROM {STAGING}; COMMIT;')
     pg(sql)
-    cnt = pg('SELECT COUNT(*) AS c FROM style_factors')
-    print(f'  写入完成，style_factors 当前 {cnt[0]["c"]} 条')
+    cnt = pg(f'SELECT COUNT(*)::int AS c FROM {PROD}')
+    print(f'  ✓ 已原子切换生产表 {PROD}，当前 {cnt[0]["c"]} 条')
+
+
+def main():
+    import argparse
+    ap = argparse.ArgumentParser(description='风格因子三段式 ETL（staging→校验→promote）')
+    ap.add_argument('--to-staging', action='store_true', help='抓取计算并只写中间表')
+    ap.add_argument('--promote', action='store_true', help='校验中间表并原子切换生产')
+    args = ap.parse_args()
+    if args.to_staging and args.promote:
+        raise SystemExit('--to-staging 与 --promote 不能同时使用')
+
+    print('== 建表 style_factors（含 staging）==')
+    for stmt in [s.strip() for s in DDL.strip().split(';') if s.strip()]:
+        pg(stmt)
+    pg(f'CREATE TABLE IF NOT EXISTS {STAGING} (LIKE {PROD} INCLUDING DEFAULTS)')
+    print('  表就绪')
+
+    if args.promote:
+        promote()
+        print('== 完成（promote）==')
+        return
+    if args.to_staging:
+        all_rows = compute_all()
+        print(f'\n== 共 {len(all_rows)} 条信号，写入中间表 {STAGING} ==')
+        _insert_rows(STAGING, all_rows)
+        cnt = pg(f'SELECT COUNT(*)::int AS c FROM {STAGING}')
+        print(f'  中间表写入完成：{cnt[0]["c"]} 条（未写生产）')
+        print('== 完成（to-staging）==')
+        return
+
+    # 兼容旧行为（一次性回填用，禁止夜间 CI）
+    all_rows = compute_all()
+    print(f'\n== [直接模式] 共 {len(all_rows)} 条信号，写入生产 {PROD} ==')
+    _insert_rows(PROD, all_rows)
+    cnt = pg(f'SELECT COUNT(*)::int AS c FROM {PROD}')
+    print(f'  写入完成，{PROD} 当前 {cnt[0]["c"]} 条')
     print('== 完成 ==')
 
 

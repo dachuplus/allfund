@@ -3,9 +3,12 @@ name: 同步标签涨跌幅与资金流（fund_tag_perf）
 on:
   # 手动触发
   workflow_dispatch:
-  # 每日北京时间 21:45（UTC 13:45），在主线更新之后补充板块涨跌幅+资金流
-  schedule:
-    - cron: '45 13 * * *'
+  # 统一调度（2026-11-28）：独立 schedule 停用，改由 data-center-orchestrator.yml 串行触发。
+  # workflow_call（供编排器复用；抓取→staging→校验→原子切换三段式）
+  workflow_call:
+  # 原：每日北京时间 21:45（UTC 13:45）
+  # schedule:
+  #   - cron: '45 13 * * *'
 
 env:
   PYTHONUNBUFFERED: '1'
