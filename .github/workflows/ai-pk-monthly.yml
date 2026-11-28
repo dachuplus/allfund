@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       from_orchestrator:
-        description: '仅由调度中心调用时置 true；手动/远程触发一律跳过写生产'
+        description: '仅由调度中心调用时置 true；手动/远程触发自动转交调度中心排队，本 workflow 不直接写生产'
         type: boolean
         default: false
       period:
@@ -36,6 +36,28 @@ permissions:
   contents: read
 
 jobs:
+  # 手动/远程触发不直接写生产：自动转交调度中心，按 needs 优先次序排队执行。
+  # 调度中心回调本 workflow 时 from_orchestrator=true，本 job 自动跳过，避免循环。
+  delegate-to-orchestrator:
+    if: ${{ !inputs.from_orchestrator }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: 转交调度中心排队
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TASK: ai-pk-monthly
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/data-center-orchestrator.yml/dispatches" \
+            -d "{\"ref\":\"main\",\"inputs\":{\"only_task\":\"${TASK}\"}}")
+          if [ "$status" != "204" ]; then echo "转交调度中心失败：HTTP $status"; exit 1; fi
+          echo "已转交调度中心：only_task=${TASK}，将按 needs 优先次序排队执行（本 workflow 不直接写生产）"
+
   rebalance:
     if: ${{ inputs.from_orchestrator }}
     runs-on: ubuntu-latest

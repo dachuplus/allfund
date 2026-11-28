@@ -240,6 +240,12 @@
               <td><span class="version-current">当前线上</span></td>
             </tr>
             <tr>
+              <td>v4.0.65</td>
+              <td>2026-11-28</td>
+              <td><code>61af9f51</code></td>
+              <td><span class="version-history">历史版本（分类兜底游标分批 + 手动触发门控调度中心 + 标签重复刷新消除）</span></td>
+            </tr>
+            <tr>
               <td>v4.0.64</td>
               <td>2026-11-28</td>
               <td><code>9b08845e</code></td>
@@ -1688,7 +1694,7 @@
           <tr><td>主动 ETF PCF</td><td>交易日 08:30</td><td>上交所 query.sse.com.cn / 深交所报表 API</td><td><code>fetch_etf_pcf.py</code></td><td>写 pcf-data 独立分支，不写 Supabase</td></tr>
         </tbody>
       </table>
-      <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用。子 workflow 的手动 / 远程触发一律不写生产（以 <code>from_orchestrator</code> 门控）；手动执行唯一入口是调度中心的 <code>workflow_dispatch</code>（<code>only_task</code> 可选单个任务或整链），仍然按 needs 顺序排队，不再有时间重叠的可能。</p>
+      <p class="api-note">其余所有数据抓取 CI 均已纳入调度中心串行链，各自独立 cron 已停用。任何写生产表的动作只能由调度中心执行：子 workflow 的手动 / 远程触发不会直接写库，而是由 <code>delegate-to-orchestrator</code> 自动转交调度中心（<code>only_task</code>=对应任务），按 needs 优先次序排队执行；调度中心自身还设有 <code>dispatch-queue-gate</code> 排队门，等待更早的调度中心 run 结束后才放行写库链，多个手动请求同时到达也不会并发写库。<code>from_orchestrator</code> 仅用于区分「调度中心回调」与「手动转交」，避免循环转交。</p>
       <p class="api-note"><strong>爬虫防护（2026-11-28）：</strong>上次挂库直接根因是 AhrefsBot 遍历分页。<code>/api/fs-count</code> 与 <code>/api/sb-proxy</code> 现在对 AhrefsBot / SemrushBot / MJ12bot / DotBot / Bytespider 等已知低价值 SEO 爬虫在边缘直接返回 403，不给回源机会；<code>/api/fs-count</code> 对相同筛选条件的总数缓存 5 分钟；<code>/api/sb-proxy</code> 对伪装 UA 的「大表深分页（offset≥4000）」按 IP 限流 20 次/分钟；<code>robots.txt</code> 同步声明禁止抓取。Googlebot / Bingbot / Baiduspider 正常放行。</p>
       <p class="api-note"><strong>物化视图减负：</strong>已移除 <code>promote_staging.py</code> 冗余中间刷新与 <code>tag_sync_daily.py</code> 的兜底重复刷新（落地函数已在同事务内刷新）；原每晚多次全量重建持强锁阻塞前端查询，现只保留必要刷新，数据口径不变。</p>
       <p class="api-note"><strong>分类兜底减负：</strong>四个静态源全不可用时，不再调用 <code>get_fund_categories()</code> 做 2.8 万行全表 GROUP BY（实测 57014），改为按 <code>c</code> 游标每批 2000 行读取并在前端聚合。</p>
