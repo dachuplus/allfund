@@ -43,9 +43,17 @@ function cacheSet(key, value) {
 }
 
 function json(o, status = 200) {
+  // 2026-11-28：成功响应交给 CDN 缓存 5 分钟（仅返回计数、无隐私数据）。
+  // 原因：EdgeOne 每个请求是独立函数实例，应用层 Map 计数/缓存跨实例不共享
+  // （实测同 IP 连打 45 次全部落到函数，内存 IP 限流从未触发 429）。
+  // CDN 缓存是唯一能跨实例吸收重复请求的防线，让爬虫遍历相同筛选条件时
+  // 直接在边缘命中、不到函数更不到 Supabase。
+  const cacheControl = status === 200 && !o.error
+    ? 'public, s-maxage=300, stale-while-revalidate=60'
+    : 'no-store'
   return new Response(JSON.stringify(o), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': cacheControl },
   })
 }
 
